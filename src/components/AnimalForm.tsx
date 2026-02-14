@@ -33,14 +33,13 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
         </div>
         <div>
           <label className="block mb-1 text-sm font-medium text-gray-700">
-            Numéro de boucle <span className="text-red-500">*</span>
+            Numéro de boucle
           </label>
           <input
             type="text"
             name="numeroBoucle"
             defaultValue={animal?.numeroBoucle || ""}
             placeholder="FR123456789"
-            required
             readOnly={!!animal}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 read-only:bg-gray-100 read-only:cursor-not-allowed"
           />
