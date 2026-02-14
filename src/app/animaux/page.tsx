@@ -7,7 +7,7 @@ import Modal, { ConfirmModal } from "@/components/Modal";
 import AnimalCard from "@/components/AnimalCard";
 import AnimalForm from "@/components/AnimalForm";
 import KpiCard from "@/components/KpiCard";
-import { getAnimalIcon } from "@/lib/utils";
+import { getAnimalIcon, formatAge, formatNumber } from "@/lib/utils";
 import {
   createAnimal,
   updateAnimal,
@@ -30,6 +30,8 @@ export default function AnimauxPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editAnimal, setEditAnimal] = useState<Animal | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Animal | null>(null);
+  const [detailAnimal, setDetailAnimal] = useState<Animal | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const animaux = state.animaux;
   const stats = useMemo(() => getAnimalStats(animaux), [animaux]);
@@ -42,7 +44,7 @@ export default function AnimauxPage() {
   }, [animaux, currentFilter, searchQuery]);
 
   const handleSave = async (isEdit: boolean) => {
-    if (!formRef.current) return;
+    if (!formRef.current || saving) return;
     const formData = new FormData(formRef.current);
     const data = Object.fromEntries(formData.entries()) as unknown as AnimalFormData;
 
@@ -52,16 +54,23 @@ export default function AnimauxPage() {
       return;
     }
 
-    const result = isEdit && editAnimal
-      ? await updateAnimal(editAnimal.id, data)
-      : await createAnimal(data);
+    setSaving(true);
+    try {
+      const result = isEdit && editAnimal
+        ? await updateAnimal(editAnimal.id, data)
+        : await createAnimal(data);
 
-    if (result.success) {
-      showToast({ type: "success", title: "Succès", message: isEdit ? "Animal modifié avec succès" : "Animal ajouté avec succès" });
-      setShowAddModal(false);
-      setEditAnimal(null);
-    } else {
-      showToast({ type: "error", title: "Erreur", message: result.error || "Une erreur est survenue" });
+      if (result.success) {
+        showToast({ type: "success", title: "Succès", message: isEdit ? "Animal modifié avec succès" : "Animal ajouté avec succès" });
+        setShowAddModal(false);
+        setEditAnimal(null);
+      } else {
+        showToast({ type: "error", title: "Erreur", message: result.error || "Une erreur est survenue" });
+      }
+    } catch {
+      showToast({ type: "error", title: "Erreur", message: "Impossible de contacter la base de données. Vérifiez votre connexion." });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -152,7 +161,7 @@ export default function AnimauxPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredAnimaux.map((animal) => (
-            <AnimalCard key={animal.id} animal={animal} onEdit={handleEdit} onDelete={handleDelete} />
+            <AnimalCard key={animal.id} animal={animal} onEdit={handleEdit} onDelete={handleDelete} onClick={setDetailAnimal} />
           ))}
         </div>
       )}
@@ -174,9 +183,10 @@ export default function AnimauxPage() {
           </button>
           <button
             onClick={() => handleSave(false)}
-            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer"
+            disabled={saving}
+            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Ajouter
+            {saving ? "Enregistrement..." : "Ajouter"}
           </button>
         </div>
       </Modal>
@@ -198,11 +208,120 @@ export default function AnimauxPage() {
           </button>
           <button
             onClick={() => handleSave(true)}
-            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer"
+            disabled={saving}
+            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Enregistrer
+            {saving ? "Enregistrement..." : "Enregistrer"}
           </button>
         </div>
+      </Modal>
+
+      {/* Modal détail */}
+      <Modal
+        isOpen={!!detailAnimal}
+        onClose={() => setDetailAnimal(null)}
+        title={`${detailAnimal ? getAnimalIcon(detailAnimal.type) : ""} ${detailAnimal?.nom || detailAnimal?.numeroBoucle || ""}`}
+        size="large"
+      >
+        {detailAnimal && (
+          <div className="grid gap-6">
+            {/* Infos principales */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+              <div>
+                <div className="text-gray-500 mb-0.5">Numéro de boucle</div>
+                <div className="font-medium">{detailAnimal.numeroBoucle}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 mb-0.5">Type</div>
+                <div className="font-medium">{getAnimalIcon(detailAnimal.type)} {detailAnimal.type}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 mb-0.5">Sexe</div>
+                <div className="font-medium">{detailAnimal.sexe === "M" ? "♂ Mâle" : "♀ Femelle"}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 mb-0.5">Race</div>
+                <div className="font-medium">{detailAnimal.race || "-"}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 mb-0.5">Âge</div>
+                <div className="font-medium">{detailAnimal.ageMois ? formatAge(detailAnimal.ageMois) : "-"}</div>
+              </div>
+              <div>
+                <div className="text-gray-500 mb-0.5">Poids</div>
+                <div className="font-medium">{detailAnimal.poids ? formatNumber(detailAnimal.poids) + " kg" : "-"}</div>
+              </div>
+              {detailAnimal.commentaire && (
+                <div className="col-span-full">
+                  <div className="text-gray-500 mb-0.5">Commentaire</div>
+                  <div className="font-medium">{detailAnimal.commentaire}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Filiation */}
+            {(detailAnimal.numeroBouclePere || detailAnimal.numeroBoucleMere) && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Filiation</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Père */}
+                  {detailAnimal.numeroBouclePere && (() => {
+                    const pere = animaux.find((a) => a.numeroBoucle === detailAnimal.numeroBouclePere);
+                    return (
+                      <div className="border border-gray-200 rounded-lg p-4 bg-blue-50/50">
+                        <div className="text-xs font-semibold text-blue-600 uppercase mb-2">♂ Père</div>
+                        {pere ? (
+                          <div>
+                            <button
+                              onClick={() => setDetailAnimal(pere)}
+                              className="text-base font-semibold text-blue-700 hover:underline cursor-pointer bg-transparent border-none p-0"
+                            >
+                              {pere.nom || pere.numeroBoucle}
+                            </button>
+                            <div className="text-sm text-gray-600 mt-1">{pere.numeroBoucle}</div>
+                            <div className="text-sm text-gray-600">{pere.race || "-"} · {pere.ageMois ? formatAge(pere.ageMois) : "-"}</div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="text-sm font-medium text-gray-700">{detailAnimal.numeroBouclePere}</div>
+                            <div className="text-xs text-gray-400 mt-1">Non trouvé dans le troupeau</div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Mère */}
+                  {detailAnimal.numeroBoucleMere && (() => {
+                    const mere = animaux.find((a) => a.numeroBoucle === detailAnimal.numeroBoucleMere);
+                    return (
+                      <div className="border border-gray-200 rounded-lg p-4 bg-pink-50/50">
+                        <div className="text-xs font-semibold text-pink-600 uppercase mb-2">♀ Mère</div>
+                        {mere ? (
+                          <div>
+                            <button
+                              onClick={() => setDetailAnimal(mere)}
+                              className="text-base font-semibold text-pink-700 hover:underline cursor-pointer bg-transparent border-none p-0"
+                            >
+                              {mere.nom || mere.numeroBoucle}
+                            </button>
+                            <div className="text-sm text-gray-600 mt-1">{mere.numeroBoucle}</div>
+                            <div className="text-sm text-gray-600">{mere.race || "-"} · {mere.ageMois ? formatAge(mere.ageMois) : "-"}</div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="text-sm font-medium text-gray-700">{detailAnimal.numeroBoucleMere}</div>
+                            <div className="text-xs text-gray-400 mt-1">Non trouvé dans le troupeau</div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
 
       {/* Modal suppression */}

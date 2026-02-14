@@ -14,6 +14,8 @@ export interface AnimalFormData {
   poids?: string | number;
   statut?: string;
   commentaire?: string;
+  numeroBouclePere?: string;
+  numeroBoucleMere?: string;
 }
 
 export function validateAnimalData(data: AnimalFormData): { valid: boolean; errors: string[] } {

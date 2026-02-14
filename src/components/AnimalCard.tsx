@@ -7,11 +7,15 @@ interface AnimalCardProps {
   animal: Animal;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onClick?: (animal: Animal) => void;
 }
 
-export default function AnimalCard({ animal, onEdit, onDelete }: AnimalCardProps) {
+export default function AnimalCard({ animal, onEdit, onDelete, onClick }: AnimalCardProps) {
   return (
-    <div className={`bg-white rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer border-l-4 ${getAnimalBorderColor(animal.type)}`}>
+    <div
+      onClick={() => onClick?.(animal)}
+      className={`bg-white rounded-xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer border-l-4 ${getAnimalBorderColor(animal.type)}`}
+    >
       <div className="flex items-center gap-3 p-4 border-b border-gray-200">
         <span className="text-3xl">{getAnimalIcon(animal.type)}</span>
         <div className="flex-1">

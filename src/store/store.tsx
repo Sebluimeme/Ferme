@@ -16,6 +16,8 @@ export interface Animal {
   poids?: number;
   statut: "actif" | "vendu" | "mort" | "reforme";
   commentaire?: string;
+  numeroBouclePere?: string;
+  numeroBoucleMere?: string;
   dateCreation?: string;
   derniereMAJ?: string;
 }
