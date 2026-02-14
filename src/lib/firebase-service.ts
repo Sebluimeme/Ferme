@@ -111,7 +111,26 @@ class FirebaseService {
       }
     );
   }
+
+  listenWhere<T>(path: string, field: string, value: unknown, callback: (data: T[]) => void): Unsubscribe {
+    const dbRef = ref(database, path);
+    const q = query(dbRef, orderByChild(field), equalTo(value as string | number | boolean | null));
+    return onValue(
+      q,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          callback(Object.values(snapshot.val()) as T[]);
+        } else {
+          callback([]);
+        }
+      },
+      () => {
+        callback([]);
+      }
+    );
+  }
 }
 
 const firebaseService = new FirebaseService();
+export { firebaseService };
 export default firebaseService;

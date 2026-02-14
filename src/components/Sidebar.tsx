@@ -29,6 +29,13 @@ const sections: NavSection[] = [
     ],
   },
   {
+    title: "Parc Machine",
+    items: [
+      { icon: "🚗", label: "Véhicules", route: "/vehicules" },
+      { icon: "🔧", label: "Entretiens", route: "/vehicules?tab=entretien" },
+    ],
+  },
+  {
     title: "Financier",
     items: [
       { icon: "💰", label: "Coûts", route: "/couts" },
@@ -39,7 +46,6 @@ const sections: NavSection[] = [
     title: "Autres",
     items: [
       { icon: "📊", label: "Rapports", route: "/rapports" },
-      { icon: "🚜", label: "Matériel", route: "/materiel", badge: "Phase 2" },
     ],
   },
 ];

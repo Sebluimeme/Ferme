@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from "react";
 import firebaseService from "@/lib/firebase-service";
 import type { Unsubscribe } from "firebase/database";
+import type { Vehicle, MaintenanceAlert, MaintenanceEntry } from "@/types/vehicle";
+import { calculateMaintenanceAlerts } from "@/services/vehicle-detail-service";
 
 export interface Animal {
   id: string;
@@ -45,6 +47,9 @@ interface AppState {
   couts: unknown[];
   ventes: unknown[];
   alertes: Alerte[];
+  vehicles: Vehicle[];
+  maintenanceEntries: MaintenanceEntry[];
+  maintenanceAlerts: MaintenanceAlert[];
   stats: Stats;
   loading: boolean;
   sidebarOpen: boolean;
@@ -56,10 +61,14 @@ type Action =
   | { type: "SET_COUTS"; payload: unknown[] }
   | { type: "SET_VENTES"; payload: unknown[] }
   | { type: "SET_ALERTES"; payload: Alerte[] }
+  | { type: "SET_VEHICLES"; payload: Vehicle[] }
+  | { type: "SET_MAINTENANCE_ENTRIES"; payload: MaintenanceEntry[] }
+  | { type: "SET_MAINTENANCE_ALERTS"; payload: MaintenanceAlert[] }
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "TOGGLE_SIDEBAR" }
   | { type: "CLOSE_SIDEBAR" }
-  | { type: "UPDATE_STATS" };
+  | { type: "UPDATE_STATS" }
+  | { type: "UPDATE_MAINTENANCE_ALERTS" };
 
 function computeStats(animaux: Animal[]): Stats {
   return {
@@ -78,6 +87,9 @@ const initialState: AppState = {
   couts: [],
   ventes: [],
   alertes: [],
+  vehicles: [],
+  maintenanceEntries: [],
+  maintenanceAlerts: [],
   stats: { totalAnimaux: 0, ovins: 0, bovins: 0, caprins: 0, porcins: 0, profitGlobal: 0 },
   loading: true,
   sidebarOpen: false,
@@ -97,6 +109,19 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, ventes: action.payload };
     case "SET_ALERTES":
       return { ...state, alertes: action.payload.filter((a) => a.statut === "active") };
+    case "SET_VEHICLES":
+      return { ...state, vehicles: action.payload };
+    case "SET_MAINTENANCE_ENTRIES": {
+      const maintenanceEntries = action.payload;
+      const alerts = calculateMaintenanceAlerts(state.vehicles, maintenanceEntries);
+      return { ...state, maintenanceEntries, maintenanceAlerts: alerts };
+    }
+    case "SET_MAINTENANCE_ALERTS":
+      return { ...state, maintenanceAlerts: action.payload };
+    case "UPDATE_MAINTENANCE_ALERTS": {
+      const alerts = calculateMaintenanceAlerts(state.vehicles, state.maintenanceEntries);
+      return { ...state, maintenanceAlerts: alerts };
+    }
     case "SET_LOADING":
       return { ...state, loading: action.payload };
     case "TOGGLE_SIDEBAR":
@@ -144,6 +169,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
     listeners.push(
       firebaseService.listen<Alerte>("alertes", (data) => dispatch({ type: "SET_ALERTES", payload: data }))
+    );
+    listeners.push(
+      firebaseService.listen<Vehicle>("vehicules", (data) => {
+        dispatch({ type: "SET_VEHICLES", payload: data });
+        dispatch({ type: "UPDATE_MAINTENANCE_ALERTS" });
+      })
+    );
+    listeners.push(
+      firebaseService.listen<MaintenanceEntry>("vehicules-maintenance", (data) =>
+        dispatch({ type: "SET_MAINTENANCE_ENTRIES", payload: data })
+      )
     );
 
     listenersRef.current = listeners;
