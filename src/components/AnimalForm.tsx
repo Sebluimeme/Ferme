@@ -138,39 +138,33 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block mb-1 text-sm font-medium text-gray-700">Père (optionnel)</label>
-          <input
-            type="text"
+          <select
             name="numeroBouclePere"
-            list="pere-list"
             defaultValue={animal?.numeroBouclePere || ""}
-            placeholder="Saisir ou choisir dans la liste..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
-          />
-          <datalist id="pere-list">
+          >
+            <option value="">Aucun</option>
             {maleAnimals.map((a) => (
               <option key={a.id} value={a.numeroBoucle}>
                 {a.nom ? `${a.nom} - ${a.numeroBoucle}` : a.numeroBoucle}
               </option>
             ))}
-          </datalist>
+          </select>
         </div>
         <div>
           <label className="block mb-1 text-sm font-medium text-gray-700">Mère (optionnel)</label>
-          <input
-            type="text"
+          <select
             name="numeroBoucleMere"
-            list="mere-list"
             defaultValue={animal?.numeroBoucleMere || ""}
-            placeholder="Saisir ou choisir dans la liste..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
-          />
-          <datalist id="mere-list">
+          >
+            <option value="">Aucune</option>
             {femaleAnimals.map((a) => (
               <option key={a.id} value={a.numeroBoucle}>
                 {a.nom ? `${a.nom} - ${a.numeroBoucle}` : a.numeroBoucle}
               </option>
             ))}
-          </datalist>
+          </select>
         </div>
       </div>
     </form>
