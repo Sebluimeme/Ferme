@@ -1,10 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/store";
 import { formatCurrency, getAnimalIcon } from "@/lib/utils";
 import KpiCard from "@/components/KpiCard";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { state } = useAppStore();
   const { stats, alertes } = state;
 
@@ -14,14 +16,14 @@ export default function DashboardPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <KpiCard label="Total Animaux" value={stats.totalAnimaux || 0} subtitle="actifs" />
-        <KpiCard label={`${getAnimalIcon("ovin")} Ovins`} value={stats.ovins || 0} borderColorClass="border-l-ovin" valueColorClass="text-ovin" />
-        <KpiCard label={`${getAnimalIcon("bovin")} Bovins`} value={stats.bovins || 0} borderColorClass="border-l-bovin" valueColorClass="text-bovin" />
-        <KpiCard label={`${getAnimalIcon("caprin")} Caprins`} value={stats.caprins || 0} borderColorClass="border-l-caprin" valueColorClass="text-caprin" />
+        <KpiCard label="Total Animaux" value={stats.totalAnimaux || 0} subtitle="actifs" onClick={() => router.push("/animaux")} />
+        <KpiCard label={`${getAnimalIcon("ovin")} Ovins`} value={stats.ovins || 0} borderColorClass="border-l-ovin" valueColorClass="text-ovin" onClick={() => router.push("/animaux?type=ovin")} />
+        <KpiCard label={`${getAnimalIcon("bovin")} Bovins`} value={stats.bovins || 0} borderColorClass="border-l-bovin" valueColorClass="text-bovin" onClick={() => router.push("/animaux?type=bovin")} />
+        <KpiCard label={`${getAnimalIcon("caprin")} Caprins`} value={stats.caprins || 0} borderColorClass="border-l-caprin" valueColorClass="text-caprin" onClick={() => router.push("/animaux?type=caprin")} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-        <KpiCard label={`${getAnimalIcon("porcin")} Porcins`} value={stats.porcins || 0} borderColorClass="border-l-porcin" valueColorClass="text-porcin" />
+        <KpiCard label={`${getAnimalIcon("porcin")} Porcins`} value={stats.porcins || 0} borderColorClass="border-l-porcin" valueColorClass="text-porcin" onClick={() => router.push("/animaux?type=porcin")} />
         <KpiCard label="Profit Global" value={formatCurrency(stats.profitGlobal || 0)} subtitle="Année en cours" borderColorClass="border-l-green-500" valueColorClass="text-green-500" />
       </div>
 

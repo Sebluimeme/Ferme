@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useMemo, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAppStore } from "@/store/store";
 import { useToast } from "@/components/Toast";
 import Modal, { ConfirmModal } from "@/components/Modal";
@@ -23,6 +23,7 @@ export default function AnimauxPage() {
   const { state } = useAppStore();
   const { showToast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const formRef = useRef<HTMLFormElement>(null);
 
   const [currentFilter, setCurrentFilter] = useState<string | null>(null);
@@ -30,6 +31,14 @@ export default function AnimauxPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Animal | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Appliquer le filtre depuis l'URL au chargement
+  useEffect(() => {
+    const typeParam = searchParams.get("type");
+    if (typeParam && ["ovin", "bovin", "caprin", "porcin"].includes(typeParam)) {
+      setCurrentFilter(typeParam);
+    }
+  }, [searchParams]);
 
   const animaux = state.animaux;
   const stats = useMemo(() => getAnimalStats(animaux), [animaux]);
