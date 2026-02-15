@@ -9,8 +9,8 @@ interface AnimalFormProps {
 
 export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
   const { state } = useAppStore();
-  const maleAnimals = state.animaux.filter((a) => a.sexe === "M" && a.statut === "actif");
-  const femaleAnimals = state.animaux.filter((a) => a.sexe === "F" && a.statut === "actif");
+  const maleAnimals = state.animaux.filter((a) => a.sexe === "M" && a.statut === "actif" && a.numeroBoucle);
+  const femaleAnimals = state.animaux.filter((a) => a.sexe === "F" && a.statut === "actif" && a.numeroBoucle);
   return (
     <form ref={formRef} className="grid gap-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -33,7 +33,7 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
         </div>
         <div>
           <label className="block mb-1 text-sm font-medium text-gray-700">
-            Numéro de boucle
+            Numéro de boucle <span className="text-xs text-gray-400 font-normal">(ou nom requis)</span>
           </label>
           <input
             type="text"
@@ -48,7 +48,7 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Nom (optionnel)</label>
+          <label className="block mb-1 text-sm font-medium text-gray-700">Nom <span className="text-xs text-gray-400 font-normal">(ou n° boucle requis)</span></label>
           <input
             type="text"
             name="nom"

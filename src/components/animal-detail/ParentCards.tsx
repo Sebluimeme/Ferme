@@ -35,9 +35,9 @@ export default function ParentCards({ animal, animaux }: ParentCardsProps) {
                   onClick={() => router.push(`/animaux/${pere.id}`)}
                   className="text-base font-semibold text-blue-700 hover:underline cursor-pointer bg-transparent border-none p-0"
                 >
-                  {pere.nom || pere.numeroBoucle}
+                  {pere.nom || pere.numeroBoucle || "Père"}
                 </button>
-                <div className="text-sm text-gray-600 mt-1">{pere.numeroBoucle}</div>
+                {pere.numeroBoucle && <div className="text-sm text-gray-600 mt-1">{pere.numeroBoucle}</div>}
                 <div className="text-sm text-gray-600">
                   {pere.race || "-"} · {pere.ageMois ? formatAge(pere.ageMois) : "-"}
                 </div>
@@ -60,9 +60,9 @@ export default function ParentCards({ animal, animaux }: ParentCardsProps) {
                   onClick={() => router.push(`/animaux/${mere.id}`)}
                   className="text-base font-semibold text-pink-700 hover:underline cursor-pointer bg-transparent border-none p-0"
                 >
-                  {mere.nom || mere.numeroBoucle}
+                  {mere.nom || mere.numeroBoucle || "Mère"}
                 </button>
-                <div className="text-sm text-gray-600 mt-1">{mere.numeroBoucle}</div>
+                {mere.numeroBoucle && <div className="text-sm text-gray-600 mt-1">{mere.numeroBoucle}</div>}
                 <div className="text-sm text-gray-600">
                   {mere.race || "-"} · {mere.ageMois ? formatAge(mere.ageMois) : "-"}
                 </div>

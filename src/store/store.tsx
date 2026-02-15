@@ -8,7 +8,7 @@ import { calculateMaintenanceAlerts } from "@/services/vehicle-detail-service";
 
 export interface Animal {
   id: string;
-  numeroBoucle: string;
+  numeroBoucle?: string;
   nom?: string;
   type: "ovin" | "bovin" | "caprin" | "porcin";
   sexe: "M" | "F";

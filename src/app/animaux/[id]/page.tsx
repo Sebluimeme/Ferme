@@ -183,7 +183,7 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={handleDelete}
         title="Supprimer l'animal"
-        message={`Voulez-vous vraiment supprimer <strong>${animal.nom || animal.numeroBoucle}</strong> ?<br><br>Cette action est irréversible.`}
+        message={`Voulez-vous vraiment supprimer <strong>${animal.nom || animal.numeroBoucle || "cet animal"}</strong> ?<br><br>Cette action est irréversible.`}
         confirmText="Supprimer"
         cancelText="Annuler"
         danger

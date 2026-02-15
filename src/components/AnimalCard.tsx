@@ -20,8 +20,8 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
         <div className="flex items-center gap-3 p-4 border-b border-gray-200">
           <span className="text-3xl">{getAnimalIcon(animal.type)}</span>
           <div className="flex-1">
-            <div className="font-semibold text-lg">{animal.nom || animal.numeroBoucle}</div>
-            <div className="text-sm text-gray-600">{animal.numeroBoucle}</div>
+            <div className="font-semibold text-lg">{animal.nom || animal.numeroBoucle || "Animal sans identifiant"}</div>
+            {animal.numeroBoucle && <div className="text-sm text-gray-600">{animal.numeroBoucle}</div>}
           </div>
           <span className={`text-xs font-medium px-2 py-1 rounded-full ${getAnimalBgColor(animal.type)}`}>
             {getAnimalLabel(animal.type)}

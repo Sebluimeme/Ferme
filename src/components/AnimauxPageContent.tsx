@@ -197,7 +197,7 @@ export default function AnimauxPageContent() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
         title="Supprimer l'animal"
-        message={`Voulez-vous vraiment supprimer l'animal <strong>${deleteTarget?.nom || deleteTarget?.numeroBoucle}</strong> ?<br><br>Cette action est irréversible.`}
+        message={`Voulez-vous vraiment supprimer l'animal <strong>${deleteTarget?.nom || deleteTarget?.numeroBoucle || "cet animal"}</strong> ?<br><br>Cette action est irréversible.`}
         confirmText="Supprimer"
         cancelText="Annuler"
         danger

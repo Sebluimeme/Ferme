@@ -39,9 +39,9 @@ export default function AnimalHeader({ animal, onEdit, onDelete }: AnimalHeaderP
         <span className="text-4xl">{getAnimalIcon(animal.type)}</span>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl font-bold m-0 truncate">
-            {animal.nom || animal.numeroBoucle}
+            {animal.nom || animal.numeroBoucle || "Animal sans identifiant"}
           </h1>
-          <div className="text-sm text-gray-500 mt-1">{animal.numeroBoucle}</div>
+          {animal.numeroBoucle && <div className="text-sm text-gray-500 mt-1">{animal.numeroBoucle}</div>}
           <div className="flex gap-2 mt-2 flex-wrap">
             <span className={`text-xs font-medium px-2 py-1 rounded-full ${getAnimalBgColor(animal.type)}`}>
               {animal.type.charAt(0).toUpperCase() + animal.type.slice(1)}

@@ -6,7 +6,7 @@ const PATH = "animaux";
 
 export interface AnimalFormData {
   type: string;
-  numeroBoucle: string;
+  numeroBoucle?: string;
   nom?: string;
   sexe: string;
   race?: string;
@@ -19,7 +19,9 @@ export interface AnimalFormData {
 
 export function validateAnimalData(data: AnimalFormData): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  if (!data.numeroBoucle || data.numeroBoucle.trim() === "") errors.push("Le numéro de boucle est obligatoire");
+  const hasNom = data.nom && data.nom.trim() !== "";
+  const hasNumeroBoucle = data.numeroBoucle && data.numeroBoucle.trim() !== "";
+  if (!hasNom && !hasNumeroBoucle) errors.push("Un nom ou un numéro de boucle est requis (au moins un des deux)");
   if (!data.type) errors.push("Le type d'animal est obligatoire");
   if (!["ovin", "bovin", "caprin", "porcin"].includes(data.type)) errors.push("Type d'animal invalide");
   if (!data.sexe || !["M", "F"].includes(data.sexe)) errors.push("Le sexe est obligatoire (M ou F)");
@@ -35,9 +37,11 @@ export async function createAnimal(data: AnimalFormData) {
   const validation = validateAnimalData(data);
   if (!validation.valid) return { success: false, error: validation.errors.join(", ") };
 
-  const existing = await firebaseService.getWhere<Animal>(PATH, "numeroBoucle", data.numeroBoucle);
-  if (existing.success && existing.data && existing.data.length > 0) {
-    return { success: false, error: "Ce numéro de boucle existe déjà" };
+  if (data.numeroBoucle && data.numeroBoucle.trim() !== "") {
+    const existing = await firebaseService.getWhere<Animal>(PATH, "numeroBoucle", data.numeroBoucle);
+    if (existing.success && existing.data && existing.data.length > 0) {
+      return { success: false, error: "Ce numéro de boucle existe déjà" };
+    }
   }
 
   const animalData: Record<string, unknown> = { ...data };
