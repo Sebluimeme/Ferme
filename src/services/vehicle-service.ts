@@ -72,8 +72,18 @@ export function validateVehicleData(data: VehicleFormData): { valid: boolean; er
 
 // ==================== Transformation des données ====================
 
-function formDataToVehicle(formData: VehicleFormData): Omit<Vehicle, "id" | "dateCreation" | "derniereMAJ"> {
-  return {
+/**
+ * Supprime les propriétés undefined/null d'un objet
+ * Firebase Realtime Database n'accepte pas les valeurs undefined
+ */
+function removeUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined && v !== null)
+  ) as Partial<T>;
+}
+
+function formDataToVehicle(formData: VehicleFormData): Partial<Omit<Vehicle, "id" | "dateCreation" | "derniereMAJ">> {
+  const raw = {
     nom: formData.nom?.trim() || undefined,
     type: formData.type,
     marque: formData.marque?.trim() || undefined,
@@ -101,6 +111,8 @@ function formDataToVehicle(formData: VehicleFormData): Omit<Vehicle, "id" | "dat
 
     commentaire: formData.commentaire?.trim() || undefined,
   };
+
+  return removeUndefined(raw);
 }
 
 // ==================== CRUD Operations ====================
