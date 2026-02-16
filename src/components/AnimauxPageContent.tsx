@@ -67,13 +67,25 @@ export default function AnimauxPageContent() {
   const [deleteTarget, setDeleteTarget] = useState<Animal | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Appliquer le filtre depuis l'URL au chargement
+  // Synchroniser le filtre avec l'URL (source de vérité)
   useEffect(() => {
     const typeParam = searchParams.get("type");
     if (typeParam && ["ovin", "bovin", "caprin", "porcin"].includes(typeParam)) {
       setCurrentFilter(typeParam);
+    } else {
+      setCurrentFilter(null);
     }
   }, [searchParams]);
+
+  // Navigation avec mise à jour de l'URL pour que le swipe-back fonctionne
+  const navigateToType = (type: string | null) => {
+    setStatusFilter("actif");
+    if (type) {
+      router.push(`/animaux?type=${type}`);
+    } else {
+      router.push("/animaux");
+    }
+  };
 
   const animaux = state.animaux;
   const stats = useMemo(() => getAnimalStats(animaux), [animaux]);
@@ -176,7 +188,7 @@ export default function AnimauxPageContent() {
           <KpiCard
             label="Total"
             value={stats.actifs}
-            onClick={() => setCurrentFilter(null)}
+            onClick={() => navigateToType(null)}
             borderColorClass="border-l-primary"
           />
           <KpiCard
@@ -184,28 +196,28 @@ export default function AnimauxPageContent() {
             value={stats.parType.ovins}
             borderColorClass="border-l-ovin"
             valueColorClass="text-ovin"
-            onClick={() => setCurrentFilter("ovin")}
+            onClick={() => navigateToType("ovin")}
           />
           <KpiCard
             label={`${getAnimalIcon("bovin")} Bovins`}
             value={stats.parType.bovins}
             borderColorClass="border-l-bovin"
             valueColorClass="text-bovin"
-            onClick={() => setCurrentFilter("bovin")}
+            onClick={() => navigateToType("bovin")}
           />
           <KpiCard
             label={`${getAnimalIcon("caprin")} Caprins`}
             value={stats.parType.caprins}
             borderColorClass="border-l-caprin"
             valueColorClass="text-caprin"
-            onClick={() => setCurrentFilter("caprin")}
+            onClick={() => navigateToType("caprin")}
           />
           <KpiCard
             label={`${getAnimalIcon("porcin")} Porcins`}
             value={stats.parType.porcins}
             borderColorClass="border-l-porcin"
             valueColorClass="text-porcin"
-            onClick={() => setCurrentFilter("porcin")}
+            onClick={() => navigateToType("porcin")}
           />
         </div>
       )}
@@ -215,7 +227,7 @@ export default function AnimauxPageContent() {
         <div className="mb-6 space-y-4">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { setCurrentFilter(null); setStatusFilter("actif"); }}
+              onClick={() => navigateToType(null)}
               className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all cursor-pointer"
               title="Retour à tous les animaux"
             >
@@ -271,7 +283,7 @@ export default function AnimauxPageContent() {
           {!currentFilter && (
             <select
               value={currentFilter || ""}
-              onChange={(e) => setCurrentFilter(e.target.value || null)}
+              onChange={(e) => navigateToType(e.target.value || null)}
               className="w-[150px] px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 cursor-pointer"
             >
               <option value="">Tous les types</option>
