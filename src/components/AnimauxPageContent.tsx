@@ -19,6 +19,14 @@ import {
 } from "@/services/animal-service";
 import type { Animal } from "@/store/store";
 
+function sortByLastModified(animals: Animal[]): Animal[] {
+  return [...animals].sort((a, b) => {
+    const dateA = a.derniereMAJ ? new Date(a.derniereMAJ).getTime() : 0;
+    const dateB = b.derniereMAJ ? new Date(b.derniereMAJ).getTime() : 0;
+    return dateB - dateA; // Plus récent en premier
+  });
+}
+
 function groupByBirthYear(animaux: Animal[]): { year: string; animals: Animal[] }[] {
   const groups: Record<string, Animal[]> = {};
 
@@ -35,13 +43,14 @@ function groupByBirthYear(animaux: Animal[]): { year: string; animals: Animal[] 
   }
 
   // Trier par année décroissante, "Non renseigné" à la fin
+  // Au sein de chaque groupe, trier par dernière modification
   return Object.entries(groups)
     .sort(([a], [b]) => {
       if (a === "Non renseigné") return 1;
       if (b === "Non renseigné") return -1;
       return parseInt(b) - parseInt(a);
     })
-    .map(([year, animals]) => ({ year, animals }));
+    .map(([year, animals]) => ({ year, animals: sortByLastModified(animals) }));
 }
 
 export default function AnimauxPageContent() {
@@ -72,7 +81,7 @@ export default function AnimauxPageContent() {
     let filtered = animaux.filter((a) => a.statut === "actif");
     if (currentFilter) filtered = filtered.filter((a) => a.type === currentFilter);
     if (searchQuery) filtered = searchAnimaux(filtered, searchQuery);
-    return filtered;
+    return sortByLastModified(filtered);
   }, [animaux, currentFilter, searchQuery]);
 
   const groupedAnimaux = useMemo(() => {
@@ -146,43 +155,45 @@ export default function AnimauxPageContent() {
         </button>
       </div>
 
-      {/* Stats rapides */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-        <KpiCard
-          label="Total"
-          value={stats.actifs}
-          onClick={() => setCurrentFilter(null)}
-          borderColorClass={!currentFilter ? "border-l-primary" : undefined}
-        />
-        <KpiCard
-          label={`${getAnimalIcon("ovin")} Ovins`}
-          value={stats.parType.ovins}
-          borderColorClass="border-l-ovin"
-          valueColorClass="text-ovin"
-          onClick={() => setCurrentFilter(currentFilter === "ovin" ? null : "ovin")}
-        />
-        <KpiCard
-          label={`${getAnimalIcon("bovin")} Bovins`}
-          value={stats.parType.bovins}
-          borderColorClass="border-l-bovin"
-          valueColorClass="text-bovin"
-          onClick={() => setCurrentFilter(currentFilter === "bovin" ? null : "bovin")}
-        />
-        <KpiCard
-          label={`${getAnimalIcon("caprin")} Caprins`}
-          value={stats.parType.caprins}
-          borderColorClass="border-l-caprin"
-          valueColorClass="text-caprin"
-          onClick={() => setCurrentFilter(currentFilter === "caprin" ? null : "caprin")}
-        />
-        <KpiCard
-          label={`${getAnimalIcon("porcin")} Porcins`}
-          value={stats.parType.porcins}
-          borderColorClass="border-l-porcin"
-          valueColorClass="text-porcin"
-          onClick={() => setCurrentFilter(currentFilter === "porcin" ? null : "porcin")}
-        />
-      </div>
+      {/* Stats rapides - masquées quand un filtre de type est actif */}
+      {!currentFilter && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+          <KpiCard
+            label="Total"
+            value={stats.actifs}
+            onClick={() => setCurrentFilter(null)}
+            borderColorClass="border-l-primary"
+          />
+          <KpiCard
+            label={`${getAnimalIcon("ovin")} Ovins`}
+            value={stats.parType.ovins}
+            borderColorClass="border-l-ovin"
+            valueColorClass="text-ovin"
+            onClick={() => setCurrentFilter("ovin")}
+          />
+          <KpiCard
+            label={`${getAnimalIcon("bovin")} Bovins`}
+            value={stats.parType.bovins}
+            borderColorClass="border-l-bovin"
+            valueColorClass="text-bovin"
+            onClick={() => setCurrentFilter("bovin")}
+          />
+          <KpiCard
+            label={`${getAnimalIcon("caprin")} Caprins`}
+            value={stats.parType.caprins}
+            borderColorClass="border-l-caprin"
+            valueColorClass="text-caprin"
+            onClick={() => setCurrentFilter("caprin")}
+          />
+          <KpiCard
+            label={`${getAnimalIcon("porcin")} Porcins`}
+            value={stats.parType.porcins}
+            borderColorClass="border-l-porcin"
+            valueColorClass="text-porcin"
+            onClick={() => setCurrentFilter("porcin")}
+          />
+        </div>
+      )}
 
       {/* Titre de la vue filtrée par espèce */}
       {currentFilter && (
