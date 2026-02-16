@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { useAppStore, type Animal } from "@/store/store";
 
 interface AnimalFormProps {
@@ -9,8 +10,20 @@ interface AnimalFormProps {
 
 export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
   const { state } = useAppStore();
+  const [selectedType, setSelectedType] = useState(animal?.type || "");
+
   const maleAnimals = state.animaux.filter((a) => a.sexe === "M" && a.statut === "actif" && a.numeroBoucle);
   const femaleAnimals = state.animaux.filter((a) => a.sexe === "F" && a.statut === "actif" && a.numeroBoucle);
+
+  // Races uniques pour le type sélectionné
+  const raceSuggestions = useMemo(() => {
+    if (!selectedType) return [];
+    const races = state.animaux
+      .filter((a) => a.type === selectedType && a.race && a.race.trim() !== "")
+      .map((a) => a.race!.trim());
+    return [...new Set(races)].sort((a, b) => a.localeCompare(b, "fr"));
+  }, [state.animaux, selectedType]);
+
   return (
     <form ref={formRef} className="grid gap-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -20,7 +33,8 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
           </label>
           <select
             name="type"
-            defaultValue={animal?.type || ""}
+            value={selectedType}
+            onChange={(e) => setSelectedType(e.target.value)}
             required
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
           >
@@ -81,9 +95,21 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
             type="text"
             name="race"
             defaultValue={animal?.race || ""}
-            placeholder="Suffolk, Charolaise..."
+            placeholder={selectedType ? "Commencez à taper..." : "Choisissez d'abord un type"}
+            list="race-suggestions"
+            autoComplete="off"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
           />
+          <datalist id="race-suggestions">
+            {raceSuggestions.map((race) => (
+              <option key={race} value={race} />
+            ))}
+          </datalist>
+          {selectedType && raceSuggestions.length > 0 && (
+            <p className="text-xs text-gray-400 mt-1">
+              {raceSuggestions.length} race{raceSuggestions.length > 1 ? "s" : ""} connue{raceSuggestions.length > 1 ? "s" : ""} pour ce type
+            </p>
+          )}
         </div>
         <div>
           <label className="block mb-1 text-sm font-medium text-gray-700">Date de naissance</label>
