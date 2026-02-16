@@ -32,12 +32,30 @@ export function calculateAge(birthDate: string): number {
 }
 
 export function formatAge(months: number): string {
-  if (!months || months === 0) return "0 mois";
+  if (months === null || months === undefined) return "-";
+  if (months === 0) return "< 1 mois";
   const years = Math.floor(months / 12);
   const remainingMonths = months % 12;
   if (years === 0) return `${remainingMonths} mois`;
   if (remainingMonths === 0) return `${years} an${years > 1 ? "s" : ""}`;
   return `${years} an${years > 1 ? "s" : ""} ${remainingMonths} mois`;
+}
+
+export function formatAgeFromBirthDate(dateNaissance: string | undefined): string {
+  if (!dateNaissance) return "-";
+  const birth = new Date(dateNaissance);
+  if (isNaN(birth.getTime())) return "-";
+  const today = new Date();
+  let months = (today.getFullYear() - birth.getFullYear()) * 12;
+  months -= birth.getMonth();
+  months += today.getMonth();
+  if (months <= 0) {
+    const diffTime = today.getTime() - birth.getTime();
+    const days = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+    if (days === 0) return "Né aujourd'hui";
+    return `${days} jour${days > 1 ? "s" : ""}`;
+  }
+  return formatAge(months);
 }
 
 export function getAnimalIcon(type: string): string {

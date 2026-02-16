@@ -1,7 +1,7 @@
 "use client";
 
 import type { Animal } from "@/store/store";
-import { getAnimalIcon, getAnimalLabel, getAnimalBorderColor, getAnimalBgColor, formatAge, formatNumber } from "@/lib/utils";
+import { getAnimalIcon, getAnimalLabel, getAnimalBorderColor, getAnimalBgColor, formatAgeFromBirthDate, formatNumber } from "@/lib/utils";
 
 interface AnimalCardProps {
   animal: Animal;
@@ -56,7 +56,7 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
             </div>
             <div>
               <div className="text-gray-400 mb-0.5">Âge</div>
-              <div className="font-medium">{animal.ageMois ? formatAge(animal.ageMois) : "-"}</div>
+              <div className="font-medium">{formatAgeFromBirthDate(animal.dateNaissance)}</div>
             </div>
             <div>
               <div className="text-gray-400 mb-0.5">Poids</div>
