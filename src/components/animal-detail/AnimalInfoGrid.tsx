@@ -1,7 +1,7 @@
 "use client";
 
 import type { Animal } from "@/store/store";
-import { getAnimalIcon, formatAge, formatNumber, formatDate } from "@/lib/utils";
+import { getAnimalIcon, formatAgeFromBirthDate, formatNumber, formatDate } from "@/lib/utils";
 
 interface AnimalInfoGridProps {
   animal: Animal;
@@ -30,7 +30,7 @@ export default function AnimalInfoGrid({ animal }: AnimalInfoGridProps) {
         </div>
         <div>
           <div className="text-gray-500 mb-0.5">Âge</div>
-          <div className="font-medium">{animal.ageMois ? formatAge(animal.ageMois) : "-"}</div>
+          <div className="font-medium">{formatAgeFromBirthDate(animal.dateNaissance)}</div>
         </div>
         <div>
           <div className="text-gray-500 mb-0.5">Poids</div>
