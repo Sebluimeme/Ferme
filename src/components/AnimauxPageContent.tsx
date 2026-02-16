@@ -8,7 +8,7 @@ import Modal, { ConfirmModal } from "@/components/Modal";
 import AnimalCard from "@/components/AnimalCard";
 import AnimalForm from "@/components/AnimalForm";
 import KpiCard from "@/components/KpiCard";
-import { getAnimalIcon } from "@/lib/utils";
+import { getAnimalIcon, getAnimalLabel, getAnimalBgColor } from "@/lib/utils";
 import {
   createAnimal,
   deleteAnimal as deleteAnimalService,
@@ -18,6 +18,31 @@ import {
   type AnimalFormData,
 } from "@/services/animal-service";
 import type { Animal } from "@/store/store";
+
+function groupByBirthYear(animaux: Animal[]): { year: string; animals: Animal[] }[] {
+  const groups: Record<string, Animal[]> = {};
+
+  for (const animal of animaux) {
+    let year = "Non renseigné";
+    if (animal.dateNaissance) {
+      const date = new Date(animal.dateNaissance);
+      if (!isNaN(date.getTime())) {
+        year = date.getFullYear().toString();
+      }
+    }
+    if (!groups[year]) groups[year] = [];
+    groups[year].push(animal);
+  }
+
+  // Trier par année décroissante, "Non renseigné" à la fin
+  return Object.entries(groups)
+    .sort(([a], [b]) => {
+      if (a === "Non renseigné") return 1;
+      if (b === "Non renseigné") return -1;
+      return parseInt(b) - parseInt(a);
+    })
+    .map(([year, animals]) => ({ year, animals }));
+}
 
 export default function AnimauxPageContent() {
   const { state } = useAppStore();
@@ -49,6 +74,11 @@ export default function AnimauxPageContent() {
     if (searchQuery) filtered = searchAnimaux(filtered, searchQuery);
     return filtered;
   }, [animaux, currentFilter, searchQuery]);
+
+  const groupedAnimaux = useMemo(() => {
+    if (!currentFilter) return null;
+    return groupByBirthYear(filteredAnimaux);
+  }, [filteredAnimaux, currentFilter]);
 
   const handleSave = async () => {
     if (!formRef.current || saving) return;
@@ -93,6 +123,16 @@ export default function AnimauxPageContent() {
     setDeleteTarget(null);
   };
 
+  const renderAnimalCard = (animal: Animal) => (
+    <AnimalCard
+      key={animal.id}
+      animal={animal}
+      onEdit={() => router.push(`/animaux/${animal.id}`)}
+      onDelete={handleDelete}
+      onClick={(a) => router.push(`/animaux/${a.id}`)}
+    />
+  );
+
   return (
     <div className="fade-in">
       {/* Header */}
@@ -108,14 +148,65 @@ export default function AnimauxPageContent() {
 
       {/* Stats rapides */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
-        <KpiCard label="Total" value={stats.actifs} onClick={() => setCurrentFilter(null)} />
-        <KpiCard label={`${getAnimalIcon("ovin")} Ovins`} value={stats.parType.ovins} borderColorClass="border-l-ovin" valueColorClass="text-ovin" onClick={() => setCurrentFilter("ovin")} />
-        <KpiCard label={`${getAnimalIcon("bovin")} Bovins`} value={stats.parType.bovins} borderColorClass="border-l-bovin" valueColorClass="text-bovin" onClick={() => setCurrentFilter("bovin")} />
-        <KpiCard label={`${getAnimalIcon("caprin")} Caprins`} value={stats.parType.caprins} borderColorClass="border-l-caprin" valueColorClass="text-caprin" onClick={() => setCurrentFilter("caprin")} />
-        <KpiCard label={`${getAnimalIcon("porcin")} Porcins`} value={stats.parType.porcins} borderColorClass="border-l-porcin" valueColorClass="text-porcin" onClick={() => setCurrentFilter("porcin")} />
+        <KpiCard
+          label="Total"
+          value={stats.actifs}
+          onClick={() => setCurrentFilter(null)}
+          borderColorClass={!currentFilter ? "border-l-primary" : undefined}
+        />
+        <KpiCard
+          label={`${getAnimalIcon("ovin")} Ovins`}
+          value={stats.parType.ovins}
+          borderColorClass="border-l-ovin"
+          valueColorClass="text-ovin"
+          onClick={() => setCurrentFilter(currentFilter === "ovin" ? null : "ovin")}
+        />
+        <KpiCard
+          label={`${getAnimalIcon("bovin")} Bovins`}
+          value={stats.parType.bovins}
+          borderColorClass="border-l-bovin"
+          valueColorClass="text-bovin"
+          onClick={() => setCurrentFilter(currentFilter === "bovin" ? null : "bovin")}
+        />
+        <KpiCard
+          label={`${getAnimalIcon("caprin")} Caprins`}
+          value={stats.parType.caprins}
+          borderColorClass="border-l-caprin"
+          valueColorClass="text-caprin"
+          onClick={() => setCurrentFilter(currentFilter === "caprin" ? null : "caprin")}
+        />
+        <KpiCard
+          label={`${getAnimalIcon("porcin")} Porcins`}
+          value={stats.parType.porcins}
+          borderColorClass="border-l-porcin"
+          valueColorClass="text-porcin"
+          onClick={() => setCurrentFilter(currentFilter === "porcin" ? null : "porcin")}
+        />
       </div>
 
-      {/* Barre de recherche et filtres */}
+      {/* Titre de la vue filtrée par espèce */}
+      {currentFilter && (
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            onClick={() => setCurrentFilter(null)}
+            className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all cursor-pointer"
+            title="Retour à tous les animaux"
+          >
+            ←
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{getAnimalIcon(currentFilter)}</span>
+            <h2 className="text-xl sm:text-2xl font-bold m-0">
+              {getAnimalLabel(currentFilter)}s
+            </h2>
+            <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${getAnimalBgColor(currentFilter)}`}>
+              {filteredAnimaux.length}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Barre de recherche */}
       <div className="bg-white rounded-xl shadow-sm p-4 mb-8">
         <div className="flex gap-4 flex-wrap">
           <input
@@ -123,19 +214,21 @@ export default function AnimauxPageContent() {
             placeholder="🔍 Rechercher par numéro, nom ou race..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 min-w-[250px] px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+            className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
           />
-          <select
-            value={currentFilter || ""}
-            onChange={(e) => setCurrentFilter(e.target.value || null)}
-            className="w-[150px] px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 cursor-pointer"
-          >
-            <option value="">Tous les types</option>
-            <option value="ovin">🐑 Ovins</option>
-            <option value="bovin">🐄 Bovins</option>
-            <option value="caprin">🐐 Caprins</option>
-            <option value="porcin">🐷 Porcins</option>
-          </select>
+          {!currentFilter && (
+            <select
+              value={currentFilter || ""}
+              onChange={(e) => setCurrentFilter(e.target.value || null)}
+              className="w-[150px] px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 cursor-pointer"
+            >
+              <option value="">Tous les types</option>
+              <option value="ovin">🐑 Ovins</option>
+              <option value="bovin">🐄 Bovins</option>
+              <option value="caprin">🐐 Caprins</option>
+              <option value="porcin">🐷 Porcins</option>
+            </select>
+          )}
         </div>
       </div>
 
@@ -144,7 +237,11 @@ export default function AnimauxPageContent() {
         <div className="text-center py-16">
           <div className="text-6xl mb-4">🐾</div>
           <h3 className="text-2xl font-semibold mb-2">Aucun animal</h3>
-          <p className="text-gray-600 mb-6">Commencez par ajouter votre premier animal</p>
+          <p className="text-gray-600 mb-6">
+            {currentFilter
+              ? `Aucun ${getAnimalLabel(currentFilter).toLowerCase()} trouvé`
+              : "Commencez par ajouter votre premier animal"}
+          </p>
           <button
             onClick={() => setShowAddModal(true)}
             className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer"
@@ -152,17 +249,35 @@ export default function AnimauxPageContent() {
             + Ajouter un animal
           </button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredAnimaux.map((animal) => (
-            <AnimalCard
-              key={animal.id}
-              animal={animal}
-              onEdit={() => router.push(`/animaux/${animal.id}`)}
-              onDelete={handleDelete}
-              onClick={(a) => router.push(`/animaux/${a.id}`)}
-            />
+      ) : currentFilter && groupedAnimaux ? (
+        /* Vue par espèce : groupé par année de naissance */
+        <div className="space-y-8">
+          {groupedAnimaux.map(({ year, animals }) => (
+            <div key={year}>
+              {/* Séparateur année */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm">
+                  <span className="text-lg">📅</span>
+                  <span className="font-bold text-lg">
+                    {year === "Non renseigné" ? year : `Nés en ${year}`}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    ({animals.length} {animals.length > 1 ? "animaux" : "animal"})
+                  </span>
+                </div>
+                <div className="flex-1 h-px bg-gray-200" />
+              </div>
+              {/* Grille des animaux de cette année */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {animals.map(renderAnimalCard)}
+              </div>
+            </div>
           ))}
+        </div>
+      ) : (
+        /* Vue normale : tous les animaux */
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filteredAnimaux.map(renderAnimalCard)}
         </div>
       )}
 
