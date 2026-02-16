@@ -90,10 +90,11 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
 
   const handleDelete = async () => {
     if (!animal) return;
+    const animalType = animal.type;
     const result = await deleteAnimalService(animal.id);
     if (result.success) {
       showToast({ type: "success", title: "Succès", message: "Animal supprimé" });
-      router.push("/animaux");
+      router.push(`/animaux?type=${animalType}`);
     } else {
       showToast({ type: "error", title: "Erreur", message: result.error || "Erreur" });
     }
@@ -116,7 +117,7 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
         <h2 className="text-2xl font-semibold mb-2">Animal introuvable</h2>
         <p className="text-gray-600 mb-6">Cet animal n&apos;existe pas ou a été supprimé.</p>
         <button
-          onClick={() => router.push("/animaux")}
+          onClick={() => router.back()}
           className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg cursor-pointer"
         >
           Retour aux animaux

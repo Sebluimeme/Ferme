@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useAppStore, type Animal } from "@/store/store";
 
 interface AnimalFormProps {
@@ -11,6 +11,12 @@ interface AnimalFormProps {
 export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
   const { state } = useAppStore();
   const [selectedType, setSelectedType] = useState(animal?.type || "");
+  const [raceValue, setRaceValue] = useState(animal?.race || "");
+  const [raceDropdownOpen, setRaceDropdownOpen] = useState(false);
+  const [raceSearchQuery, setRaceSearchQuery] = useState("");
+  const [isAddingNewRace, setIsAddingNewRace] = useState(false);
+  const raceDropdownRef = useRef<HTMLDivElement>(null);
+  const raceInputRef = useRef<HTMLInputElement>(null);
 
   const maleAnimals = state.animaux.filter((a) => a.sexe === "M" && a.statut === "actif" && a.numeroBoucle);
   const femaleAnimals = state.animaux.filter((a) => a.sexe === "F" && a.statut === "actif" && a.numeroBoucle);
@@ -23,6 +29,35 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
       .map((a) => a.race!.trim());
     return [...new Set(races)].sort((a, b) => a.localeCompare(b, "fr"));
   }, [state.animaux, selectedType]);
+
+  const filteredRaceSuggestions = useMemo(() => {
+    if (!raceSearchQuery) return raceSuggestions;
+    const lower = raceSearchQuery.toLowerCase();
+    return raceSuggestions.filter((r) => r.toLowerCase().includes(lower));
+  }, [raceSuggestions, raceSearchQuery]);
+
+  // Fermer le dropdown au clic extérieur
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (raceDropdownRef.current && !raceDropdownRef.current.contains(e.target as Node)) {
+        setRaceDropdownOpen(false);
+        setRaceSearchQuery("");
+        setIsAddingNewRace(false);
+      }
+    }
+    if (raceDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [raceDropdownOpen]);
+
+  // Reset race quand le type change
+  useEffect(() => {
+    if (!animal) {
+      setRaceValue("");
+      setIsAddingNewRace(false);
+    }
+  }, [selectedType, animal]);
 
   return (
     <form ref={formRef} className="grid gap-4">
@@ -89,26 +124,115 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
+        <div className="relative" ref={raceDropdownRef}>
           <label className="block mb-1 text-sm font-medium text-gray-700">Race</label>
-          <input
-            type="text"
-            name="race"
-            defaultValue={animal?.race || ""}
-            placeholder={selectedType ? "Commencez à taper..." : "Choisissez d'abord un type"}
-            list="race-suggestions"
-            autoComplete="off"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
-          />
-          <datalist id="race-suggestions">
-            {raceSuggestions.map((race) => (
-              <option key={race} value={race} />
-            ))}
-          </datalist>
-          {selectedType && raceSuggestions.length > 0 && (
-            <p className="text-xs text-gray-400 mt-1">
-              {raceSuggestions.length} race{raceSuggestions.length > 1 ? "s" : ""} connue{raceSuggestions.length > 1 ? "s" : ""} pour ce type
-            </p>
+          <input type="hidden" name="race" value={raceValue} />
+          {isAddingNewRace ? (
+            <div className="flex gap-2">
+              <input
+                ref={raceInputRef}
+                type="text"
+                value={raceValue}
+                onChange={(e) => setRaceValue(e.target.value)}
+                placeholder="Saisir le nom de la race..."
+                autoFocus
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingNewRace(false);
+                  if (!raceValue) setRaceDropdownOpen(false);
+                }}
+                className="px-2 py-2 text-xs text-gray-500 hover:text-gray-800 bg-gray-100 rounded-lg cursor-pointer border border-gray-300"
+              >
+                OK
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (!selectedType) return;
+                setRaceDropdownOpen(!raceDropdownOpen);
+                setRaceSearchQuery("");
+              }}
+              disabled={!selectedType}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-left flex items-center justify-between cursor-pointer bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:bg-gray-100 disabled:cursor-not-allowed ${
+                raceDropdownOpen ? "border-primary ring-2 ring-primary/10" : ""
+              }`}
+            >
+              <span className={raceValue ? "text-gray-900" : "text-gray-400"}>
+                {raceValue || (selectedType ? "Sélectionner une race..." : "Choisissez d'abord un type")}
+              </span>
+              <span className="text-gray-400 text-xs ml-2">{raceDropdownOpen ? "▲" : "▼"}</span>
+            </button>
+          )}
+          {raceDropdownOpen && !isAddingNewRace && (
+            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
+              {raceSuggestions.length > 3 && (
+                <div className="p-2 border-b border-gray-100">
+                  <input
+                    type="text"
+                    value={raceSearchQuery}
+                    onChange={(e) => setRaceSearchQuery(e.target.value)}
+                    placeholder="Filtrer..."
+                    autoFocus
+                    className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-primary"
+                  />
+                </div>
+              )}
+              <div className="overflow-y-auto max-h-48">
+                {raceValue && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRaceValue("");
+                      setRaceDropdownOpen(false);
+                      setRaceSearchQuery("");
+                    }}
+                    className="w-full px-3 py-2 text-sm text-left text-gray-400 italic hover:bg-gray-50 cursor-pointer bg-transparent border-none"
+                  >
+                    Aucune race
+                  </button>
+                )}
+                {filteredRaceSuggestions.map((race) => (
+                  <button
+                    key={race}
+                    type="button"
+                    onClick={() => {
+                      setRaceValue(race);
+                      setRaceDropdownOpen(false);
+                      setRaceSearchQuery("");
+                    }}
+                    className={`w-full px-3 py-2 text-sm text-left hover:bg-primary/5 cursor-pointer bg-transparent border-none flex items-center justify-between ${
+                      raceValue === race ? "bg-primary/10 text-primary font-medium" : "text-gray-700"
+                    }`}
+                  >
+                    <span>{race}</span>
+                    {raceValue === race && <span className="text-primary">✓</span>}
+                  </button>
+                ))}
+                {raceSearchQuery && filteredRaceSuggestions.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-gray-400 italic">Aucune race trouvée</div>
+                )}
+              </div>
+              <div className="border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingNewRace(true);
+                    setRaceDropdownOpen(false);
+                    setRaceSearchQuery("");
+                    setRaceValue("");
+                  }}
+                  className="w-full px-3 py-2.5 text-sm text-left text-primary font-medium hover:bg-primary/5 cursor-pointer bg-transparent border-none flex items-center gap-2"
+                >
+                  <span>+</span>
+                  <span>Ajouter une race</span>
+                </button>
+              </div>
+            </div>
           )}
         </div>
         <div>

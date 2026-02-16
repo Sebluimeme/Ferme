@@ -46,7 +46,7 @@ export default function AnimalHeader({ animal, onEdit, onDelete }: AnimalHeaderP
     <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 mb-6">
       <div className="flex items-start gap-3 sm:gap-4">
         <button
-          onClick={() => router.push("/animaux")}
+          onClick={() => router.push(`/animaux?type=${animal.type}`)}
           className="text-gray-500 hover:text-gray-800 text-xl cursor-pointer bg-transparent border-none p-1"
         >
           &larr;

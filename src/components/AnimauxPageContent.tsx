@@ -61,6 +61,7 @@ export default function AnimauxPageContent() {
   const formRef = useRef<HTMLFormElement>(null);
 
   const [currentFilter, setCurrentFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string | null>("actif");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Animal | null>(null);
@@ -78,16 +79,30 @@ export default function AnimauxPageContent() {
   const stats = useMemo(() => getAnimalStats(animaux), [animaux]);
 
   const filteredAnimaux = useMemo(() => {
-    let filtered = animaux.filter((a) => a.statut === "actif");
+    let filtered = animaux;
+    if (statusFilter) filtered = filtered.filter((a) => a.statut === statusFilter);
     if (currentFilter) filtered = filtered.filter((a) => a.type === currentFilter);
     if (searchQuery) filtered = searchAnimaux(filtered, searchQuery);
     return sortByLastModified(filtered);
-  }, [animaux, currentFilter, searchQuery]);
+  }, [animaux, currentFilter, statusFilter, searchQuery]);
 
   const groupedAnimaux = useMemo(() => {
     if (!currentFilter) return null;
     return groupByBirthYear(filteredAnimaux);
   }, [filteredAnimaux, currentFilter]);
+
+  // Comptage par statut pour l'espèce filtrée
+  const statusCounts = useMemo(() => {
+    if (!currentFilter) return null;
+    const ofType = animaux.filter((a) => a.type === currentFilter);
+    return {
+      tous: ofType.length,
+      actif: ofType.filter((a) => a.statut === "actif").length,
+      vendu: ofType.filter((a) => a.statut === "vendu").length,
+      mort: ofType.filter((a) => a.statut === "mort").length,
+      reforme: ofType.filter((a) => a.statut === "reforme").length,
+    };
+  }, [animaux, currentFilter]);
 
   const handleSave = async () => {
     if (!formRef.current || saving) return;
@@ -197,23 +212,49 @@ export default function AnimauxPageContent() {
 
       {/* Titre de la vue filtrée par espèce */}
       {currentFilter && (
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => setCurrentFilter(null)}
-            className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all cursor-pointer"
-            title="Retour à tous les animaux"
-          >
-            ←
-          </button>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">{getAnimalIcon(currentFilter)}</span>
-            <h2 className="text-xl sm:text-2xl font-bold m-0">
-              {getAnimalLabel(currentFilter)}s
-            </h2>
-            <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${getAnimalBgColor(currentFilter)}`}>
-              {filteredAnimaux.length}
-            </span>
+        <div className="mb-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { setCurrentFilter(null); setStatusFilter("actif"); }}
+              className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all cursor-pointer"
+              title="Retour à tous les animaux"
+            >
+              ←
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{getAnimalIcon(currentFilter)}</span>
+              <h2 className="text-xl sm:text-2xl font-bold m-0">
+                {getAnimalLabel(currentFilter)}s
+              </h2>
+              <span className={`text-sm font-medium px-2 py-0.5 rounded-full ${getAnimalBgColor(currentFilter)}`}>
+                {filteredAnimaux.length}
+              </span>
+            </div>
           </div>
+          {/* Filtres par statut */}
+          {statusCounts && (
+            <div className="flex gap-2 flex-wrap ml-11">
+              {([
+                { key: null, label: "Tous", count: statusCounts.tous },
+                { key: "actif", label: "Actifs", count: statusCounts.actif },
+                { key: "vendu", label: "Vendus", count: statusCounts.vendu },
+                { key: "mort", label: "Morts", count: statusCounts.mort },
+                { key: "reforme", label: "Réformés", count: statusCounts.reforme },
+              ] as const).map(({ key, label, count }) => (
+                <button
+                  key={label}
+                  onClick={() => setStatusFilter(key)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all cursor-pointer border ${
+                    statusFilter === key
+                      ? "bg-primary text-white border-primary"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:bg-gray-50"
+                  }`}
+                >
+                  {label} ({count})
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -250,7 +291,7 @@ export default function AnimauxPageContent() {
           <h3 className="text-2xl font-semibold mb-2">Aucun animal</h3>
           <p className="text-gray-600 mb-6">
             {currentFilter
-              ? `Aucun ${getAnimalLabel(currentFilter).toLowerCase()} trouvé`
+              ? `Aucun ${getAnimalLabel(currentFilter).toLowerCase()} ${statusFilter ? `avec le statut "${statusFilter === "actif" ? "actif" : statusFilter === "vendu" ? "vendu" : statusFilter === "mort" ? "mort" : "réformé"}" ` : ""}trouvé`
               : "Commencez par ajouter votre premier animal"}
           </p>
           <button
