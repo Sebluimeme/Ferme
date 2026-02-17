@@ -35,7 +35,7 @@ const sections: NavSection[] = [
     title: "Parc Machine",
     items: [
       { icon: "🚗", label: "Véhicules", route: "/vehicules" },
-      { icon: "🔧", label: "Entretiens", route: "/vehicules?tab=entretien" },
+      { icon: "🔧", label: "Entretiens", route: "/entretiens" },
     ],
   },
   {
