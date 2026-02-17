@@ -20,17 +20,30 @@ export interface FirebaseResult<T = unknown> {
   error?: string;
 }
 
+// Supprime récursivement les valeurs undefined d'un objet (Firebase les rejette)
+function stripUndefined<T>(obj: T): T {
+  if (obj === null || obj === undefined || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map(stripUndefined) as T;
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    if (value !== undefined) {
+      cleaned[key] = typeof value === "object" && value !== null ? stripUndefined(value) : value;
+    }
+  }
+  return cleaned as T;
+}
+
 class FirebaseService {
   async create<T extends Record<string, unknown>>(path: string, data: T): Promise<FirebaseResult<T & { id: string }>> {
     try {
       const newRef = push(ref(database, path));
       const id = newRef.key!;
-      const dataWithMetadata = {
+      const dataWithMetadata = stripUndefined({
         ...data,
         id,
         dateCreation: new Date().toISOString(),
         derniereMAJ: new Date().toISOString(),
-      };
+      });
       await set(newRef, dataWithMetadata);
       return { success: true, id, data: dataWithMetadata as T & { id: string } };
     } catch (error) {
@@ -78,7 +91,7 @@ class FirebaseService {
 
   async update(path: string, id: string, updates: Record<string, unknown>): Promise<FirebaseResult> {
     try {
-      const updateData = { ...updates, derniereMAJ: new Date().toISOString() };
+      const updateData = stripUndefined({ ...updates, derniereMAJ: new Date().toISOString() });
       await update(ref(database, `${path}/${id}`), updateData);
       return { success: true };
     } catch (error) {

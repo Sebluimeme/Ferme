@@ -6,7 +6,6 @@ import { useToast } from "@/components/Toast";
 import Modal, { ConfirmModal } from "@/components/Modal";
 import TaskForm from "@/components/TaskForm";
 import TaskNotificationBanner from "@/components/TaskNotificationBanner";
-import KpiCard from "@/components/KpiCard";
 import { scheduleTaskNotifications, isNotificationSupported, getNotificationPermission } from "@/services/notification-service";
 import { formatDate } from "@/lib/utils";
 import { getAnimalIcon } from "@/lib/utils";
@@ -202,43 +201,6 @@ export default function TachesPageContent() {
         >
           + Nouvelle tâche
         </button>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-        <KpiCard
-          label="Total"
-          value={stats.total}
-          borderColorClass="border-l-primary"
-          onClick={() => setStatusFilter("toutes")}
-        />
-        <KpiCard
-          label="A faire"
-          value={stats.aFaire}
-          borderColorClass="border-l-gray-400"
-          valueColorClass="text-gray-600"
-          onClick={() => setStatusFilter("a_faire")}
-        />
-        <KpiCard
-          label="En cours"
-          value={stats.enCours}
-          borderColorClass="border-l-blue-500"
-          valueColorClass="text-blue-500"
-          onClick={() => setStatusFilter("en_cours")}
-        />
-        <KpiCard
-          label="Terminées"
-          value={stats.terminees}
-          borderColorClass="border-l-green-500"
-          valueColorClass="text-green-500"
-          onClick={() => setStatusFilter("terminee")}
-        />
-        <KpiCard
-          label="En retard"
-          value={stats.enRetard}
-          borderColorClass="border-l-red-500"
-          valueColorClass="text-red-500"
-        />
       </div>
 
       {/* Filtres par statut */}
