@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/store";
-import { formatCurrency, formatDate, getAnimalIcon } from "@/lib/utils";
-import { getVehicleIcon, formatAlertMessage } from "@/lib/vehicle-utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatAlertMessage } from "@/lib/vehicle-utils";
 import { getVehicleStats } from "@/services/vehicle-service";
 import { getUrgentTasks, getTaskStats, isTaskOverdue, isTaskDueSoon, getDaysUntilDue } from "@/services/task-service";
 import KpiCard from "@/components/KpiCard";
@@ -116,51 +116,18 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <KpiCard label="Total Animaux" value={stats.totalAnimaux || 0} subtitle="actifs" onClick={() => router.push("/animaux")} />
-        <KpiCard label={`${getAnimalIcon("ovin")} Ovins`} value={stats.ovins || 0} borderColorClass="border-l-ovin" valueColorClass="text-ovin" onClick={() => router.push("/animaux?type=ovin")} />
-        <KpiCard label={`${getAnimalIcon("bovin")} Bovins`} value={stats.bovins || 0} borderColorClass="border-l-bovin" valueColorClass="text-bovin" onClick={() => router.push("/animaux?type=bovin")} />
-        <KpiCard label={`${getAnimalIcon("caprin")} Caprins`} value={stats.caprins || 0} borderColorClass="border-l-caprin" valueColorClass="text-caprin" onClick={() => router.push("/animaux?type=caprin")} />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-        <KpiCard label={`${getAnimalIcon("porcin")} Porcins`} value={stats.porcins || 0} borderColorClass="border-l-porcin" valueColorClass="text-porcin" onClick={() => router.push("/animaux?type=porcin")} />
-        <KpiCard label="Profit Global" value={formatCurrency(stats.profitGlobal || 0)} subtitle="Année en cours" borderColorClass="border-l-green-500" valueColorClass="text-green-500" />
-      </div>
-
-      {/* KPI Véhicules */}
-      <h2 className="text-xl font-bold mb-3 mt-6">🚗 Parc de véhicules</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      {/* Résumé rapide */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <KpiCard label="🐾 Animaux" value={stats.totalAnimaux || 0} subtitle="actifs" onClick={() => router.push("/animaux")} />
         <KpiCard
-          label="Total Véhicules"
+          label="🚗 Véhicules"
           value={vehicleStats.totalVehicules || 0}
           subtitle="actifs"
           borderColorClass="border-l-blue-500"
           valueColorClass="text-blue-500"
           onClick={() => router.push("/vehicules")}
         />
-        <KpiCard
-          label={`${getVehicleIcon("voiture")} Voitures`}
-          value={vehicleStats.parType.voiture || 0}
-          borderColorClass="border-l-blue-600"
-          valueColorClass="text-blue-600"
-          onClick={() => router.push("/vehicules")}
-        />
-        <KpiCard
-          label={`${getVehicleIcon("tracteur")} Tracteurs`}
-          value={vehicleStats.parType.tracteur || 0}
-          borderColorClass="border-l-green-600"
-          valueColorClass="text-green-600"
-          onClick={() => router.push("/vehicules")}
-        />
-        <KpiCard
-          label={`${getVehicleIcon("moto")} Motos/Quads`}
-          value={(vehicleStats.parType.moto || 0) + (vehicleStats.parType.quad || 0)}
-          borderColorClass="border-l-red-600"
-          valueColorClass="text-red-600"
-          onClick={() => router.push("/vehicules")}
-        />
+        <KpiCard label="💰 Profit Global" value={formatCurrency(stats.profitGlobal || 0)} subtitle="Année en cours" borderColorClass="border-l-green-500" valueColorClass="text-green-500" />
       </div>
 
       {/* Alertes d'entretien */}
@@ -236,43 +203,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Bienvenue */}
-      <div className="bg-white rounded-lg shadow-sm">
-        <div className="px-4 py-3">
-          <h2 className="text-xl font-bold mb-3">👋 Bienvenue dans votre application de gestion de ferme!</h2>
-          <p className="text-gray-700 mb-3 text-sm">
-            Gérez votre cheptel et votre parc de véhicules en toute simplicité.
-          </p>
-
-          <div className="mt-4">
-            <h4 className="text-base font-semibold mb-1.5">🚀 Fonctionnalités disponibles:</h4>
-            <ul className="list-none space-y-0.5 text-gray-700 text-sm">
-              <li>✅ Gestion de 4 types d&apos;animaux (ovins, bovins, caprins, porcins)</li>
-              <li>✅ Gestion du parc de véhicules (voitures, tracteurs, motos, quads...)</li>
-              <li>✅ Suivi complet des entretiens avec alertes automatiques</li>
-              <li>✅ Planification des entretiens basée sur km, heures ou dates</li>
-              <li>✅ Templates d&apos;entretien prédéfinis</li>
-              <li>✅ Gestion des documents (carte grise, assurance, CT...)</li>
-              <li>✅ Suivi des coûts d&apos;entretien et pièces</li>
-              <li>✅ Gestion des tâches avec échéances et notifications</li>
-              <li>🔄 Synchronisation en temps réel avec Firebase</li>
-              <li>📱 Interface responsive (mobile, tablette, desktop)</li>
-            </ul>
-          </div>
-
-          <div className="mt-4">
-            <h4 className="text-base font-semibold mb-1.5">📝 En développement:</h4>
-            <ul className="list-none space-y-0.5 text-gray-700 text-sm">
-              <li>Module Traitements vétérinaires</li>
-              <li>Module Coûts globaux</li>
-              <li>Module Profits</li>
-              <li>Module Rapports</li>
-              <li>Galerie photos véhicules</li>
-              <li>Suivi consommation carburant</li>
-            </ul>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
