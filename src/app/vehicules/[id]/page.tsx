@@ -7,6 +7,8 @@ import type { Vehicle } from "@/types/vehicle";
 import VehicleHeader from "@/components/vehicle-detail/VehicleHeader";
 import VehicleInfoGrid from "@/components/vehicle-detail/VehicleInfoGrid";
 import MaintenanceTimeline from "@/components/vehicle-detail/MaintenanceTimeline";
+import VehiclePhotoGallery from "@/components/vehicle-detail/VehiclePhotoGallery";
+import VehicleDocuments from "@/components/vehicle-detail/VehicleDocuments";
 
 const TABS = [
   { id: "info", label: "Informations" },
@@ -66,18 +68,8 @@ export default function VehicleDetailPage() {
         <div className="p-6">
           {activeTab === "info" && <VehicleInfoGrid vehicle={vehicle} />}
           {activeTab === "entretien" && <MaintenanceTimeline vehicleId={vehicle.id} />}
-          {activeTab === "photos" && (
-            <div className="text-center py-12">
-              <div className="text-4xl mb-3">📷</div>
-              <p className="text-gray-500">Galerie photos - En cours de développement</p>
-            </div>
-          )}
-          {activeTab === "documents" && (
-            <div className="text-center py-12">
-              <div className="text-4xl mb-3">📄</div>
-              <p className="text-gray-500">Documents - En cours de développement</p>
-            </div>
-          )}
+          {activeTab === "photos" && <VehiclePhotoGallery vehicleId={vehicle.id} />}
+          {activeTab === "documents" && <VehicleDocuments vehicleId={vehicle.id} />}
         </div>
       </div>
     </div>
