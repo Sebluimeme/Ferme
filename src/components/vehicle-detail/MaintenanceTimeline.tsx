@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import type { MaintenanceEntry, MaintenanceFormData, PartUsed } from "@/types/vehicle";
+import type { MaintenanceEntry, MaintenanceFormData } from "@/types/vehicle";
 import {
   addMaintenance,
   updateMaintenance,
   deleteMaintenance,
   listenMaintenanceEntries,
+  uploadMaintenanceFacture,
+  deleteMaintenanceFacture,
 } from "@/services/vehicle-detail-service";
 import { useToast } from "../Toast";
 import Modal, { ConfirmModal } from "../Modal";
@@ -35,6 +37,7 @@ export default function MaintenanceTimeline({ vehicleId }: MaintenanceTimelinePr
   const [loading, setLoading] = useState(false);
 
   const formRef = useRef<HTMLFormElement | null>(null);
+  const factureFileRef = useRef<File | null>(null);
 
   useEffect(() => {
     const unsubscribe = listenMaintenanceEntries(vehicleId, (data) => {
@@ -69,6 +72,12 @@ export default function MaintenanceTimeline({ vehicleId }: MaintenanceTimelinePr
       : await addMaintenance(vehicleId, data);
 
     if (result.success) {
+      // Upload facture si sélectionnée
+      const entryId = editEntry ? editEntry.id : result.id;
+      if (factureFileRef.current && entryId) {
+        await uploadMaintenanceFacture(entryId, vehicleId, factureFileRef.current);
+        factureFileRef.current = null;
+      }
       showToast({
         type: "success",
         title: editEntry ? "Entretien modifié" : "Entretien ajouté",
@@ -133,14 +142,14 @@ export default function MaintenanceTimeline({ vehicleId }: MaintenanceTimelinePr
                   className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-start gap-3">
-                    <span className="text-2xl">{getMaintenanceTypeIcon(entry.type)}</span>
+                    <span className="text-2xl">{entry.type ? getMaintenanceTypeIcon(entry.type) : "🔧"}</span>
                     <div className="flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <h4 className="font-semibold text-gray-800">{entry.titre}</h4>
-                          <p className="text-sm text-gray-600">{getMaintenanceTypeLabel(entry.type)}</p>
+                          <h4 className="font-semibold text-gray-800">{entry.titre || "Entretien"}</h4>
+                          <p className="text-sm text-gray-600">{entry.type ? getMaintenanceTypeLabel(entry.type) : ""}</p>
                         </div>
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${getMaintenanceStatusColor(entry.statut)}`}>
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${getMaintenanceStatusColor(entry.statut || "termine")}`}>
                           {entry.statut === "planifie" ? "Planifié" : entry.statut === "en_cours" ? "En cours" : entry.statut === "termine" ? "Terminé" : "Annulé"}
                         </span>
                       </div>
@@ -192,16 +201,12 @@ export default function MaintenanceTimeline({ vehicleId }: MaintenanceTimelinePr
                           <p className="text-sm font-medium">{formatDate(entry.prochaineDate)}</p>
                         </div>
                       )}
-                      {entry.coutMain && (
+                      {entry.facture && (
                         <div>
-                          <p className="text-xs text-gray-500">Main d'œuvre</p>
-                          <p className="text-sm font-medium">{formatCurrency(entry.coutMain)}</p>
-                        </div>
-                      )}
-                      {entry.coutPieces && (
-                        <div>
-                          <p className="text-xs text-gray-500">Pièces</p>
-                          <p className="text-sm font-medium">{formatCurrency(entry.coutPieces)}</p>
+                          <p className="text-xs text-gray-500">Facture</p>
+                          <a href={entry.facture} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">
+                            📄 Voir la facture
+                          </a>
                         </div>
                       )}
                     </div>
@@ -244,7 +249,7 @@ export default function MaintenanceTimeline({ vehicleId }: MaintenanceTimelinePr
         title={editEntry ? "Modifier l'entretien" : "Ajouter un entretien"}
         size="large"
       >
-        <MaintenanceForm entry={editEntry} formRef={formRef} />
+        <MaintenanceForm entry={editEntry} formRef={formRef} factureFileRef={factureFileRef} />
         <div className="flex gap-2 justify-end mt-6">
           <button
             onClick={() => {
@@ -278,15 +283,16 @@ export default function MaintenanceTimeline({ vehicleId }: MaintenanceTimelinePr
   );
 }
 
-function MaintenanceForm({ entry, formRef }: { entry: MaintenanceEntry | null; formRef: React.RefObject<HTMLFormElement | null> }) {
+function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: MaintenanceEntry | null; formRef: React.RefObject<HTMLFormElement | null>; factureFileRef: React.RefObject<File | null> }) {
+  const [facturePreview, setFacturePreview] = useState<string | null>(entry?.facture || null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <form ref={formRef} className="grid gap-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">
-            Type <span className="text-red-500">*</span>
-          </label>
-          <select name="type" defaultValue={entry?.type || ""} required className="w-full px-3 py-2 border rounded-lg">
+          <label className="block mb-1 text-sm font-medium text-gray-700">Type</label>
+          <select name="type" defaultValue={entry?.type || ""} className="w-full px-3 py-2 border rounded-lg">
             <option value="">Sélectionnez...</option>
             <option value="vidange">🛢️ Vidange</option>
             <option value="filtres">🔧 Filtres</option>
@@ -302,14 +308,11 @@ function MaintenanceForm({ entry, formRef }: { entry: MaintenanceEntry | null; f
           </select>
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">
-            Titre <span className="text-red-500">*</span>
-          </label>
+          <label className="block mb-1 text-sm font-medium text-gray-700">Titre</label>
           <input
             type="text"
             name="titre"
             defaultValue={entry?.titre || ""}
-            required
             placeholder="Ex: Vidange moteur"
             className="w-full px-3 py-2 border rounded-lg"
           />
@@ -329,10 +332,8 @@ function MaintenanceForm({ entry, formRef }: { entry: MaintenanceEntry | null; f
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">
-            Statut <span className="text-red-500">*</span>
-          </label>
-          <select name="statut" defaultValue={entry?.statut || "planifie"} required className="w-full px-3 py-2 border rounded-lg">
+          <label className="block mb-1 text-sm font-medium text-gray-700">Statut</label>
+          <select name="statut" defaultValue={entry?.statut || "termine"} className="w-full px-3 py-2 border rounded-lg">
             <option value="planifie">Planifié</option>
             <option value="en_cours">En cours</option>
             <option value="termine">Terminé</option>
@@ -340,12 +341,12 @@ function MaintenanceForm({ entry, formRef }: { entry: MaintenanceEntry | null; f
           </select>
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Garage / Mécanicien</label>
+          <label className="block mb-1 text-sm font-medium text-gray-700">Mécanicien</label>
           <input
             type="text"
             name="garage"
             defaultValue={entry?.garage || ""}
-            placeholder="Garage Martin"
+            placeholder="Nom du mécanicien"
             className="w-full px-3 py-2 border rounded-lg"
           />
         </div>
@@ -353,7 +354,7 @@ function MaintenanceForm({ entry, formRef }: { entry: MaintenanceEntry | null; f
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Date effectuée</label>
+          <label className="block mb-1 text-sm font-medium text-gray-700">Date</label>
           <input
             type="date"
             name="dateEffectuee"
@@ -362,11 +363,13 @@ function MaintenanceForm({ entry, formRef }: { entry: MaintenanceEntry | null; f
           />
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Date planifiée</label>
+          <label className="block mb-1 text-sm font-medium text-gray-700">Coût (€)</label>
           <input
-            type="date"
-            name="datePlanifiee"
-            defaultValue={entry?.datePlanifiee || ""}
+            type="number"
+            name="coutTotal"
+            defaultValue={entry?.coutTotal || ""}
+            step="0.01"
+            placeholder="80.00"
             className="w-full px-3 py-2 border rounded-lg"
           />
         </div>
@@ -374,7 +377,7 @@ function MaintenanceForm({ entry, formRef }: { entry: MaintenanceEntry | null; f
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Kilométrage effectué</label>
+          <label className="block mb-1 text-sm font-medium text-gray-700">Kilométrage</label>
           <input
             type="number"
             name="kilometrageEffectue"
@@ -384,7 +387,7 @@ function MaintenanceForm({ entry, formRef }: { entry: MaintenanceEntry | null; f
           />
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Heures effectuées</label>
+          <label className="block mb-1 text-sm font-medium text-gray-700">Heures</label>
           <input
             type="number"
             name="heuresEffectuees"
@@ -395,7 +398,7 @@ function MaintenanceForm({ entry, formRef }: { entry: MaintenanceEntry | null; f
         </div>
       </div>
 
-      <h4 className="font-semibold text-gray-700 mt-4">Prochain entretien</h4>
+      <h4 className="font-semibold text-gray-700 mt-2">Prochain entretien</h4>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block mb-1 text-sm font-medium text-gray-700">À X km</label>
@@ -428,41 +431,57 @@ function MaintenanceForm({ entry, formRef }: { entry: MaintenanceEntry | null; f
         </div>
       </div>
 
-      <h4 className="font-semibold text-gray-700 mt-4">Coûts</h4>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Main d'œuvre (€)</label>
-          <input
-            type="number"
-            name="coutMain"
-            defaultValue={entry?.coutMain || ""}
-            step="0.01"
-            placeholder="50.00"
-            className="w-full px-3 py-2 border rounded-lg"
-          />
-        </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Pièces (€)</label>
-          <input
-            type="number"
-            name="coutPieces"
-            defaultValue={entry?.coutPieces || ""}
-            step="0.01"
-            placeholder="30.00"
-            className="w-full px-3 py-2 border rounded-lg"
-          />
-        </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Total (€)</label>
-          <input
-            type="number"
-            name="coutTotal"
-            defaultValue={entry?.coutTotal || ""}
-            step="0.01"
-            placeholder="80.00"
-            className="w-full px-3 py-2 border rounded-lg"
-          />
-        </div>
+      {/* Facture jointe */}
+      <div>
+        <label className="block mb-1 text-sm font-medium text-gray-700">Facture</label>
+        {facturePreview ? (
+          <div className="flex items-center gap-3">
+            {facturePreview.startsWith("data:image") || facturePreview.startsWith("http") ? (
+              <a href={facturePreview} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+                📄 Voir la facture
+              </a>
+            ) : (
+              <span className="text-sm text-gray-700">📄 {facturePreview}</span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setFacturePreview(null);
+                if (factureFileRef) factureFileRef.current = null;
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+              className="px-2 py-1 text-xs text-red-500 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 cursor-pointer"
+            >
+              Supprimer
+            </button>
+          </div>
+        ) : (
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full px-3 py-4 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+          >
+            <span className="text-gray-400 text-sm">Cliquez pour ajouter une facture (photo ou PDF)</span>
+          </div>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.pdf"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              if (factureFileRef) factureFileRef.current = file;
+              if (file.type.startsWith("image/")) {
+                const reader = new FileReader();
+                reader.onload = (ev) => setFacturePreview(ev.target?.result as string);
+                reader.readAsDataURL(file);
+              } else {
+                setFacturePreview(file.name);
+              }
+            }
+          }}
+        />
       </div>
     </form>
   );

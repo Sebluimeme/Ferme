@@ -25,11 +25,7 @@ const MAINTENANCE_PATH = "vehicules-maintenance";
 export function validateMaintenanceData(data: MaintenanceFormData): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  if (!data.type) errors.push("Le type d'entretien est obligatoire");
-  if (!data.titre?.trim()) errors.push("Le titre est obligatoire");
-  if (!data.statut) errors.push("Le statut est obligatoire");
-
-  // Validation numérique
+  // Validation numérique (aucun champ n'est obligatoire)
   if (data.kilometrageEffectue && isNaN(Number(data.kilometrageEffectue))) {
     errors.push("Le kilométrage doit être un nombre valide");
   }
@@ -42,23 +38,8 @@ export function validateMaintenanceData(data: MaintenanceFormData): { valid: boo
   if (data.prochainesHeures && isNaN(Number(data.prochainesHeures))) {
     errors.push("Les prochaines heures doivent être un nombre valide");
   }
-  if (data.intervalKm && isNaN(Number(data.intervalKm))) {
-    errors.push("L'intervalle kilométrage doit être un nombre valide");
-  }
-  if (data.intervalMois && isNaN(Number(data.intervalMois))) {
-    errors.push("L'intervalle en mois doit être un nombre valide");
-  }
-  if (data.intervalHeures && isNaN(Number(data.intervalHeures))) {
-    errors.push("L'intervalle en heures doit être un nombre valide");
-  }
-  if (data.coutMain && isNaN(Number(data.coutMain))) {
-    errors.push("Le coût main d'œuvre doit être un nombre valide");
-  }
-  if (data.coutPieces && isNaN(Number(data.coutPieces))) {
-    errors.push("Le coût des pièces doit être un nombre valide");
-  }
   if (data.coutTotal && isNaN(Number(data.coutTotal))) {
-    errors.push("Le coût total doit être un nombre valide");
+    errors.push("Le coût doit être un nombre valide");
   }
 
   return { valid: errors.length === 0, errors };
@@ -69,19 +50,16 @@ function formDataToMaintenance(
   formData: MaintenanceFormData,
   pieces?: PartUsed[]
 ): Omit<MaintenanceEntry, "id" | "dateCreation" | "derniereMAJ"> {
-  const coutMain = formData.coutMain ? Number(formData.coutMain) : undefined;
-  const coutPieces = formData.coutPieces ? Number(formData.coutPieces) : undefined;
-  const coutTotal = formData.coutTotal ? Number(formData.coutTotal) : (coutMain || 0) + (coutPieces || 0);
+  const coutTotal = formData.coutTotal ? Number(formData.coutTotal) : undefined;
 
   return {
     vehicleId,
-    type: formData.type,
-    titre: formData.titre.trim(),
+    type: formData.type || undefined,
+    titre: formData.titre?.trim() || undefined,
     description: formData.description?.trim() || undefined,
-    statut: formData.statut,
+    statut: formData.statut || "termine",
 
     dateEffectuee: formData.dateEffectuee || undefined,
-    datePlanifiee: formData.datePlanifiee || undefined,
     kilometrageEffectue: formData.kilometrageEffectue ? Number(formData.kilometrageEffectue) : undefined,
     heuresEffectuees: formData.heuresEffectuees ? Number(formData.heuresEffectuees) : undefined,
 
@@ -89,15 +67,9 @@ function formDataToMaintenance(
     prochaineDate: formData.prochaineDate || undefined,
     prochainesHeures: formData.prochainesHeures ? Number(formData.prochainesHeures) : undefined,
 
-    intervalKm: formData.intervalKm ? Number(formData.intervalKm) : undefined,
-    intervalMois: formData.intervalMois ? Number(formData.intervalMois) : undefined,
-    intervalHeures: formData.intervalHeures ? Number(formData.intervalHeures) : undefined,
-
     garage: formData.garage?.trim() || undefined,
 
     pieces: pieces || undefined,
-    coutMain,
-    coutPieces,
     coutTotal,
   };
 }
@@ -143,6 +115,25 @@ export async function updateMaintenance(
 
 export async function deleteMaintenance(maintenanceId: string): Promise<FirebaseResult> {
   return await firebaseService.delete(MAINTENANCE_PATH, maintenanceId);
+}
+
+export async function uploadMaintenanceFacture(maintenanceId: string, vehicleId: string, file: File): Promise<FirebaseResult> {
+  const storagePath = `vehicules/${vehicleId}/factures/${Date.now()}_${file.name}`;
+  const uploadResult: StorageResult = await uploadFile(storagePath, file);
+  if (!uploadResult.success) return { success: false, error: uploadResult.error };
+
+  return firebaseService.update(MAINTENANCE_PATH, maintenanceId, {
+    facture: uploadResult.url,
+    factureStoragePath: storagePath,
+  });
+}
+
+export async function deleteMaintenanceFacture(maintenanceId: string, storagePath: string): Promise<FirebaseResult> {
+  await deleteFile(storagePath);
+  return firebaseService.update(MAINTENANCE_PATH, maintenanceId, {
+    facture: null,
+    factureStoragePath: null,
+  });
 }
 
 export function listenMaintenanceEntries(

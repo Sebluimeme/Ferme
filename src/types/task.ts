@@ -25,11 +25,18 @@ export interface Task {
   // Échéance
   dateEcheance?: string;               // Date d'échéance (ISO format)
 
+  // Assignation
+  assigneA?: string;                   // Personne assignée à la tâche
+
   // Liens optionnels
   animalId?: string;                   // Référence à un animal
   animalNom?: string;                  // Nom/numéro de l'animal (pour affichage rapide)
   vehiculeId?: string;                 // Référence à un véhicule
   vehiculeNom?: string;                // Nom du véhicule (pour affichage rapide)
+
+  // Photo jointe
+  photoUrl?: string;                   // URL de la photo (Firebase Storage)
+  photoStoragePath?: string;           // Chemin de stockage (pour suppression)
 
   // Méta-données (auto-générées)
   dateCreation?: string;               // Date de création
@@ -45,6 +52,7 @@ export interface TaskFormData {
   priorite: TaskPriority;
   statut: TaskStatus;
   categorie?: string;
+  assigneA?: string;
   dateEcheance?: string;
   animalId?: string;
   animalNom?: string;

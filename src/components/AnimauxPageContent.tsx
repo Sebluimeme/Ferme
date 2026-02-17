@@ -161,7 +161,7 @@ export default function AnimauxPageContent() {
     <div className="fade-in">
       {/* Header */}
       <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
-        <h1 className="text-3xl font-bold m-0">🐾 Mes Animaux</h1>
+        <h1 className="text-2xl font-bold m-0">🐾 Mes Animaux</h1>
         <button
           onClick={() => setShowAddModal(true)}
           className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
@@ -172,7 +172,7 @@ export default function AnimauxPageContent() {
 
       {/* Stats rapides - masquées quand un filtre de type est actif */}
       {!currentFilter && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
           <KpiCard
             label="Total"
             value={stats.actifs}
@@ -320,7 +320,7 @@ export default function AnimauxPageContent() {
                 <div className="flex-1 h-px bg-gray-200" />
               </div>
               {/* Grille des animaux de cette année */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {animals.map(renderAnimalCard)}
               </div>
             </div>
@@ -328,7 +328,7 @@ export default function AnimauxPageContent() {
         </div>
       ) : (
         /* Vue normale : tous les animaux */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {filteredAnimaux.map(renderAnimalCard)}
         </div>
       )}

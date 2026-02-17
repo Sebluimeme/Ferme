@@ -1,4 +1,5 @@
 import firebaseService from "@/lib/firebase-service";
+import { uploadFile, deleteFile } from "@/lib/firebase-storage";
 import type { Task, TaskFormData, TaskStatus } from "@/types/task";
 
 const PATH = "taches";
@@ -27,6 +28,7 @@ export async function createTask(data: TaskFormData) {
   // Nettoyer les champs vides
   if (!taskData.description) delete taskData.description;
   if (!taskData.categorie) delete taskData.categorie;
+  if (!taskData.assigneA) delete taskData.assigneA;
   if (!taskData.dateEcheance) delete taskData.dateEcheance;
   if (!taskData.animalId) {
     delete taskData.animalId;
@@ -58,6 +60,25 @@ export async function toggleTaskStatus(task: Task, newStatut: TaskStatus) {
   return firebaseService.update(PATH, task.id, updates);
 }
 
+export async function uploadTaskPhoto(taskId: string, file: File) {
+  const storagePath = `taches/${taskId}/photos/${Date.now()}_${file.name}`;
+  const uploadResult = await uploadFile(storagePath, file);
+  if (!uploadResult.success) return uploadResult;
+
+  return firebaseService.update(PATH, taskId, {
+    photoUrl: uploadResult.url,
+    photoStoragePath: storagePath,
+  });
+}
+
+export async function deleteTaskPhoto(taskId: string, storagePath: string) {
+  await deleteFile(storagePath);
+  return firebaseService.update(PATH, taskId, {
+    photoUrl: null,
+    photoStoragePath: null,
+  });
+}
+
 export async function deleteTask(id: string) {
   return firebaseService.delete(PATH, id);
 }
@@ -69,6 +90,7 @@ export function searchTasks(tasks: Task[], query: string): Task[] {
       t.titre.toLowerCase().includes(lower) ||
       t.description?.toLowerCase().includes(lower) ||
       t.categorie?.toLowerCase().includes(lower) ||
+      t.assigneA?.toLowerCase().includes(lower) ||
       t.animalNom?.toLowerCase().includes(lower) ||
       t.vehiculeNom?.toLowerCase().includes(lower)
   );

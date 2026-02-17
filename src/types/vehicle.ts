@@ -76,10 +76,10 @@ export interface MaintenanceEntry {
   vehicleId: string;                   // Référence au véhicule
 
   // Informations de base
-  type: MaintenanceType;               // Type d'entretien
-  titre: string;                       // Titre court (ex: "Vidange moteur")
+  type?: MaintenanceType;              // Type d'entretien
+  titre?: string;                      // Titre court (ex: "Vidange moteur")
   description?: string;                // Description détaillée
-  statut: MaintenanceStatus;           // État de l'entretien
+  statut?: MaintenanceStatus;          // État de l'entretien
 
   // Dates et déclencheurs
   dateEffectuee?: string;              // Date de réalisation (ISO format)
@@ -108,6 +108,7 @@ export interface MaintenanceEntry {
 
   // Documents
   facture?: string;                    // URL de la facture (Firebase Storage)
+  factureStoragePath?: string;         // Chemin de stockage pour suppression
 
   // Méta-données
   dateCreation?: string;
@@ -242,10 +243,10 @@ export interface VehicleFormData {
 }
 
 export interface MaintenanceFormData {
-  type: MaintenanceType;
-  titre: string;
+  type?: MaintenanceType;
+  titre?: string;
   description?: string;
-  statut: MaintenanceStatus;
+  statut?: MaintenanceStatus;
 
   dateEffectuee?: string;
   datePlanifiee?: string;
@@ -291,8 +292,8 @@ export interface MaintenanceAlert {
   vehicleId: string;
   vehicleNom: string;
   maintenanceId?: string;
-  type: MaintenanceType;
-  titre: string;
+  type?: MaintenanceType;
+  titre?: string;
   raison: "date" | "kilometrage" | "heures";
   valeurActuelle?: number;             // Km ou heures actuels
   valeurCible?: number;                // Km ou heures du prochain entretien
