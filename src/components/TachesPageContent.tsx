@@ -16,6 +16,8 @@ import {
   updateTask,
   deleteTask as deleteTaskService,
   toggleTaskStatus,
+  uploadTaskPhoto,
+  deleteTaskPhoto,
   searchTasks,
   sortTasksByEcheance,
   getTaskStats,
@@ -69,6 +71,8 @@ export default function TachesPageContent() {
   const { state } = useAppStore();
   const { showToast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
+  const photoFileRef = useRef<File | null>(null);
+  const [photoRemoved, setPhotoRemoved] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "toutes">("a_faire");
   const [searchQuery, setSearchQuery] = useState("");
@@ -116,6 +120,20 @@ export default function TachesPageContent() {
       if (editTarget) {
         const result = await updateTask(editTarget.id, data);
         if (result.success) {
+          // Supprimer l'ancienne photo si demandé
+          if (photoRemoved && editTarget.photoStoragePath) {
+            await deleteTaskPhoto(editTarget.id, editTarget.photoStoragePath);
+          }
+          // Upload nouvelle photo si sélectionnée
+          if (photoFileRef.current) {
+            // Supprimer l'ancienne photo si une nouvelle est ajoutée
+            if (editTarget.photoStoragePath && !photoRemoved) {
+              await deleteTaskPhoto(editTarget.id, editTarget.photoStoragePath);
+            }
+            await uploadTaskPhoto(editTarget.id, photoFileRef.current);
+            photoFileRef.current = null;
+          }
+          setPhotoRemoved(false);
           showToast({ type: "success", title: "Succès", message: "Tâche modifiée avec succès" });
           setEditTarget(null);
         } else {
@@ -124,6 +142,11 @@ export default function TachesPageContent() {
       } else {
         const result = await createTask(data);
         if (result.success) {
+          // Upload photo si sélectionnée
+          if (photoFileRef.current && result.id) {
+            await uploadTaskPhoto(result.id, photoFileRef.current);
+            photoFileRef.current = null;
+          }
           showToast({ type: "success", title: "Succès", message: "Tâche ajoutée avec succès" });
           setShowAddModal(false);
         } else {
@@ -152,6 +175,10 @@ export default function TachesPageContent() {
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
+    // Supprimer la photo associée si elle existe
+    if (deleteTarget.photoStoragePath) {
+      await deleteTaskPhoto(deleteTarget.id, deleteTarget.photoStoragePath);
+    }
     const result = await deleteTaskService(deleteTarget.id);
     if (result.success) {
       showToast({ type: "success", title: "Succès", message: "Tâche supprimée" });
@@ -167,8 +194,8 @@ export default function TachesPageContent() {
       <TaskNotificationBanner />
 
       {/* Header */}
-      <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
-        <h1 className="text-3xl font-bold m-0">📋 Tâches</h1>
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
+        <h1 className="text-2xl font-bold m-0">📋 Tâches</h1>
         <button
           onClick={() => setShowAddModal(true)}
           className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
@@ -178,7 +205,7 @@ export default function TachesPageContent() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         <KpiCard
           label="Total"
           value={stats.total}
@@ -237,7 +264,7 @@ export default function TachesPageContent() {
       </div>
 
       {/* Barre de recherche */}
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-8">
+      <div className="bg-white rounded-lg shadow-sm p-3 mb-6">
         <input
           type="text"
           placeholder="🔍 Rechercher par titre, description, catégorie..."
@@ -263,7 +290,7 @@ export default function TachesPageContent() {
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {filteredTaches.map((task) => {
             const overdue = isTaskOverdue(task);
             const dueSoon = isTaskDueSoon(task);
@@ -273,7 +300,7 @@ export default function TachesPageContent() {
             return (
               <div
                 key={task.id}
-                className={`bg-white rounded-xl shadow-sm border-l-4 transition-all hover:shadow-md ${
+                className={`bg-white rounded-lg shadow-sm border-l-4 transition-all hover:shadow-md ${
                   isDone
                     ? "border-l-green-400 opacity-70"
                     : overdue
@@ -287,8 +314,8 @@ export default function TachesPageContent() {
                     : "border-l-green-400"
                 }`}
               >
-                <div className="p-4">
-                  <div className="flex items-start gap-3">
+                <div className="px-3 py-2.5">
+                  <div className="flex items-start gap-2">
                     {/* Checkbox */}
                     <button
                       onClick={() => handleToggleStatus(task)}
@@ -304,7 +331,7 @@ export default function TachesPageContent() {
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className={`text-base font-semibold m-0 ${isDone ? "line-through text-gray-400" : "text-gray-900"}`}>
+                        <h3 className={`text-sm font-semibold m-0 ${isDone ? "line-through text-gray-400" : "text-gray-900"}`}>
                           {task.titre}
                         </h3>
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${getStatutBadgeClass(task.statut)}`}>
@@ -318,9 +345,19 @@ export default function TachesPageContent() {
                       </div>
 
                       {task.description && (
-                        <p className={`text-sm mb-2 ${isDone ? "text-gray-300" : "text-gray-600"}`}>
+                        <p className={`text-xs mb-1.5 ${isDone ? "text-gray-300" : "text-gray-600"}`}>
                           {task.description}
                         </p>
+                      )}
+
+                      {task.photoUrl && (
+                        <div className="mb-1.5">
+                          <img
+                            src={task.photoUrl}
+                            alt="Photo jointe"
+                            className="w-16 h-16 object-cover rounded-md border border-gray-200"
+                          />
+                        </div>
                       )}
 
                       <div className="flex items-center gap-3 flex-wrap text-xs text-gray-500">
@@ -331,6 +368,11 @@ export default function TachesPageContent() {
                         {task.categorie && (
                           <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">
                             {task.categorie}
+                          </span>
+                        )}
+                        {task.assigneA && (
+                          <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">
+                            👤 {task.assigneA}
                           </span>
                         )}
                         {task.animalId && task.animalNom && (
@@ -374,11 +416,11 @@ export default function TachesPageContent() {
       {/* Modal ajout */}
       <Modal
         isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
+        onClose={() => { setShowAddModal(false); photoFileRef.current = null; }}
         title="+ Nouvelle tâche"
         size="large"
       >
-        <TaskForm formRef={formRef} />
+        <TaskForm formRef={formRef} photoFileRef={photoFileRef} />
         <div className="flex gap-3 justify-end mt-6">
           <button
             onClick={() => setShowAddModal(false)}
@@ -399,11 +441,11 @@ export default function TachesPageContent() {
       {/* Modal édition */}
       <Modal
         isOpen={!!editTarget}
-        onClose={() => setEditTarget(null)}
+        onClose={() => { setEditTarget(null); photoFileRef.current = null; }}
         title="Modifier la tâche"
         size="large"
       >
-        {editTarget && <TaskForm task={editTarget} formRef={formRef} />}
+        {editTarget && <TaskForm task={editTarget} formRef={formRef} photoFileRef={photoFileRef} onPhotoRemoved={() => setPhotoRemoved(true)} />}
         <div className="flex gap-3 justify-end mt-6">
           <button
             onClick={() => setEditTarget(null)}

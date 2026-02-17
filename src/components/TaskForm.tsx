@@ -10,10 +10,14 @@ import { getVehicleDisplayName } from "@/services/vehicle-service";
 interface TaskFormProps {
   task?: Task | null;
   formRef: React.RefObject<HTMLFormElement | null>;
+  photoFileRef?: React.RefObject<File | null>;
+  onPhotoRemoved?: () => void;
 }
 
-export default function TaskForm({ task, formRef }: TaskFormProps) {
+export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }: TaskFormProps) {
   const { state } = useAppStore();
+  const [photoPreview, setPhotoPreview] = useState<string | null>(task?.photoUrl || null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Catégorie (même pattern que les races)
   const [categorieValue, setCategorieValue] = useState(task?.categorie || "");
@@ -21,6 +25,13 @@ export default function TaskForm({ task, formRef }: TaskFormProps) {
   const [categorieSearchQuery, setCategorieSearchQuery] = useState("");
   const [isAddingNewCategorie, setIsAddingNewCategorie] = useState(false);
   const categorieDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Personne assignée (même pattern que les catégories)
+  const [assigneAValue, setAssigneAValue] = useState(task?.assigneA || "");
+  const [assigneADropdownOpen, setAssigneADropdownOpen] = useState(false);
+  const [assigneASearchQuery, setAssigneASearchQuery] = useState("");
+  const [isAddingNewPersonne, setIsAddingNewPersonne] = useState(false);
+  const assigneADropdownRef = useRef<HTMLDivElement>(null);
 
   // Animal lié
   const [selectedAnimalId, setSelectedAnimalId] = useState(task?.animalId || "");
@@ -47,6 +58,20 @@ export default function TaskForm({ task, formRef }: TaskFormProps) {
     const lower = categorieSearchQuery.toLowerCase();
     return categorieSuggestions.filter((c) => c.toLowerCase().includes(lower));
   }, [categorieSuggestions, categorieSearchQuery]);
+
+  // Personnes uniques depuis les tâches existantes
+  const personneSuggestions = useMemo(() => {
+    const personnes = state.taches
+      .filter((t) => t.assigneA && t.assigneA.trim() !== "")
+      .map((t) => t.assigneA!.trim());
+    return [...new Set(personnes)].sort((a, b) => a.localeCompare(b, "fr"));
+  }, [state.taches]);
+
+  const filteredPersonneSuggestions = useMemo(() => {
+    if (!assigneASearchQuery) return personneSuggestions;
+    const lower = assigneASearchQuery.toLowerCase();
+    return personneSuggestions.filter((p) => p.toLowerCase().includes(lower));
+  }, [personneSuggestions, assigneASearchQuery]);
 
   // Animaux actifs
   const activeAnimals = useMemo(() => {
@@ -119,6 +144,11 @@ export default function TaskForm({ task, formRef }: TaskFormProps) {
         setCategorieSearchQuery("");
         setIsAddingNewCategorie(false);
       }
+      if (assigneADropdownRef.current && !assigneADropdownRef.current.contains(e.target as Node)) {
+        setAssigneADropdownOpen(false);
+        setAssigneASearchQuery("");
+        setIsAddingNewPersonne(false);
+      }
       if (animalDropdownRef.current && !animalDropdownRef.current.contains(e.target as Node)) {
         setAnimalDropdownOpen(false);
         setAnimalSearchQuery("");
@@ -128,11 +158,11 @@ export default function TaskForm({ task, formRef }: TaskFormProps) {
         setVehiculeSearchQuery("");
       }
     }
-    if (categorieDropdownOpen || animalDropdownOpen || vehiculeDropdownOpen) {
+    if (categorieDropdownOpen || assigneADropdownOpen || animalDropdownOpen || vehiculeDropdownOpen) {
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [categorieDropdownOpen, animalDropdownOpen, vehiculeDropdownOpen]);
+  }, [categorieDropdownOpen, assigneADropdownOpen, animalDropdownOpen, vehiculeDropdownOpen]);
 
   return (
     <form ref={formRef} className="grid gap-4">
@@ -185,8 +215,8 @@ export default function TaskForm({ task, formRef }: TaskFormProps) {
         </div>
       </div>
 
-      {/* Date d'échéance + Catégorie */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Date d'échéance + Catégorie + Assignée à */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block mb-1 text-sm font-medium text-gray-700">
             Date d&apos;échéance
@@ -308,6 +338,116 @@ export default function TaskForm({ task, formRef }: TaskFormProps) {
             </div>
           )}
         </div>
+
+        {/* Assignée à - même pattern que les catégories */}
+        <div className="relative" ref={assigneADropdownRef}>
+          <label className="block mb-1 text-sm font-medium text-gray-700">Assignée à</label>
+          <input type="hidden" name="assigneA" value={assigneAValue} />
+          {isAddingNewPersonne ? (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={assigneAValue}
+                onChange={(e) => setAssigneAValue(e.target.value)}
+                placeholder="Nom de la personne..."
+                autoFocus
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingNewPersonne(false);
+                  if (!assigneAValue) setAssigneADropdownOpen(false);
+                }}
+                className="px-2 py-2 text-xs text-gray-500 hover:text-gray-800 bg-gray-100 rounded-lg cursor-pointer border border-gray-300"
+              >
+                OK
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setAssigneADropdownOpen(!assigneADropdownOpen);
+                setAssigneASearchQuery("");
+              }}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-left flex items-center justify-between cursor-pointer bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 ${
+                assigneADropdownOpen ? "border-primary ring-2 ring-primary/10" : ""
+              }`}
+            >
+              <span className={assigneAValue ? "text-gray-900" : "text-gray-400"}>
+                {assigneAValue || "Sélectionner une personne..."}
+              </span>
+              <span className="text-gray-400 text-xs ml-2">{assigneADropdownOpen ? "▲" : "▼"}</span>
+            </button>
+          )}
+          {assigneADropdownOpen && !isAddingNewPersonne && (
+            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
+              {personneSuggestions.length > 3 && (
+                <div className="p-2 border-b border-gray-100">
+                  <input
+                    type="text"
+                    value={assigneASearchQuery}
+                    onChange={(e) => setAssigneASearchQuery(e.target.value)}
+                    placeholder="Filtrer..."
+                    autoFocus
+                    className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-primary"
+                  />
+                </div>
+              )}
+              <div className="overflow-y-auto max-h-48">
+                {assigneAValue && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssigneAValue("");
+                      setAssigneADropdownOpen(false);
+                      setAssigneASearchQuery("");
+                    }}
+                    className="w-full px-3 py-2 text-sm text-left text-gray-400 italic hover:bg-gray-50 cursor-pointer bg-transparent border-none"
+                  >
+                    Aucune personne
+                  </button>
+                )}
+                {filteredPersonneSuggestions.map((personne) => (
+                  <button
+                    key={personne}
+                    type="button"
+                    onClick={() => {
+                      setAssigneAValue(personne);
+                      setAssigneADropdownOpen(false);
+                      setAssigneASearchQuery("");
+                    }}
+                    className={`w-full px-3 py-2 text-sm text-left hover:bg-primary/5 cursor-pointer bg-transparent border-none flex items-center justify-between ${
+                      assigneAValue === personne ? "bg-primary/10 text-primary font-medium" : "text-gray-700"
+                    }`}
+                  >
+                    <span>{personne}</span>
+                    {assigneAValue === personne && <span className="text-primary">✓</span>}
+                  </button>
+                ))}
+                {assigneASearchQuery && filteredPersonneSuggestions.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-gray-400 italic">Aucune personne trouvée</div>
+                )}
+              </div>
+              <div className="border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingNewPersonne(true);
+                    setAssigneADropdownOpen(false);
+                    setAssigneASearchQuery("");
+                    setAssigneAValue("");
+                  }}
+                  className="w-full px-3 py-2.5 text-sm text-left text-primary font-medium hover:bg-primary/5 cursor-pointer bg-transparent border-none flex items-center gap-2"
+                >
+                  <span>+</span>
+                  <span>Ajouter une personne</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Description */}
@@ -319,6 +459,56 @@ export default function TaskForm({ task, formRef }: TaskFormProps) {
           placeholder="Détails de la tâche..."
           rows={3}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 resize-y min-h-[80px]"
+        />
+      </div>
+
+      {/* Photo jointe */}
+      <div>
+        <label className="block mb-1 text-sm font-medium text-gray-700">
+          Photo jointe <span className="text-xs text-gray-400 font-normal">(optionnel)</span>
+        </label>
+        {photoPreview ? (
+          <div className="flex items-start gap-3">
+            <img
+              src={photoPreview}
+              alt="Aperçu"
+              className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setPhotoPreview(null);
+                if (photoFileRef) photoFileRef.current = null;
+                if (fileInputRef.current) fileInputRef.current.value = "";
+                if (task?.photoUrl && onPhotoRemoved) onPhotoRemoved();
+              }}
+              className="px-2 py-1 text-xs text-red-500 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 cursor-pointer"
+            >
+              Supprimer
+            </button>
+          </div>
+        ) : (
+          <div
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full px-3 py-4 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+          >
+            <span className="text-gray-400 text-sm">Cliquez pour ajouter une photo</span>
+          </div>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              if (photoFileRef) photoFileRef.current = file;
+              const reader = new FileReader();
+              reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
+              reader.readAsDataURL(file);
+            }
+          }}
         />
       </div>
 
