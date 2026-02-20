@@ -8,23 +8,19 @@ export type VehicleType = "voiture" | "moto" | "quad" | "tracteur" | "utilitaire
 
 export type VehicleStatus = "actif" | "en_reparation" | "stocke" | "vendu" | "reforme";
 
-export type FuelType = "essence" | "diesel" | "electrique" | "hybride" | "gpl";
-
 // ==================== Interface Véhicule Principal ====================
 
 export interface Vehicle {
   id: string;                          // ID Firebase auto-généré
 
   // Identification
-  nom?: string;                        // Nom personnalisé (ex: "Tracteur rouge")
   type: VehicleType;                   // Type de véhicule
   marque?: string;                     // Marque (Renault, John Deere, etc.)
   modele?: string;                     // Modèle
-  annee?: number;                      // Année de fabrication
+  dateMiseEnCirculation?: string;      // Date de mise en circulation (ISO format)
 
-  // Immatriculation et numéros
+  // Immatriculation
   plaqueImmatriculation?: string;      // Plaque d'immatriculation
-  numeroSerie?: string;                // Numéro de série / VIN
 
   // État et statut
   statut: VehicleStatus;               // État actuel
@@ -32,19 +28,17 @@ export interface Vehicle {
   kilometrage?: number;                // Kilométrage actuel
 
   // Spécifications techniques
-  typeCarburant?: FuelType;            // Type de carburant
-  capaciteReservoir?: number;          // Capacité en litres
   puissance?: number;                  // Puissance (CV ou kW)
 
   // Financier
   valeurAchat?: number;                // Prix d'achat
   dateAchat?: string;                  // Date d'achat (ISO format)
-  valeurActuelle?: number;             // Valeur estimée actuelle
 
-  // Assurance et documents
-  numeroPoliceAssurance?: string;      // Numéro de police d'assurance
-  dateExpAssurance?: string;           // Date d'expiration assurance
+  // Documents
   dateProchainCT?: string;             // Date prochain contrôle technique
+
+  // Composants / références pièces
+  composants?: import("@/store/store").Composant[];
 
   // Notes
   commentaire?: string;                // Notes diverses
@@ -237,29 +231,22 @@ export interface MeterReadingFormData {
 // ==================== Formulaires ====================
 
 export interface VehicleFormData {
-  nom?: string;
   type: VehicleType;
   marque?: string;
   modele?: string;
-  annee?: string;                      // String car vient d'un input
+  dateMiseEnCirculation?: string;
 
   plaqueImmatriculation?: string;
-  numeroSerie?: string;
 
   statut: VehicleStatus;
-  heuresUtilisation?: string;          // String car vient d'un input
+  heuresUtilisation?: string;
   kilometrage?: string;
 
-  typeCarburant?: FuelType;
-  capaciteReservoir?: string;
   puissance?: string;
 
   valeurAchat?: string;
   dateAchat?: string;
-  valeurActuelle?: string;
 
-  numeroPoliceAssurance?: string;
-  dateExpAssurance?: string;
   dateProchainCT?: string;
 
   commentaire?: string;

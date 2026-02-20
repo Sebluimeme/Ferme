@@ -5,6 +5,7 @@
 
 import { firebaseService, FirebaseResult } from "@/lib/firebase-service";
 import type { Vehicle, VehicleFormData, VehicleStats, VehicleType } from "@/types/vehicle";
+import type { Composant } from "@/store/store";
 
 const COLLECTION_PATH = "vehicules";
 
@@ -23,10 +24,6 @@ export function validateVehicleData(data: VehicleFormData): { valid: boolean; er
   }
 
   // Validation formats numériques
-  if (data.annee && (isNaN(Number(data.annee)) || Number(data.annee) < 1900 || Number(data.annee) > new Date().getFullYear() + 1)) {
-    errors.push("L'année doit être valide");
-  }
-
   if (data.kilometrage && isNaN(Number(data.kilometrage))) {
     errors.push("Le kilométrage doit être un nombre valide");
   }
@@ -39,14 +36,6 @@ export function validateVehicleData(data: VehicleFormData): { valid: boolean; er
     errors.push("La valeur d'achat doit être un nombre valide");
   }
 
-  if (data.valeurActuelle && isNaN(Number(data.valeurActuelle))) {
-    errors.push("La valeur actuelle doit être un nombre valide");
-  }
-
-  if (data.capaciteReservoir && isNaN(Number(data.capaciteReservoir))) {
-    errors.push("La capacité du réservoir doit être un nombre valide");
-  }
-
   if (data.puissance && isNaN(Number(data.puissance))) {
     errors.push("La puissance doit être un nombre valide");
   }
@@ -56,8 +45,8 @@ export function validateVehicleData(data: VehicleFormData): { valid: boolean; er
     errors.push("La date d'achat n'est pas valide");
   }
 
-  if (data.dateExpAssurance && isNaN(Date.parse(data.dateExpAssurance))) {
-    errors.push("La date d'expiration de l'assurance n'est pas valide");
+  if (data.dateMiseEnCirculation && isNaN(Date.parse(data.dateMiseEnCirculation))) {
+    errors.push("La date de mise en circulation n'est pas valide");
   }
 
   if (data.dateProchainCT && isNaN(Date.parse(data.dateProchainCT))) {
@@ -84,29 +73,22 @@ function removeUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> 
 
 function formDataToVehicle(formData: VehicleFormData): Partial<Omit<Vehicle, "id" | "dateCreation" | "derniereMAJ">> {
   const raw = {
-    nom: formData.nom?.trim() || undefined,
     type: formData.type,
     marque: formData.marque?.trim() || undefined,
     modele: formData.modele?.trim() || undefined,
-    annee: formData.annee ? Number(formData.annee) : undefined,
+    dateMiseEnCirculation: formData.dateMiseEnCirculation || undefined,
 
     plaqueImmatriculation: formData.plaqueImmatriculation?.trim().toUpperCase() || undefined,
-    numeroSerie: formData.numeroSerie?.trim().toUpperCase() || undefined,
 
     statut: formData.statut,
     heuresUtilisation: formData.heuresUtilisation ? Number(formData.heuresUtilisation) : undefined,
     kilometrage: formData.kilometrage ? Number(formData.kilometrage) : undefined,
 
-    typeCarburant: formData.typeCarburant || undefined,
-    capaciteReservoir: formData.capaciteReservoir ? Number(formData.capaciteReservoir) : undefined,
     puissance: formData.puissance ? Number(formData.puissance) : undefined,
 
     valeurAchat: formData.valeurAchat ? Number(formData.valeurAchat) : undefined,
     dateAchat: formData.dateAchat || undefined,
-    valeurActuelle: formData.valeurActuelle ? Number(formData.valeurActuelle) : undefined,
 
-    numeroPoliceAssurance: formData.numeroPoliceAssurance?.trim() || undefined,
-    dateExpAssurance: formData.dateExpAssurance || undefined,
     dateProchainCT: formData.dateProchainCT || undefined,
 
     commentaire: formData.commentaire?.trim() || undefined,
@@ -212,6 +194,15 @@ export async function getAllVehicles(): Promise<FirebaseResult<Vehicle[]>> {
   return await firebaseService.getAll<Vehicle>(COLLECTION_PATH);
 }
 
+// ==================== Composants ====================
+
+export async function updateVehicleComposants(vehicleId: string, composants: Composant[]): Promise<FirebaseResult> {
+  return await firebaseService.update(COLLECTION_PATH, vehicleId, {
+    composants,
+    derniereMAJ: new Date().toISOString(),
+  });
+}
+
 // ==================== Recherche et Filtrage ====================
 
 export function searchVehicles(vehicles: Vehicle[], query: string): Vehicle[] {
@@ -221,9 +212,7 @@ export function searchVehicles(vehicles: Vehicle[], query: string): Vehicle[] {
 
   return vehicles.filter((vehicle) => {
     return (
-      vehicle.nom?.toLowerCase().includes(lowerQuery) ||
       vehicle.plaqueImmatriculation?.toLowerCase().includes(lowerQuery) ||
-      vehicle.numeroSerie?.toLowerCase().includes(lowerQuery) ||
       vehicle.marque?.toLowerCase().includes(lowerQuery) ||
       vehicle.modele?.toLowerCase().includes(lowerQuery) ||
       vehicle.type?.toLowerCase().includes(lowerQuery)
@@ -272,9 +261,7 @@ export function getVehicleStats(vehicles: Vehicle[]): VehicleStats {
     if (vehicle.statut) {
       parStatut[vehicle.statut] = (parStatut[vehicle.statut] || 0) + 1;
     }
-    if (vehicle.valeurActuelle) {
-      valeurTotale += vehicle.valeurActuelle;
-    } else if (vehicle.valeurAchat) {
+    if (vehicle.valeurAchat) {
       valeurTotale += vehicle.valeurAchat;
     }
   });
@@ -291,21 +278,10 @@ export function getVehicleStats(vehicles: Vehicle[]): VehicleStats {
 // ==================== Helpers ====================
 
 export function getVehicleDisplayName(vehicle: Vehicle): string {
-  if (vehicle.nom) return vehicle.nom;
   if (vehicle.plaqueImmatriculation) return vehicle.plaqueImmatriculation;
   if (vehicle.marque && vehicle.modele) return `${vehicle.marque} ${vehicle.modele}`;
   if (vehicle.marque) return vehicle.marque;
   return `Véhicule #${vehicle.id.substring(0, 6)}`;
-}
-
-export function getVehicleAge(vehicle: Vehicle): number | null {
-  if (!vehicle.annee) return null;
-  return new Date().getFullYear() - vehicle.annee;
-}
-
-export function isAssuranceExpired(vehicle: Vehicle): boolean {
-  if (!vehicle.dateExpAssurance) return false;
-  return new Date(vehicle.dateExpAssurance) < new Date();
 }
 
 export function isCTExpired(vehicle: Vehicle): boolean {

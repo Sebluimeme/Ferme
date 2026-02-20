@@ -39,7 +39,7 @@ export default function VehicleHeader({ vehicle }: VehicleHeaderProps) {
           {vehicle.marque && vehicle.modele && (
             <p className="text-gray-600 mt-2">
               {vehicle.marque} {vehicle.modele}
-              {vehicle.annee && ` • ${vehicle.annee}`}
+              {vehicle.dateMiseEnCirculation && ` • ${new Date(vehicle.dateMiseEnCirculation).toLocaleDateString("fr-FR")}`}
             </p>
           )}
         </div>

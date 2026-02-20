@@ -172,7 +172,7 @@ export function calculateMaintenanceAlerts(
         if (daysRemaining <= 30) {
           alerts.push({
             vehicleId: vehicle.id,
-            vehicleNom: vehicle.nom || vehicle.plaqueImmatriculation || `Véhicule ${vehicle.id}`,
+            vehicleNom: vehicle.plaqueImmatriculation || (vehicle.marque && vehicle.modele ? `${vehicle.marque} ${vehicle.modele}` : `Véhicule ${vehicle.id}`),
             maintenanceId: maintenance.id,
             type: maintenance.type,
             titre: maintenance.titre,
@@ -190,7 +190,7 @@ export function calculateMaintenanceAlerts(
         if (kmRemaining <= 1000) {
           alerts.push({
             vehicleId: vehicle.id,
-            vehicleNom: vehicle.nom || vehicle.plaqueImmatriculation || `Véhicule ${vehicle.id}`,
+            vehicleNom: vehicle.plaqueImmatriculation || (vehicle.marque && vehicle.modele ? `${vehicle.marque} ${vehicle.modele}` : `Véhicule ${vehicle.id}`),
             maintenanceId: maintenance.id,
             type: maintenance.type,
             titre: maintenance.titre,
@@ -208,7 +208,7 @@ export function calculateMaintenanceAlerts(
         if (heuresRemaining <= 50) {
           alerts.push({
             vehicleId: vehicle.id,
-            vehicleNom: vehicle.nom || vehicle.plaqueImmatriculation || `Véhicule ${vehicle.id}`,
+            vehicleNom: vehicle.plaqueImmatriculation || (vehicle.marque && vehicle.modele ? `${vehicle.marque} ${vehicle.modele}` : `Véhicule ${vehicle.id}`),
             maintenanceId: maintenance.id,
             type: maintenance.type,
             titre: maintenance.titre,
@@ -221,26 +221,6 @@ export function calculateMaintenanceAlerts(
       }
     });
 
-    // Alertes basées sur les documents du véhicule
-    if (vehicle.dateExpAssurance) {
-      const expDate = new Date(vehicle.dateExpAssurance);
-      const diffTime = expDate.getTime() - now.getTime();
-      const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      if (daysRemaining <= 30) {
-        alerts.push({
-          vehicleId: vehicle.id,
-          vehicleNom: vehicle.nom || vehicle.plaqueImmatriculation || `Véhicule ${vehicle.id}`,
-          type: "autre",
-          titre: "Renouvellement assurance",
-          raison: "date",
-          dateCible: vehicle.dateExpAssurance,
-          joursRestants: daysRemaining,
-          urgent: daysRemaining <= 7 || daysRemaining < 0,
-        });
-      }
-    }
-
     if (vehicle.dateProchainCT) {
       const ctDate = new Date(vehicle.dateProchainCT);
       const diffTime = ctDate.getTime() - now.getTime();
@@ -249,7 +229,7 @@ export function calculateMaintenanceAlerts(
       if (daysRemaining <= 60) {
         alerts.push({
           vehicleId: vehicle.id,
-          vehicleNom: vehicle.nom || vehicle.plaqueImmatriculation || `Véhicule ${vehicle.id}`,
+          vehicleNom: vehicle.plaqueImmatriculation || (vehicle.marque && vehicle.modele ? `${vehicle.marque} ${vehicle.modele}` : `Véhicule ${vehicle.id}`),
           type: "controle_technique",
           titre: "Contrôle technique",
           raison: "date",
@@ -285,7 +265,7 @@ export function calculateMaintenanceAlerts(
 
         alerts.push({
           vehicleId: vehicle.id,
-          vehicleNom: vehicle.nom || vehicle.plaqueImmatriculation || `Véhicule ${vehicle.id}`,
+          vehicleNom: vehicle.plaqueImmatriculation || (vehicle.marque && vehicle.modele ? `${vehicle.marque} ${vehicle.modele}` : `Véhicule ${vehicle.id}`),
           type: "autre",
           titre: `Relevé ${label} à faire`,
           raison: "date",

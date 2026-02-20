@@ -197,7 +197,7 @@ export default function VehiclesPageContent() {
                 if (v)
                   setDeleteTarget({
                     id: v.id,
-                    nom: v.nom || v.plaqueImmatriculation || `Véhicule ${v.id}`,
+                    nom: v.plaqueImmatriculation || (v.marque && v.modele ? `${v.marque} ${v.modele}` : `Véhicule ${v.id}`),
                   });
               }}
               onClick={handleVehicleClick}

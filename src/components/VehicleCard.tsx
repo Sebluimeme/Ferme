@@ -54,8 +54,12 @@ export default function VehicleCard({ vehicle, onEdit, onDelete, onClick }: Vehi
         <div className="px-3 py-2">
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div>
-              <div className="text-gray-500">Année</div>
-              <div className="font-medium">{vehicle.annee || "-"}</div>
+              <div className="text-gray-500">Mise en circulation</div>
+              <div className="font-medium">
+                {vehicle.dateMiseEnCirculation
+                  ? new Date(vehicle.dateMiseEnCirculation).toLocaleDateString("fr-FR")
+                  : "-"}
+              </div>
             </div>
             <div>
               <div className="text-gray-500">
@@ -67,18 +71,6 @@ export default function VehicleCard({ vehicle, onEdit, onDelete, onClick }: Vehi
                   : formatKilometrage(vehicle.kilometrage)}
               </div>
             </div>
-            {vehicle.typeCarburant && (
-              <div>
-                <div className="text-gray-500">Carburant</div>
-                <div className="font-medium capitalize">{vehicle.typeCarburant}</div>
-              </div>
-            )}
-            {vehicle.numeroSerie && (
-              <div>
-                <div className="text-gray-500">N° série</div>
-                <div className="font-medium text-[11px]">{vehicle.numeroSerie.substring(0, 10)}...</div>
-              </div>
-            )}
           </div>
         </div>
       </div>

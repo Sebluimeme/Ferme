@@ -5,7 +5,6 @@ import type { Vehicle, MeterReading, MeterReadingType } from "@/types/vehicle";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import {
   getStatusLabel,
-  getFuelTypeLabel,
   formatKilometrage,
   formatHeures,
   formatPuissance,
@@ -86,21 +85,13 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
           <InfoItem label="Statut" value={getStatusLabel(vehicle.statut)} />
           <InfoItem label="Marque" value={vehicle.marque} />
           <InfoItem label="Modèle" value={vehicle.modele} />
-          <InfoItem label="Année" value={vehicle.annee?.toString()} />
-        </InfoCard>
-
-        {/* Identification */}
-        <InfoCard title="Identification">
+          <InfoItem label="Mise en circulation" value={formatDate(vehicle.dateMiseEnCirculation)} />
           <InfoItem label="Plaque d'immatriculation" value={vehicle.plaqueImmatriculation} />
-          <InfoItem label="Numéro de série (VIN)" value={vehicle.numeroSerie} mono />
-          <InfoItem label="Nom personnalisé" value={vehicle.nom} />
         </InfoCard>
 
         {/* Caractéristiques techniques */}
         <InfoCard title="Caractéristiques techniques">
-          <InfoItem label="Type de carburant" value={vehicle.typeCarburant && getFuelTypeLabel(vehicle.typeCarburant)} />
           <InfoItem label="Puissance" value={formatPuissance(vehicle.puissance)} />
-          <InfoItem label="Capacité réservoir" value={vehicle.capaciteReservoir ? `${vehicle.capaciteReservoir} L` : undefined} />
         </InfoCard>
 
         {/* Compteurs avec boutons de mise à jour */}
@@ -143,18 +134,10 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
         <InfoCard title="Financier">
           <InfoItem label="Valeur d'achat" value={formatCurrency(vehicle.valeurAchat)} />
           <InfoItem label="Date d'achat" value={formatDate(vehicle.dateAchat)} />
-          <InfoItem label="Valeur actuelle estimée" value={formatCurrency(vehicle.valeurActuelle)} />
         </InfoCard>
 
-        {/* Assurance et contrôle */}
-        <InfoCard title="Assurance et contrôle">
-          <InfoItem label="N° police d'assurance" value={vehicle.numeroPoliceAssurance} />
-          <InfoItem
-            label="Expiration assurance"
-            value={vehicle.dateExpAssurance ? formatDate(vehicle.dateExpAssurance) : undefined}
-            alert={vehicle.dateExpAssurance ? (isExpired(vehicle.dateExpAssurance) ? "expired" : isApproaching(vehicle.dateExpAssurance, 30) ? "warning" : undefined) : undefined}
-            alertMessage={vehicle.dateExpAssurance && isExpired(vehicle.dateExpAssurance) ? "Expiré !" : vehicle.dateExpAssurance && isApproaching(vehicle.dateExpAssurance, 30) ? `Dans ${daysUntil(vehicle.dateExpAssurance)} jours` : undefined}
-          />
+        {/* Contrôle technique */}
+        <InfoCard title="Contrôle technique">
           <InfoItem
             label="Prochain contrôle technique"
             value={vehicle.dateProchainCT ? formatDate(vehicle.dateProchainCT) : undefined}
@@ -291,20 +274,18 @@ function InfoCard({ title, children }: { title: string; children: React.ReactNod
 function InfoItem({
   label,
   value,
-  mono = false,
   alert,
   alertMessage,
 }: {
   label: string;
   value?: string | null;
-  mono?: boolean;
   alert?: "warning" | "expired";
   alertMessage?: string;
 }) {
   return (
     <div>
       <div className="text-xs text-gray-500">{label}</div>
-      <div className={`text-sm font-medium text-gray-800 ${mono ? "font-mono text-xs" : ""}`}>
+      <div className="text-sm font-medium text-gray-800">
         {value || "-"}
         {alert && alertMessage && (
           <span className={`ml-2 text-xs font-semibold ${alert === "expired" ? "text-red-600" : "text-orange-600"}`}>

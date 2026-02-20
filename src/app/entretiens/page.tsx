@@ -57,7 +57,7 @@ export default function EntretiensPage() {
   const getVehicleName = (vehicleId: string) => {
     const v = state.vehicles.find((v) => v.id === vehicleId);
     if (!v) return "Véhicule inconnu";
-    return v.nom || v.plaqueImmatriculation || `${v.marque || ""} ${v.modele || ""}`.trim() || "Véhicule";
+    return v.plaqueImmatriculation || `${v.marque || ""} ${v.modele || ""}`.trim() || "Véhicule";
   };
 
   const getVehicleType = (vehicleId: string) => {

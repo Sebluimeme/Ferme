@@ -3,7 +3,7 @@
  * Icônes, couleurs, formatage
  */
 
-import type { VehicleType, VehicleStatus, MaintenanceType, FuelType, DocumentType } from "@/types/vehicle";
+import type { VehicleType, VehicleStatus, MaintenanceType, DocumentType } from "@/types/vehicle";
 
 // ==================== ICÔNES ====================
 
@@ -74,17 +74,6 @@ export function getMaintenanceTypeIcon(type: MaintenanceType): string {
     autre: "📋",
   };
   return icons[type] || "📋";
-}
-
-export function getFuelTypeLabel(type: FuelType): string {
-  const labels: Record<FuelType, string> = {
-    essence: "Essence",
-    diesel: "Diesel",
-    electrique: "Électrique",
-    hybride: "Hybride",
-    gpl: "GPL",
-  };
-  return labels[type] || type;
 }
 
 export function getDocumentTypeLabel(type: DocumentType): string {

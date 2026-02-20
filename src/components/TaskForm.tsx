@@ -111,7 +111,6 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
     const lower = vehiculeSearchQuery.toLowerCase();
     return activeVehicles.filter(
       (v) =>
-        v.nom?.toLowerCase().includes(lower) ||
         v.marque?.toLowerCase().includes(lower) ||
         v.modele?.toLowerCase().includes(lower) ||
         v.plaqueImmatriculation?.toLowerCase().includes(lower)

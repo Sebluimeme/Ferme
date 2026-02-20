@@ -9,9 +9,11 @@ import VehicleInfoGrid from "@/components/vehicle-detail/VehicleInfoGrid";
 import MaintenanceTimeline from "@/components/vehicle-detail/MaintenanceTimeline";
 import VehiclePhotoGallery from "@/components/vehicle-detail/VehiclePhotoGallery";
 import VehicleDocuments from "@/components/vehicle-detail/VehicleDocuments";
+import VehicleComposantsTab from "@/components/vehicle-detail/VehicleComposantsTab";
 
 const TABS = [
   { id: "info", label: "Informations" },
+  { id: "composants", label: "Composants" },
   { id: "entretien", label: "Entretien" },
   { id: "photos", label: "Photos" },
   { id: "documents", label: "Documents" },
@@ -67,6 +69,12 @@ export default function VehicleDetailPage() {
 
         <div className="p-6">
           {activeTab === "info" && <VehicleInfoGrid vehicle={vehicle} />}
+          {activeTab === "composants" && (
+            <VehicleComposantsTab
+              vehicleId={vehicle.id}
+              initialComposants={vehicle.composants || []}
+            />
+          )}
           {activeTab === "entretien" && <MaintenanceTimeline vehicleId={vehicle.id} />}
           {activeTab === "photos" && <VehiclePhotoGallery vehicleId={vehicle.id} />}
           {activeTab === "documents" && <VehicleDocuments vehicleId={vehicle.id} />}
