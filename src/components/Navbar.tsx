@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/store/store";
+import { logout } from "@/lib/auth-service";
 
 export default function Navbar() {
   const { state, toggleSidebar } = useAppStore();
@@ -43,6 +44,13 @@ export default function Navbar() {
                 {alertCount}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => logout()}
+            className="px-3 py-1.5 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 transition-all cursor-pointer"
+            title="Se déconnecter"
+          >
+            Déconnexion
           </button>
         </div>
       </div>

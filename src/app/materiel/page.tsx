@@ -1,4 +1,5 @@
-import PlaceholderPage from "@/components/PlaceholderPage";
+import MaterielPageContent from "@/components/MaterielPageContent";
+
 export default function MaterielPage() {
-  return <PlaceholderPage icon="🚜" title="Module Matériel" subtitle="Disponible en Phase 2..." />;
+  return <MaterielPageContent />;
 }

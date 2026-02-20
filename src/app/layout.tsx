@@ -2,8 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppProvider } from "@/store/store";
 import { ToastProvider } from "@/components/Toast";
-import Navbar from "@/components/Navbar";
-import Sidebar from "@/components/Sidebar";
+import AuthGate from "@/components/AuthGate";
 import RegisterSW from "./register-sw";
 
 export const metadata: Metadata = {
@@ -31,15 +30,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <RegisterSW />
         <AppProvider>
           <ToastProvider>
-            <div className="min-h-screen flex flex-col">
-              <Navbar />
-              <div className="flex flex-1 overflow-hidden">
-                <Sidebar />
-                <main className="flex-1 h-[calc(100vh-4rem)] overflow-y-auto p-4 md:p-6 lg:p-8 bg-gray-50">
-                  {children}
-                </main>
-              </div>
-            </div>
+            <AuthGate>
+              {children}
+            </AuthGate>
           </ToastProvider>
         </AppProvider>
       </body>

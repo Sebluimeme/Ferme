@@ -2,7 +2,9 @@
 
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from "react";
 import firebaseService from "@/lib/firebase-service";
+import { onAuthChange } from "@/lib/auth-service";
 import type { Unsubscribe } from "firebase/database";
+import type { User } from "firebase/auth";
 import type { Vehicle, MaintenanceAlert, MaintenanceEntry, MeterReading } from "@/types/vehicle";
 import type { Task } from "@/types/task";
 import { calculateMaintenanceAlerts } from "@/services/vehicle-detail-service";
@@ -48,6 +50,27 @@ export interface Alerte {
   statut: "active" | "resolue";
 }
 
+export interface Composant {
+  id: string;
+  nom: string;
+  reference: string;
+}
+
+export interface Materiel {
+  id: string;
+  nom: string;
+  type: "vehicule" | "outil" | "machine" | "autre";
+  marque?: string;
+  modele?: string;
+  annee?: number;
+  immatriculation?: string;
+  statut: "actif" | "en_panne" | "vendu" | "reforme";
+  commentaire?: string;
+  composants: Composant[];
+  dateCreation?: string;
+  derniereMAJ?: string;
+}
+
 interface Stats {
   totalAnimaux: number;
   ovins: number;
@@ -58,7 +81,10 @@ interface Stats {
 }
 
 interface AppState {
+  user: User | null;
+  authLoading: boolean;
   animaux: Animal[];
+  materiels: Materiel[];
   traitements: FicheSoin[];
   couts: unknown[];
   ventes: unknown[];
@@ -74,7 +100,10 @@ interface AppState {
 }
 
 type Action =
+  | { type: "SET_USER"; payload: User | null }
+  | { type: "SET_AUTH_LOADING"; payload: boolean }
   | { type: "SET_ANIMAUX"; payload: Animal[] }
+  | { type: "SET_MATERIELS"; payload: Materiel[] }
   | { type: "SET_TRAITEMENTS"; payload: FicheSoin[] }
   | { type: "SET_COUTS"; payload: unknown[] }
   | { type: "SET_VENTES"; payload: unknown[] }
@@ -102,7 +131,10 @@ function computeStats(animaux: Animal[]): Stats {
 }
 
 const initialState: AppState = {
+  user: null,
+  authLoading: true,
   animaux: [],
+  materiels: [],
   traitements: [],
   couts: [],
   ventes: [],
@@ -119,10 +151,16 @@ const initialState: AppState = {
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    case "SET_USER":
+      return { ...state, user: action.payload };
+    case "SET_AUTH_LOADING":
+      return { ...state, authLoading: action.payload };
     case "SET_ANIMAUX": {
       const animaux = action.payload;
       return { ...state, animaux, stats: computeStats(animaux) };
     }
+    case "SET_MATERIELS":
+      return { ...state, materiels: action.payload };
     case "SET_TRAITEMENTS":
       return { ...state, traitements: action.payload };
     case "SET_COUTS":
@@ -178,7 +216,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const toggleSidebar = useCallback(() => dispatch({ type: "TOGGLE_SIDEBAR" }), []);
   const closeSidebar = useCallback(() => dispatch({ type: "CLOSE_SIDEBAR" }), []);
 
+  // Auth listener
   useEffect(() => {
+    const unsub = onAuthChange((user) => {
+      dispatch({ type: "SET_USER", payload: user });
+      dispatch({ type: "SET_AUTH_LOADING", payload: false });
+    });
+    return () => unsub();
+  }, []);
+
+  // Data listeners - only when authenticated
+  useEffect(() => {
+    if (!state.user) {
+      dispatch({ type: "SET_LOADING", payload: false });
+      return;
+    }
+
+    dispatch({ type: "SET_LOADING", payload: true });
     const listeners: Unsubscribe[] = [];
 
     listeners.push(
@@ -186,6 +240,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: "SET_ANIMAUX", payload: animaux });
         dispatch({ type: "SET_LOADING", payload: false });
       })
+    );
+    listeners.push(
+      firebaseService.listen<Materiel>("materiels", (data) => dispatch({ type: "SET_MATERIELS", payload: data }))
     );
     listeners.push(
       firebaseService.listen<FicheSoin>("traitements", (data) => dispatch({ type: "SET_TRAITEMENTS", payload: data }))
@@ -226,7 +283,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => {
       listenersRef.current.forEach((unsub) => unsub());
     };
-  }, []);
+  }, [state.user]);
 
   return (
     <AppContext.Provider value={{ state, dispatch, toggleSidebar, closeSidebar }}>
