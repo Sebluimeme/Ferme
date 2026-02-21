@@ -19,8 +19,22 @@ export default function VehicleComposantsTab({ vehicleId, initialComposants }: V
     setComposants([...composants, { id: crypto.randomUUID(), nom: "", reference: "" }]);
   };
 
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
   const removeLine = (id: string) => {
-    setComposants(composants.filter((c) => c.id !== id));
+    const c = composants.find((c) => c.id === id);
+    if (c && (c.nom.trim() || c.reference.trim())) {
+      setDeleteTarget(id);
+    } else {
+      setComposants(composants.filter((c) => c.id !== id));
+    }
+  };
+
+  const confirmDelete = () => {
+    if (deleteTarget) {
+      setComposants(composants.filter((c) => c.id !== deleteTarget));
+      setDeleteTarget(null);
+    }
   };
 
   const updateLine = (id: string, field: "nom" | "reference", value: string) => {
@@ -110,6 +124,38 @@ export default function VehicleComposantsTab({ vehicleId, initialComposants }: V
           >
             {saving ? "Enregistrement..." : "Enregistrer les composants"}
           </button>
+        </div>
+      )}
+
+      {/* Confirmation de suppression */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setDeleteTarget(null)}>
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-2">Supprimer ce composant ?</h3>
+            <p className="text-sm text-gray-600 mb-1">
+              <strong>{composants.find((c) => c.id === deleteTarget)?.nom || "Composant"}</strong>
+            </p>
+            <p className="text-sm text-gray-500 mb-4">
+              {composants.find((c) => c.id === deleteTarget)?.reference || ""}
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              N&apos;oubliez pas d&apos;enregistrer après la suppression.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors cursor-pointer"
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
