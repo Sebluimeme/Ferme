@@ -4,6 +4,7 @@
  */
 
 import { firebaseService, FirebaseResult } from "@/lib/firebase-service";
+import { uploadFile, deleteFile } from "@/lib/firebase-storage";
 import type { Vehicle, VehicleFormData, VehicleStats, VehicleType } from "@/types/vehicle";
 import type { Composant } from "@/store/store";
 
@@ -282,6 +283,52 @@ export function getVehicleDisplayName(vehicle: Vehicle): string {
   if (vehicle.marque && vehicle.modele) return `${vehicle.marque} ${vehicle.modele}`;
   if (vehicle.marque) return vehicle.marque;
   return `Véhicule #${vehicle.id.substring(0, 6)}`;
+}
+
+// ==================== Photo Principale ====================
+
+/**
+ * Upload ou remplace la photo principale d'un véhicule.
+ * Si oldStoragePath est fourni, l'ancienne photo est supprimée.
+ */
+export async function updateVehicleMainPhoto(
+  vehicleId: string,
+  file: File,
+  oldStoragePath?: string
+): Promise<FirebaseResult> {
+  // Supprimer l'ancienne photo si elle existe
+  if (oldStoragePath) {
+    await deleteFile(oldStoragePath);
+  }
+
+  const path = `vehicules/${vehicleId}/photo_principale/${Date.now()}_${file.name}`;
+  const uploadResult = await uploadFile(path, file);
+
+  if (!uploadResult.success) {
+    return { success: false, error: uploadResult.error };
+  }
+
+  return await firebaseService.update(COLLECTION_PATH, vehicleId, {
+    photoUrl: uploadResult.url,
+    photoStoragePath: uploadResult.storagePath,
+    derniereMAJ: new Date().toISOString(),
+  });
+}
+
+/**
+ * Supprime la photo principale d'un véhicule.
+ */
+export async function deleteVehicleMainPhoto(
+  vehicleId: string,
+  storagePath: string
+): Promise<FirebaseResult> {
+  await deleteFile(storagePath);
+
+  return await firebaseService.update(COLLECTION_PATH, vehicleId, {
+    photoUrl: null,
+    photoStoragePath: null,
+    derniereMAJ: new Date().toISOString(),
+  });
 }
 
 export function isCTExpired(vehicle: Vehicle): boolean {

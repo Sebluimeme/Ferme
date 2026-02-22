@@ -11,6 +11,8 @@ import {
   createVehicle,
   updateVehicle,
   deleteVehicle,
+  updateVehicleMainPhoto,
+  deleteVehicleMainPhoto,
   searchVehicles,
   filterVehiclesByType,
   filterVehiclesByStatus,
@@ -55,10 +57,15 @@ export default function VehiclesPageContent() {
     setLoading(true);
     const formData = new FormData(formRef.current);
     const data = Object.fromEntries(formData.entries()) as unknown as VehicleFormData;
+    const photoFile = formData.get("photo") as File | null;
 
     const result = await createVehicle(data);
 
     if (result.success) {
+      // Upload photo principale si fournie
+      if (result.id && photoFile && photoFile.size > 0) {
+        await updateVehicleMainPhoto(result.id, photoFile);
+      }
       showToast({ type: "success", title: "Véhicule ajouté", message: "Le véhicule a été créé avec succès" });
       setShowAddModal(false);
       formRef.current.reset();
@@ -74,10 +81,19 @@ export default function VehiclesPageContent() {
     setLoading(true);
     const formData = new FormData(formRef.current);
     const data = Object.fromEntries(formData.entries()) as unknown as VehicleFormData;
+    const photoFile = formData.get("photo") as File | null;
+    const clearPhoto = formData.get("clearPhoto") === "1";
 
     const result = await updateVehicle(editVehicle.id, data);
 
     if (result.success) {
+      if (photoFile && photoFile.size > 0) {
+        // Nouvelle photo sélectionnée → upload (et suppression de l'ancienne)
+        await updateVehicleMainPhoto(editVehicle.id, photoFile, editVehicle.photoStoragePath);
+      } else if (clearPhoto && editVehicle.photoStoragePath) {
+        // Utilisateur a supprimé la photo existante
+        await deleteVehicleMainPhoto(editVehicle.id, editVehicle.photoStoragePath);
+      }
       showToast({ type: "success", title: "Véhicule modifié", message: "Les modifications ont été enregistrées" });
       setEditVehicle(null);
       formRef.current.reset();
@@ -91,6 +107,12 @@ export default function VehiclesPageContent() {
     if (!deleteTarget) return;
 
     setLoading(true);
+    // Supprimer la photo principale si elle existe
+    const vehicle = state.vehicles.find((v) => v.id === deleteTarget.id);
+    if (vehicle?.photoStoragePath) {
+      await deleteVehicleMainPhoto(deleteTarget.id, vehicle.photoStoragePath);
+    }
+
     const result = await deleteVehicle(deleteTarget.id);
 
     if (result.success) {

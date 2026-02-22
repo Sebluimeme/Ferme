@@ -29,7 +29,16 @@ export default function VehicleCard({ vehicle, onEdit, onDelete, onClick }: Vehi
     >
       <div onClick={() => onClick?.(vehicle)} className="cursor-pointer">
         <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-200">
-          <span className="text-2xl">{getVehicleIcon(vehicle.type)}</span>
+          {vehicle.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={vehicle.photoUrl}
+              alt={displayName}
+              className="w-10 h-10 rounded-md object-cover border border-gray-200 flex-shrink-0"
+            />
+          ) : (
+            <span className="text-2xl">{getVehicleIcon(vehicle.type)}</span>
+          )}
           <div className="flex-1">
             <div className="font-semibold text-sm sm:text-base">{displayName}</div>
             {vehicle.plaqueImmatriculation && (

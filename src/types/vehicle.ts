@@ -43,6 +43,10 @@ export interface Vehicle {
   // Notes
   commentaire?: string;                // Notes diverses
 
+  // Photo principale (affichée sur la carte)
+  photoUrl?: string;                   // URL Firebase Storage de la photo principale
+  photoStoragePath?: string;           // Chemin de stockage pour suppression
+
   // Méta-données (auto-générées)
   dateCreation?: string;               // Date de création de la fiche
   derniereMAJ?: string;                // Dernière mise à jour
