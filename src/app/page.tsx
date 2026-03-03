@@ -5,7 +5,7 @@ import { useAppStore } from "@/store/store";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { formatAlertMessage } from "@/lib/vehicle-utils";
 import { getVehicleStats } from "@/services/vehicle-service";
-import { getUrgentTasks, getTaskStats, isTaskOverdue, isTaskDueSoon, getDaysUntilDue } from "@/services/task-service";
+import { getUrgentTasks, getTaskStats, getDaysUntilDue } from "@/services/task-service";
 import KpiCard from "@/components/KpiCard";
 import { useMemo } from "react";
 
@@ -54,8 +54,6 @@ export default function DashboardPage() {
           {urgentTasks.length > 0 ? (
             <>
               {urgentTasks.map((task) => {
-                const overdue = isTaskOverdue(task);
-                const dueSoon = isTaskDueSoon(task);
                 const days = getDaysUntilDue(task);
                 let echeanceText = "";
                 if (days !== null) {
@@ -63,21 +61,21 @@ export default function DashboardPage() {
                   else if (days === 0) echeanceText = "Aujourd'hui";
                   else echeanceText = `Dans ${days}j`;
                 }
+                const taskColor =
+                  days === null
+                    ? "bg-green-50 border-l-green-400 text-green-800"
+                    : days < 0
+                    ? "bg-red-50 border-l-red-500 text-red-800"
+                    : days < 5
+                    ? "bg-red-50 border-l-red-400 text-red-800"
+                    : days <= 15
+                    ? "bg-amber-50 border-l-amber-400 text-amber-800"
+                    : "bg-green-50 border-l-green-400 text-green-800";
                 return (
                   <div
                     key={task.id}
                     onClick={() => router.push("/taches")}
-                    className={`px-3 py-2 rounded-md mb-1.5 border-l-4 cursor-pointer hover:opacity-80 transition-opacity text-sm ${
-                      overdue
-                        ? "bg-red-50 border-l-red-500 text-red-800"
-                        : dueSoon
-                        ? "bg-amber-50 border-l-amber-500 text-amber-800"
-                        : task.priorite === "haute"
-                        ? "bg-red-50 border-l-red-400 text-red-800"
-                        : task.priorite === "moyenne"
-                        ? "bg-amber-50 border-l-amber-400 text-amber-800"
-                        : "bg-green-50 border-l-green-400 text-green-800"
-                    }`}
+                    className={`px-3 py-2 rounded-md mb-1.5 border-l-4 cursor-pointer hover:opacity-80 transition-opacity text-sm ${taskColor}`}
                   >
                     <div className="flex items-center justify-between">
                       <strong>{task.titre}</strong>

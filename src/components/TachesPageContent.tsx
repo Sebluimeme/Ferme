@@ -20,8 +20,6 @@ import {
   searchTasks,
   sortTasksByEcheance,
   getTaskStats,
-  isTaskOverdue,
-  isTaskDueSoon,
   getDaysUntilDue,
   validateTaskData,
 } from "@/services/task-service";
@@ -52,18 +50,18 @@ function getEcheanceBadge(task: Task): { label: string; className: string } | nu
   if (days === null) return null;
 
   if (days < 0) {
-    return {
-      label: `En retard (${Math.abs(days)}j)`,
-      className: "bg-red-100 text-red-700",
-    };
+    return { label: `En retard (${Math.abs(days)}j)`, className: "bg-red-100 text-red-700" };
   }
   if (days === 0) {
     return { label: "Aujourd'hui", className: "bg-red-100 text-red-700" };
   }
-  if (days <= 3) {
+  if (days < 5) {
+    return { label: `Dans ${days}j`, className: "bg-red-100 text-red-700" };
+  }
+  if (days <= 15) {
     return { label: `Dans ${days}j`, className: "bg-amber-100 text-amber-700" };
   }
-  return { label: `Dans ${days}j`, className: "bg-gray-100 text-gray-600" };
+  return null;
 }
 
 export default function TachesPageContent() {
@@ -213,27 +211,25 @@ export default function TachesPageContent() {
   };
 
   const renderTask = (task: Task) => {
-    const overdue = isTaskOverdue(task);
-    const dueSoon = isTaskDueSoon(task);
     const echeanceBadge = getEcheanceBadge(task);
     const isDone = task.statut === "terminee";
+    const days = getDaysUntilDue(task);
+    const borderColor = isDone
+      ? "border-l-green-400 opacity-70"
+      : days === null
+      ? "border-l-green-400"
+      : days < 0
+      ? "border-l-red-500"
+      : days < 5
+      ? "border-l-red-400"
+      : days <= 15
+      ? "border-l-amber-400"
+      : "border-l-green-400";
     return (
       <div
         key={task.id}
         onClick={() => setEditTarget(task)}
-        className={`bg-white rounded-lg shadow-sm border-l-4 transition-all hover:shadow-md cursor-pointer ${
-          isDone
-            ? "border-l-green-400 opacity-70"
-            : overdue
-            ? "border-l-red-500"
-            : dueSoon
-            ? "border-l-amber-500"
-            : task.priorite === "haute"
-            ? "border-l-red-400"
-            : task.priorite === "moyenne"
-            ? "border-l-amber-400"
-            : "border-l-green-400"
-        }`}
+        className={`bg-white rounded-lg shadow-sm border-l-4 transition-all hover:shadow-md cursor-pointer ${borderColor}`}
       >
         <div className="px-3 py-2.5">
           <div className="flex items-start gap-2">
