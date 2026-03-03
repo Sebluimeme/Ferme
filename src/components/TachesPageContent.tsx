@@ -93,7 +93,7 @@ export default function TachesPageContent() {
   // Noms disponibles dans les tâches
   const availableNames = useMemo(() => {
     const names = new Set<string>();
-    taches.forEach((t) => { if (t.assigneA) names.add(t.assigneA); });
+    taches.forEach((t) => { if (t.assigneA?.trim()) names.add(t.assigneA.trim()); });
     return Array.from(names).sort();
   }, [taches]);
 
@@ -118,11 +118,11 @@ export default function TachesPageContent() {
   }, [taches, statusFilter, searchQuery]);
 
   const myTaches = useMemo(
-    () => myName ? filteredTaches.filter((t) => t.assigneA === myName) : [],
+    () => myName ? filteredTaches.filter((t) => t.assigneA?.trim() === myName) : [],
     [filteredTaches, myName]
   );
   const otherTaches = useMemo(
-    () => myName ? filteredTaches.filter((t) => t.assigneA !== myName) : filteredTaches,
+    () => myName ? filteredTaches.filter((t) => t.assigneA?.trim() !== myName) : filteredTaches,
     [filteredTaches, myName]
   );
 
