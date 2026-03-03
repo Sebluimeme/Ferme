@@ -32,7 +32,7 @@ export default function Navbar() {
             ☰
           </button>
           <h1 className="text-2xl font-bold m-0 flex items-center gap-2">
-            🌾 <span>Gestion Ferme</span>
+            🌾 <span>La Ferme Tabouche</span>
           </h1>
         </div>
         <div className="flex items-center gap-4">

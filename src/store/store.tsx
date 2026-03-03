@@ -104,7 +104,7 @@ type Action =
 
 function computeStats(animaux: Animal[]): Stats {
   return {
-    totalAnimaux: animaux.length,
+    totalAnimaux: animaux.filter((a) => a.statut !== "mort").length,
     ovins: animaux.filter((a) => a.type === "ovin" && a.statut === "actif").length,
     bovins: animaux.filter((a) => a.type === "bovin" && a.statut === "actif").length,
     caprins: animaux.filter((a) => a.type === "caprin" && a.statut === "actif").length,
