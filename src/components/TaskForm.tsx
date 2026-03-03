@@ -180,38 +180,22 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
         />
       </div>
 
-      {/* Priorité + Statut */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">
-            Priorité <span className="text-red-500">*</span>
-          </label>
-          <select
-            name="priorite"
-            defaultValue={task?.priorite || "moyenne"}
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
-          >
-            <option value="haute">🔴 Haute</option>
-            <option value="moyenne">🟡 Moyenne</option>
-            <option value="basse">🟢 Basse</option>
-          </select>
-        </div>
-        <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">
-            Statut <span className="text-red-500">*</span>
-          </label>
-          <select
-            name="statut"
-            defaultValue={task?.statut || "a_faire"}
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
-          >
-            <option value="a_faire">A faire</option>
-            <option value="en_cours">En cours</option>
-            <option value="terminee">Terminée</option>
-          </select>
-        </div>
+      {/* Statut */}
+      <input type="hidden" name="priorite" value="basse" />
+      <div>
+        <label className="block mb-1 text-sm font-medium text-gray-700">
+          Statut <span className="text-red-500">*</span>
+        </label>
+        <select
+          name="statut"
+          defaultValue={task?.statut || "a_faire"}
+          required
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+        >
+          <option value="a_faire">A faire</option>
+          <option value="en_cours">En cours</option>
+          <option value="terminee">Terminée</option>
+        </select>
       </div>
 
       {/* Date d'échéance + Catégorie + Assignée à */}
