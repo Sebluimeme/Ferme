@@ -79,6 +79,7 @@ export function getAnimalStats(animaux: Animal[]) {
   return {
     total: animaux.length,
     actifs: animaux.filter((a) => a.statut === "actif").length,
+    morts: animaux.filter((a) => a.statut === "mort").length,
     parType: {
       ovins: animaux.filter((a) => a.type === "ovin" && a.statut === "actif").length,
       bovins: animaux.filter((a) => a.type === "bovin" && a.statut === "actif").length,

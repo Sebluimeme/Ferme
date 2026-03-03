@@ -172,12 +172,18 @@ export default function AnimauxPageContent() {
 
       {/* Stats rapides - masquées quand un filtre de type est actif */}
       {!currentFilter && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
           <KpiCard
             label="Total"
             value={stats.actifs}
             onClick={() => setCurrentFilter(null)}
             borderColorClass="border-l-primary"
+          />
+          <KpiCard
+            label="💀 Morts"
+            value={stats.morts}
+            borderColorClass="border-l-gray-500"
+            valueColorClass="text-gray-500"
           />
           <KpiCard
             label={`${getAnimalIcon("ovin")} Ovins`}

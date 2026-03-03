@@ -12,7 +12,7 @@ import { useMemo } from "react";
 export default function DashboardPage() {
   const router = useRouter();
   const { state } = useAppStore();
-  const { stats, alertes, vehicles, maintenanceAlerts, taches, animaux } = state;
+  const { stats, alertes, vehicles, maintenanceAlerts, taches } = state;
 
   // Calculer les stats des véhicules
   const vehicleStats = useMemo(() => getVehicleStats(vehicles), [vehicles]);
@@ -28,7 +28,6 @@ export default function DashboardPage() {
   );
 
   const allActiveTasks = useMemo(() => taches.filter((t) => t.statut !== "terminee"), [taches]);
-  const animauxMorts = useMemo(() => animaux.filter((a) => a.statut === "mort").length, [animaux]);
 
   return (
     <div className="fade-in">
@@ -118,16 +117,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Résumé rapide */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <KpiCard label="🐾 Animaux" value={stats.totalAnimaux || 0} subtitle="actifs" onClick={() => router.push("/animaux")} />
-        <KpiCard
-          label="💀 Animaux morts"
-          value={animauxMorts}
-          subtitle="total"
-          borderColorClass="border-l-gray-500"
-          valueColorClass="text-gray-500"
-          onClick={() => router.push("/animaux")}
-        />
         <KpiCard
           label="🚗 Véhicules"
           value={vehicleStats.totalVehicules || 0}
