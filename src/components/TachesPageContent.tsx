@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { useAppStore } from "@/store/store";
 import { useToast } from "@/components/Toast";
 import Modal, { ConfirmModal } from "@/components/Modal";
@@ -73,6 +73,10 @@ export default function TachesPageContent() {
   const photoFileRef = useRef<File | null>(null);
   const [photoRemoved, setPhotoRemoved] = useState(false);
 
+  const [myName, setMyName] = useState<string>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("ferme_my_name") || "";
+    return "";
+  });
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "toutes">("a_faire");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -80,8 +84,20 @@ export default function TachesPageContent() {
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const handleSetMyName = useCallback((name: string) => {
+    setMyName(name);
+    localStorage.setItem("ferme_my_name", name);
+  }, []);
+
   const taches = state.taches;
   const stats = useMemo(() => getTaskStats(taches), [taches]);
+
+  // Noms disponibles dans les tâches
+  const availableNames = useMemo(() => {
+    const names = new Set<string>();
+    taches.forEach((t) => { if (t.assigneA) names.add(t.assigneA); });
+    return Array.from(names).sort();
+  }, [taches]);
 
   // Programmer les notifications pour les tâches
   useEffect(() => {
@@ -102,6 +118,15 @@ export default function TachesPageContent() {
     }
     return sortTasksByEcheance(filtered);
   }, [taches, statusFilter, searchQuery]);
+
+  const myTaches = useMemo(
+    () => myName ? filteredTaches.filter((t) => t.assigneA === myName) : [],
+    [filteredTaches, myName]
+  );
+  const otherTaches = useMemo(
+    () => myName ? filteredTaches.filter((t) => t.assigneA !== myName) : filteredTaches,
+    [filteredTaches, myName]
+  );
 
   const handleSave = async () => {
     if (!formRef.current || saving) return;
@@ -187,6 +212,92 @@ export default function TachesPageContent() {
     setDeleteTarget(null);
   };
 
+  const renderTask = (task: Task) => {
+    const overdue = isTaskOverdue(task);
+    const dueSoon = isTaskDueSoon(task);
+    const echeanceBadge = getEcheanceBadge(task);
+    const isDone = task.statut === "terminee";
+    return (
+      <div
+        key={task.id}
+        onClick={() => setEditTarget(task)}
+        className={`bg-white rounded-lg shadow-sm border-l-4 transition-all hover:shadow-md cursor-pointer ${
+          isDone
+            ? "border-l-green-400 opacity-70"
+            : overdue
+            ? "border-l-red-500"
+            : dueSoon
+            ? "border-l-amber-500"
+            : task.priorite === "haute"
+            ? "border-l-red-400"
+            : task.priorite === "moyenne"
+            ? "border-l-amber-400"
+            : "border-l-green-400"
+        }`}
+      >
+        <div className="px-3 py-2.5">
+          <div className="flex items-start gap-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); handleToggleStatus(task); }}
+              className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 cursor-pointer transition-all ${
+                isDone ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-primary bg-white"
+              }`}
+            >
+              {isDone && <span className="text-xs">✓</span>}
+            </button>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <h3 className={`text-sm font-semibold m-0 ${isDone ? "line-through text-gray-400" : "text-gray-900"}`}>
+                  {task.titre}
+                </h3>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${getStatutBadgeClass(task.statut)}`}>
+                  {getStatutLabel(task.statut)}
+                </span>
+                {echeanceBadge && (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${echeanceBadge.className}`}>
+                    {echeanceBadge.label}
+                  </span>
+                )}
+              </div>
+              {task.description && (
+                <p className={`text-xs mb-1.5 ${isDone ? "text-gray-300" : "text-gray-600"}`}>{task.description}</p>
+              )}
+              {task.photoUrl && (
+                <div className="mb-1.5">
+                  <img src={task.photoUrl} alt="Photo jointe" className="w-16 h-16 object-cover rounded-md border border-gray-200" />
+                </div>
+              )}
+              <div className="flex items-center gap-3 flex-wrap text-xs text-gray-500">
+                {task.dateEcheance && <span>📅 {formatDate(task.dateEcheance)}</span>}
+                {task.categorie && (
+                  <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">{task.categorie}</span>
+                )}
+                {task.assigneA && (
+                  <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">👤 {task.assigneA}</span>
+                )}
+                {task.animalId && task.animalNom && (
+                  <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">{getAnimalIcon("")} {task.animalNom}</span>
+                )}
+                {task.vehiculeId && task.vehiculeNom && (
+                  <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{getVehicleIcon("voiture")} {task.vehiculeNom}</span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); setDeleteTarget(task); }}
+                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                title="Supprimer"
+              >
+                🗑️
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="fade-in">
       {/* Notification Banner */}
@@ -202,6 +313,31 @@ export default function TachesPageContent() {
           + Nouvelle tâche
         </button>
       </div>
+
+      {/* Filtre par personne */}
+      {availableNames.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap mb-4">
+          <span className="text-xs text-gray-500 font-medium">👤 Mon profil :</span>
+          {availableNames.map((name) => (
+            <button
+              key={name}
+              onClick={() => handleSetMyName(myName === name ? "" : name)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all cursor-pointer border ${
+                myName === name
+                  ? "bg-indigo-600 text-white border-indigo-600"
+                  : "bg-white text-gray-600 border-gray-200 hover:border-indigo-400 hover:bg-indigo-50"
+              }`}
+            >
+              {name}
+            </button>
+          ))}
+          {myName && (
+            <span className="text-[10px] text-indigo-600 font-medium bg-indigo-50 px-2 py-1 rounded-full">
+              Mémorisé sur cet appareil
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Filtres par statut */}
       <div className="flex gap-2 flex-wrap mb-4">
@@ -251,127 +387,38 @@ export default function TachesPageContent() {
             + Nouvelle tâche
           </button>
         </div>
+      ) : myName ? (
+        <div className="space-y-6">
+          {/* Mes tâches */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm font-semibold text-indigo-700">👤 Mes tâches</span>
+              <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">{myTaches.length}</span>
+            </div>
+            {myTaches.length === 0 ? (
+              <p className="text-sm text-gray-400 py-3 text-center bg-white rounded-lg border border-dashed border-gray-200">Aucune tâche assignée à {myName}</p>
+            ) : (
+              <div className="space-y-2">
+                {myTaches.map((task) => renderTask(task))}
+              </div>
+            )}
+          </div>
+          {/* Autres tâches */}
+          {otherTaches.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm font-semibold text-gray-500">Autres tâches</span>
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">{otherTaches.length}</span>
+              </div>
+              <div className="space-y-2 opacity-75">
+                {otherTaches.map((task) => renderTask(task))}
+              </div>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="space-y-2">
-          {filteredTaches.map((task) => {
-            const overdue = isTaskOverdue(task);
-            const dueSoon = isTaskDueSoon(task);
-            const echeanceBadge = getEcheanceBadge(task);
-            const isDone = task.statut === "terminee";
-
-            return (
-              <div
-                key={task.id}
-                className={`bg-white rounded-lg shadow-sm border-l-4 transition-all hover:shadow-md ${
-                  isDone
-                    ? "border-l-green-400 opacity-70"
-                    : overdue
-                    ? "border-l-red-500"
-                    : dueSoon
-                    ? "border-l-amber-500"
-                    : task.priorite === "haute"
-                    ? "border-l-red-400"
-                    : task.priorite === "moyenne"
-                    ? "border-l-amber-400"
-                    : "border-l-green-400"
-                }`}
-              >
-                <div className="px-3 py-2.5">
-                  <div className="flex items-start gap-2">
-                    {/* Checkbox */}
-                    <button
-                      onClick={() => handleToggleStatus(task)}
-                      className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 cursor-pointer transition-all ${
-                        isDone
-                          ? "bg-green-500 border-green-500 text-white"
-                          : "border-gray-300 hover:border-primary bg-white"
-                      }`}
-                    >
-                      {isDone && <span className="text-xs">✓</span>}
-                    </button>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h3 className={`text-sm font-semibold m-0 ${isDone ? "line-through text-gray-400" : "text-gray-900"}`}>
-                          {task.titre}
-                        </h3>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${getStatutBadgeClass(task.statut)}`}>
-                          {getStatutLabel(task.statut)}
-                        </span>
-                        {echeanceBadge && (
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${echeanceBadge.className}`}>
-                            {echeanceBadge.label}
-                          </span>
-                        )}
-                      </div>
-
-                      {task.description && (
-                        <p className={`text-xs mb-1.5 ${isDone ? "text-gray-300" : "text-gray-600"}`}>
-                          {task.description}
-                        </p>
-                      )}
-
-                      {task.photoUrl && (
-                        <div className="mb-1.5">
-                          <img
-                            src={task.photoUrl}
-                            alt="Photo jointe"
-                            className="w-16 h-16 object-cover rounded-md border border-gray-200"
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-3 flex-wrap text-xs text-gray-500">
-                        <span>{getPrioriteLabel(task.priorite)}</span>
-                        {task.dateEcheance && (
-                          <span>📅 {formatDate(task.dateEcheance)}</span>
-                        )}
-                        {task.categorie && (
-                          <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">
-                            {task.categorie}
-                          </span>
-                        )}
-                        {task.assigneA && (
-                          <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">
-                            👤 {task.assigneA}
-                          </span>
-                        )}
-                        {task.animalId && task.animalNom && (
-                          <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
-                            {getAnimalIcon("")} {task.animalNom}
-                          </span>
-                        )}
-                        {task.vehiculeId && task.vehiculeNom && (
-                          <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
-                            {getVehicleIcon("voiture")} {task.vehiculeNom}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => setEditTarget(task)}
-                        className="p-2 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-lg transition-all cursor-pointer"
-                        title="Modifier"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(task)}
-                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
-                        title="Supprimer"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          {filteredTaches.map((task) => renderTask(task))}
         </div>
       )}
 
