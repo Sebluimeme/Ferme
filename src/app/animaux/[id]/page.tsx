@@ -44,6 +44,8 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
   const [activeTab, setActiveTab] = useState<TabId>("info");
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showTagConfirm, setShowTagConfirm] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState<AnimalFormData | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Sub-data
@@ -87,6 +89,19 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
       return;
     }
 
+    const newTag = data.numeroBoucle?.trim() || "";
+    const oldTag = animal.numeroBoucle?.trim() || "";
+    if (newTag !== oldTag) {
+      setPendingFormData(data);
+      setShowTagConfirm(true);
+      return;
+    }
+
+    await doSave(data);
+  };
+
+  const doSave = async (data: AnimalFormData) => {
+    if (!animal) return;
     setSaving(true);
     try {
       const result = await updateAnimal(animal.id, data);
@@ -207,6 +222,17 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
         confirmText="Supprimer"
         cancelText="Annuler"
         danger
+      />
+
+      {/* Tag number change confirm */}
+      <ConfirmModal
+        isOpen={showTagConfirm}
+        onClose={() => { setShowTagConfirm(false); setPendingFormData(null); }}
+        onConfirm={() => { if (pendingFormData) doSave(pendingFormData); setPendingFormData(null); }}
+        title="Modifier le numéro de boucle"
+        message={`Vous allez changer le numéro de boucle de <strong>${animal.numeroBoucle || "(vide)"}</strong> vers <strong>${pendingFormData?.numeroBoucle?.trim() || "(vide)"}</strong>.<br><br>Confirmez-vous cette modification ?`}
+        confirmText="Modifier"
+        cancelText="Annuler"
       />
     </div>
   );
