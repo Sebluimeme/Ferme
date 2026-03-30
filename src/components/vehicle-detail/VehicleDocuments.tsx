@@ -180,7 +180,7 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
             {documents.map((doc) => (
               <div
                 key={doc.id}
-                className={`flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors ${
+                className={`flex items-start gap-3 p-4 hover:bg-gray-50 transition-colors ${
                   doc.dateExpiration && isExpired(doc.dateExpiration)
                     ? "bg-red-50/50"
                     : doc.dateExpiration && isApproaching(doc.dateExpiration, 30)
@@ -188,7 +188,7 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
                     : ""
                 }`}
               >
-                <span className="text-2xl flex-shrink-0">
+                <span className="text-2xl flex-shrink-0 mt-0.5">
                   {getDocumentTypeIcon(doc.type)}
                 </span>
                 <div className="flex-1 min-w-0">
@@ -214,23 +214,25 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
                     )}
                   </div>
                   {doc.description && (
-                    <p className="text-xs text-gray-500 mt-1 truncate">{doc.description}</p>
+                    <p className="text-xs text-gray-500 mt-1">{doc.description}</p>
                   )}
+                  <div className="flex gap-2 mt-2">
+                    <a
+                      href={doc.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200"
+                    >
+                      Ouvrir
+                    </a>
+                    <button
+                      onClick={() => setDeleteTarget(doc)}
+                      className="px-3 py-1.5 text-xs font-medium text-red-500 hover:text-red-700 cursor-pointer bg-transparent border-none"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
                 </div>
-                <a
-                  href={doc.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 flex-shrink-0"
-                >
-                  Ouvrir
-                </a>
-                <button
-                  onClick={() => setDeleteTarget(doc)}
-                  className="px-3 py-1.5 text-xs font-medium text-red-500 hover:text-red-700 cursor-pointer bg-transparent border-none flex-shrink-0"
-                >
-                  Supprimer
-                </button>
               </div>
             ))}
           </div>
