@@ -192,13 +192,13 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
                   {getDocumentTypeIcon(doc.type)}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm truncate">{doc.nom}</span>
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex-shrink-0">
                       {getDocumentTypeLabel(doc.type)}
                     </span>
                     {getExpirationBadge(doc.dateExpiration)}
                   </div>
+                  <div className="font-medium text-sm mt-0.5">{doc.nom}</div>
                   <div className="text-xs text-gray-400 mt-0.5">
                     {doc.dateDocument && (
                       <span>Date : {formatDate(doc.dateDocument)}</span>
