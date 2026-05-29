@@ -29,12 +29,13 @@ export default function DashboardPage() {
 
   const allActiveTasks = useMemo(() => taches.filter((t) => t.statut !== "terminee"), [taches]);
 
-  // Objectif foin basé sur les animaux actifs (kg/an par espèce — standards français/montagne)
-  const CONSO_FOIN_KG: Record<string, number> = { ovin: 300, bovin: 3500, caprin: 300, porcin: 0, equin: 1800 };
+  // Objectif foin — même formule que la page fourrage : kg/jour × 180 jours stabulation
+  const CONSO_KG_JOUR: Record<string, number> = { ovin: 2, bovin: 9, caprin: 1.8, porcin: 0, equin: 10 };
+  const DUREE_STABULATION = 180;
   const objectifFoinTonnes = useMemo(() => {
     const actifs = animaux.filter((a) => a.statut === "actif");
-    const kg = actifs.reduce((sum, a) => sum + (CONSO_FOIN_KG[a.type] ?? 0), 0);
-    return Math.round(kg / 100) / 10; // arrondi 1 décimale
+    const kg = actifs.reduce((sum, a) => sum + (CONSO_KG_JOUR[a.type] ?? 0) * DUREE_STABULATION, 0);
+    return Math.round(kg / 100) / 10;
   }, [animaux]);
 
   const foinsRecoltesTonnes = useMemo(() => {
@@ -185,7 +186,7 @@ export default function DashboardPage() {
             />
           </div>
           <p className="text-xs text-gray-400 mt-1">
-            {Math.min(100, Math.round((foinsRecoltesTonnes / objectifFoinTonnes) * 100))}% — Estimations : ovin 300 kg/an · bovin 3 500 kg/an · caprin 300 kg/an · équin 1 800 kg/an
+            {Math.min(100, Math.round((foinsRecoltesTonnes / objectifFoinTonnes) * 100))}% — Estimations : ovin 2 kg/j · bovin 9 kg/j · caprin 1,8 kg/j · équin 10 kg/j × 180 j stabulation
           </p>
         </div>
       )}
