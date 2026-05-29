@@ -287,8 +287,8 @@ export default function FourragePage() {
     (a, b) => new Date(b.dateActivite).getTime() - new Date(a.dateActivite).getTime()
   );
 
-  const getPartielsNoms = (ids: string[]) =>
-    ids
+  const getPartielsNoms = (ids: string[] | null | undefined) =>
+    (ids ?? [])
       .map((id) => partiels.find((p) => p.id === id)?.nom ?? id)
       .join(", ") || "—";
 
@@ -514,7 +514,7 @@ export default function FourragePage() {
             initial={{
               typeActivite: editActivite.typeActivite,
               dateActivite: editActivite.dateActivite,
-              parcelIds: editActivite.parcelIds,
+              parcelIds: editActivite.parcelIds ?? [],
               nombreBottes: editActivite.nombreBottes?.toString() ?? "",
               poidsTonne: editActivite.poidsTonne?.toString() ?? "",
               notes: editActivite.notes ?? "",

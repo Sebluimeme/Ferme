@@ -11,7 +11,7 @@ export interface ActiviteFourrage {
   id: string;
   typeActivite: "foin" | "ensilage" | "fauche" | "paturage";
   dateActivite: string; // ISO date string
-  parcelIds: string[]; // IDs des partiels concernés
+  parcelIds?: string[]; // IDs des partiels concernés (peut être absent si tableau vide en DB)
   nombreBottes?: number;
   poidsTonne?: number;
   notes?: string;
