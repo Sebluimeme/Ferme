@@ -7,6 +7,7 @@ import type { Unsubscribe } from "firebase/database";
 import type { User } from "firebase/auth";
 import type { Vehicle, MaintenanceAlert, MaintenanceEntry, MeterReading } from "@/types/vehicle";
 import type { Task } from "@/types/task";
+import type { Partiel, ActiviteFourrage } from "@/types/fourrage";
 import { calculateMaintenanceAlerts } from "@/services/vehicle-detail-service";
 
 export interface Animal {
@@ -78,6 +79,8 @@ interface AppState {
   maintenanceAlerts: MaintenanceAlert[];
   meterReadings: MeterReading[];
   taches: Task[];
+  partiels: Partiel[];
+  activitesFourrage: ActiviteFourrage[];
   stats: Stats;
   loading: boolean;
   sidebarOpen: boolean;
@@ -96,6 +99,8 @@ type Action =
   | { type: "SET_MAINTENANCE_ALERTS"; payload: MaintenanceAlert[] }
   | { type: "SET_METER_READINGS"; payload: MeterReading[] }
   | { type: "SET_TACHES"; payload: Task[] }
+  | { type: "SET_PARTIELS"; payload: Partiel[] }
+  | { type: "SET_ACTIVITES_FOURRAGE"; payload: ActiviteFourrage[] }
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "TOGGLE_SIDEBAR" }
   | { type: "CLOSE_SIDEBAR" }
@@ -126,6 +131,8 @@ const initialState: AppState = {
   maintenanceAlerts: [],
   meterReadings: [],
   taches: [],
+  partiels: [],
+  activitesFourrage: [],
   stats: { totalAnimaux: 0, ovins: 0, bovins: 0, caprins: 0, porcins: 0, profitGlobal: 0 },
   loading: true,
   sidebarOpen: false,
@@ -165,6 +172,10 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "SET_TACHES":
       return { ...state, taches: action.payload };
+    case "SET_PARTIELS":
+      return { ...state, partiels: action.payload };
+    case "SET_ACTIVITES_FOURRAGE":
+      return { ...state, activitesFourrage: action.payload };
     case "UPDATE_MAINTENANCE_ALERTS": {
       const alerts = calculateMaintenanceAlerts(state.vehicles, state.maintenanceEntries, state.meterReadings);
       return { ...state, maintenanceAlerts: alerts };
@@ -252,6 +263,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     listeners.push(
       firebaseService.listen<Task>("taches", (data) =>
         dispatch({ type: "SET_TACHES", payload: data })
+      )
+    );
+    listeners.push(
+      firebaseService.listen<Partiel>("partiels", (data) =>
+        dispatch({ type: "SET_PARTIELS", payload: data })
+      )
+    );
+    listeners.push(
+      firebaseService.listen<ActiviteFourrage>("activites-fourrage", (data) =>
+        dispatch({ type: "SET_ACTIVITES_FOURRAGE", payload: data })
       )
     );
 

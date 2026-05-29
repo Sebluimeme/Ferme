@@ -32,6 +32,13 @@ const sections: NavSection[] = [
     ],
   },
   {
+    title: "Culture",
+    items: [
+      { icon: "🌾", label: "Fourrage", route: "/fourrage" },
+      { icon: "🗺️", label: "Partiels", route: "/fourrage/partiels" },
+    ],
+  },
+  {
     title: "Parc Machine",
     items: [
       { icon: "🚗", label: "Véhicules", route: "/vehicules" },
