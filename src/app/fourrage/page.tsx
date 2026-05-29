@@ -119,7 +119,7 @@ function ActiviteForm({
 
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700">Partiels concernés</label>
+          <label className="block text-sm font-medium text-gray-700">Parcelles concernées</label>
           {partiels.length > 0 && (
             <div className="flex rounded-lg overflow-hidden border border-gray-300 text-xs">
               <button
@@ -145,7 +145,7 @@ function ActiviteForm({
         </div>
         {partiels.length === 0 ? (
           <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            Aucun partiel créé — allez dans <strong>Partiels</strong> pour en ajouter.
+            Aucune parcelle créée — allez dans <strong>Parcellaire</strong> pour en ajouter.
           </p>
         ) : viewMode === "map" ? (
           <ParcelSelectorMap
@@ -293,6 +293,15 @@ function BottesForm({
 
 // ==================== Page principale ====================
 
+const DUREE_STABULATION = 180;
+const CONSO_KG_JOUR: Record<string, number> = {
+  bovin: 9,
+  ovin: 2,
+  caprin: 1.8,
+  porcin: 0,
+  equin: 10,
+};
+
 export default function FourragePage() {
   const { state } = useAppStore();
   const { showToast } = useToast();
@@ -316,6 +325,25 @@ export default function FourragePage() {
 
   const bottesCeMois = activitesCeMois.reduce((sum, a) => sum + (a.nombreBottes ?? 0), 0);
   const surfaceTotale = partiels.reduce((sum, p) => sum + (p.surface ?? 0), 0);
+
+  // Objectif foin basé sur les animaux actifs
+  const animauxActifs = state.animaux.filter((a) => a.statut === "actif");
+  const objectifFoinKg = animauxActifs.reduce((sum, a) => sum + (CONSO_KG_JOUR[a.type] ?? 0) * DUREE_STABULATION, 0);
+  const objectifFoinT = objectifFoinKg / 1000;
+
+  const foinsRecoltesT = activitesFourrage
+    .filter((a) => a.typeActivite === "foin" && a.poidsTonne != null)
+    .reduce((sum, a) => sum + (a.poidsTonne ?? 0), 0);
+
+  const progressPct = objectifFoinT > 0 ? Math.min(100, (foinsRecoltesT / objectifFoinT) * 100) : 0;
+  const manquantT = Math.max(0, objectifFoinT - foinsRecoltesT);
+
+  type AnimalType = "bovin" | "ovin" | "caprin" | "equin" | "porcin";
+  const detailParType = (["bovin", "ovin", "caprin", "equin"] as AnimalType[]).map((type) => ({
+    type,
+    count: animauxActifs.filter((a) => a.type === type).length,
+    conso: CONSO_KG_JOUR[type],
+  })).filter((d) => d.count > 0);
 
   const activitesTri = [...activitesFourrage].sort(
     (a, b) => new Date(b.dateActivite).getTime() - new Date(a.dateActivite).getTime()
@@ -427,7 +455,7 @@ export default function FourragePage() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <KpiCard
-          label="Partiels"
+          label="Parcellaire"
           value={partiels.length}
           subtitle="parcelles gérées"
           borderColorClass="border-l-primary"
@@ -452,6 +480,64 @@ export default function FourragePage() {
           valueColorClass="text-purple-600"
         />
       </div>
+
+      {/* Objectif foin */}
+      {objectifFoinT > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-base font-semibold text-gray-800">🎯 Objectif foin — saison</h2>
+              <p className="text-xs text-gray-400 mt-0.5">{DUREE_STABULATION} jours de stabulation · {animauxActifs.length} animaux actifs</p>
+            </div>
+            <div className="text-right">
+              <span className={`text-2xl font-bold ${progressPct >= 100 ? "text-green-600" : progressPct >= 60 ? "text-yellow-600" : "text-red-500"}`}>
+                {progressPct.toFixed(0)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Barre de progression */}
+          <div className="w-full bg-gray-100 rounded-full h-3 mb-3">
+            <div
+              className={`h-3 rounded-full transition-all ${progressPct >= 100 ? "bg-green-500" : progressPct >= 60 ? "bg-yellow-400" : "bg-red-400"}`}
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+
+          {/* Chiffres */}
+          <div className="flex items-center justify-between text-sm mb-4">
+            <span className="text-gray-600">
+              <span className="font-semibold text-gray-800">{foinsRecoltesT.toFixed(1)} t</span> récoltées
+            </span>
+            <span className="text-gray-400">sur</span>
+            <span className="text-gray-600">
+              objectif <span className="font-semibold text-gray-800">{objectifFoinT.toFixed(1)} t</span>
+            </span>
+            {manquantT > 0 && (
+              <span className="text-red-500 font-medium">−{manquantT.toFixed(1)} t restantes</span>
+            )}
+            {manquantT === 0 && (
+              <span className="text-green-600 font-medium">✓ Objectif atteint</span>
+            )}
+          </div>
+
+          {/* Détail par type */}
+          {detailParType.length > 0 && (
+            <div className="border-t border-gray-100 pt-3">
+              <p className="text-xs text-gray-400 mb-2">Détail par type</p>
+              <div className="flex flex-wrap gap-2">
+                {detailParType.map((d) => (
+                  <div key={d.type} className="bg-gray-50 rounded-lg px-3 py-1.5 text-xs text-gray-600">
+                    <span className="font-medium capitalize">{d.type}</span>
+                    {" · "}{d.count} têtes{" · "}
+                    {((d.count * d.conso * DUREE_STABULATION) / 1000).toFixed(1)} t
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Liste activités */}
       <div className="space-y-3">
@@ -482,7 +568,7 @@ export default function FourragePage() {
                 <span className="text-sm text-gray-500">{formatDate(activite.dateActivite)}</span>
               </div>
               <div className="mt-1 text-sm text-gray-700">
-                <span className="font-medium">Partiels :</span> {getPartielsNoms(activite.parcelIds)}
+                <span className="font-medium">Parcelles :</span> {getPartielsNoms(activite.parcelIds)}
               </div>
               <div className="mt-0.5 text-sm text-gray-600">
                 {activite.nombreBottes != null ? (
