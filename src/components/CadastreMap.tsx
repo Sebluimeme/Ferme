@@ -157,8 +157,8 @@ export default function CadastreMap({ onSelect, onClose }: CadastreMapProps) {
       {/* Carte */}
       <div className="flex-1 rounded-xl overflow-hidden border border-gray-200" style={{ minHeight: "420px" }}>
         <MapContainer
-          center={[46.5, 2.3]}
-          zoom={6}
+          center={[48.172, 7.141]}
+          zoom={15}
           style={{ height: "100%", width: "100%" }}
         >
           {/* Fond OSM */}
@@ -169,7 +169,7 @@ export default function CadastreMap({ onSelect, onClose }: CadastreMapProps) {
 
           {/* Overlay cadastral IGN */}
           <WMSTileLayer
-            url="https://wxs.ign.fr/essentiels/geoportail/r/wms"
+            url="https://data.geopf.fr/wms-r/wms"
             layers="CADASTRALPARCELS.PARCELLAIRE_EXPRESS"
             format="image/png"
             transparent={true}
