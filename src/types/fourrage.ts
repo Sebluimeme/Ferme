@@ -5,6 +5,11 @@ export interface Partiel {
   description?: string;
   dateCreation?: string;
   derniereMAJ?: string;
+  cadastreRef?: string;      // ex: "67001/ZD/0042"
+  codeInsee?: string;        // code commune INSEE
+  section?: string;          // section cadastrale
+  numeroParcelle?: string;   // numéro de parcelle
+  geometry?: object;         // GeoJSON polygon (pour affichage futur)
 }
 
 export interface ActiviteFourrage {

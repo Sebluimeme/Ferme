@@ -1,11 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import { useAppStore } from "@/store/store";
 import Modal, { ConfirmModal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import type { Partiel } from "@/types/fourrage";
 import { createPartiel, updatePartiel, deletePartiel } from "@/services/fourrage-service";
+import type { CadastreSelectData } from "@/components/CadastreMap";
+
+// Import dynamique pour éviter le crash SSR (window is not defined)
+const CadastreMap = dynamic(() => import("@/components/CadastreMap"), { ssr: false });
 
 // ==================== Types internes ====================
 
@@ -106,21 +111,60 @@ export default function PartielsPage() {
   const [editPartiel, setEditPartiel] = useState<Partiel | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Partiel | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+
+  // Données pré-remplies depuis le cadastre (stockées pour la création)
+  const [cadastrePrefill, setCadastrePrefill] = useState<{
+    nom: string;
+    surface: string;
+    cadastreRef?: string;
+    codeInsee?: string;
+    section?: string;
+    numeroParcelle?: string;
+    geometry?: object;
+  } | null>(null);
 
   const getActivitesCount = (partielId: string) =>
-    activitesFourrage.filter((a) => a.parcelIds.includes(partielId)).length;
+    activitesFourrage.filter((a) => a.parcelIds?.includes(partielId)).length;
+
+  const handleCadastreSelect = (data: CadastreSelectData) => {
+    // Fermer la carte
+    setShowMap(false);
+    // Pré-remplir les données cadastrales
+    setCadastrePrefill({
+      nom: data.nom,
+      surface: data.surface.toString(),
+      cadastreRef: data.cadastreRef,
+      codeInsee: data.codeInsee,
+      section: data.section,
+      numeroParcelle: data.numeroParcelle,
+      geometry: data.geometry,
+    });
+    // Ouvrir le modal de création
+    setModalOpen(true);
+  };
 
   const handleCreate = async (data: PartielFormData) => {
     setSaving(true);
     try {
-      const result = await createPartiel({
+      const payload: Omit<Partiel, "id" | "dateCreation" | "derniereMAJ"> = {
         nom: data.nom.trim(),
         surface: data.surface ? parseFloat(data.surface) : undefined,
         description: data.description.trim() || undefined,
-      });
+      };
+      // Ajouter les champs cadastraux si disponibles
+      if (cadastrePrefill) {
+        if (cadastrePrefill.cadastreRef) payload.cadastreRef = cadastrePrefill.cadastreRef;
+        if (cadastrePrefill.codeInsee) payload.codeInsee = cadastrePrefill.codeInsee;
+        if (cadastrePrefill.section) payload.section = cadastrePrefill.section;
+        if (cadastrePrefill.numeroParcelle) payload.numeroParcelle = cadastrePrefill.numeroParcelle;
+        if (cadastrePrefill.geometry) payload.geometry = cadastrePrefill.geometry;
+      }
+      const result = await createPartiel(payload);
       if (result.success) {
         showToast({ type: "success", title: "Partiel créé" });
         setModalOpen(false);
+        setCadastrePrefill(null);
       } else {
         showToast({ type: "error", title: "Erreur", message: result.error });
       }
@@ -168,12 +212,20 @@ export default function PartielsPage() {
           <h1 className="text-3xl font-bold text-gray-900">🗺️ Partiels</h1>
           <p className="text-gray-500 mt-1">Gérez vos parcelles fourragères</p>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md"
-        >
-          + Nouveau partiel
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowMap(true)}
+            className="px-4 py-2.5 text-sm font-semibold text-primary border border-primary rounded-xl hover:bg-primary/5 cursor-pointer"
+          >
+            📍 Cadastre
+          </button>
+          <button
+            onClick={() => { setCadastrePrefill(null); setModalOpen(true); }}
+            className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md"
+          >
+            + Nouveau partiel
+          </button>
+        </div>
       </div>
 
       {/* Grille partiels */}
@@ -199,6 +251,9 @@ export default function PartielsPage() {
                       <p className="text-sm text-primary font-semibold mt-0.5">
                         {partiel.surface} ha
                       </p>
+                    )}
+                    {partiel.cadastreRef && (
+                      <p className="text-xs text-gray-400 mt-0.5 font-mono">{partiel.cadastreRef}</p>
                     )}
                   </div>
                   <div className="flex gap-1 shrink-0 ml-2">
@@ -234,11 +289,37 @@ export default function PartielsPage() {
         </div>
       )}
 
+      {/* Modal carte cadastrale */}
+      <Modal
+        isOpen={showMap}
+        onClose={() => setShowMap(false)}
+        title="Sélectionner une parcelle cadastrale"
+        size="large"
+      >
+        <div style={{ height: "600px" }} className="flex flex-col">
+          <CadastreMap
+            onSelect={handleCadastreSelect}
+            onClose={() => setShowMap(false)}
+          />
+        </div>
+      </Modal>
+
       {/* Modal création */}
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Nouveau partiel" size="small">
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => { setModalOpen(false); setCadastrePrefill(null); }}
+        title="Nouveau partiel"
+        size="small"
+      >
+        {cadastrePrefill && (
+          <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-4 text-xs text-green-700">
+            Données pré-remplies depuis le cadastre — {cadastrePrefill.cadastreRef}
+          </div>
+        )}
         <PartielForm
+          initial={cadastrePrefill ?? undefined}
           onSubmit={handleCreate}
-          onCancel={() => setModalOpen(false)}
+          onCancel={() => { setModalOpen(false); setCadastrePrefill(null); }}
           loading={saving}
         />
       </Modal>
