@@ -12,7 +12,7 @@ import { useMemo } from "react";
 export default function DashboardPage() {
   const router = useRouter();
   const { state } = useAppStore();
-  const { stats, alertes, vehicles, maintenanceAlerts, taches } = state;
+  const { stats, alertes, vehicles, maintenanceAlerts, taches, animaux, activitesFourrage } = state;
 
   // Calculer les stats des véhicules
   const vehicleStats = useMemo(() => getVehicleStats(vehicles), [vehicles]);
@@ -28,6 +28,21 @@ export default function DashboardPage() {
   );
 
   const allActiveTasks = useMemo(() => taches.filter((t) => t.statut !== "terminee"), [taches]);
+
+  // Objectif foin basé sur les animaux actifs (kg/an par espèce — standards français/montagne)
+  const CONSO_FOIN_KG: Record<string, number> = { ovin: 300, bovin: 3500, caprin: 300, porcin: 0, equin: 1800 };
+  const objectifFoinTonnes = useMemo(() => {
+    const actifs = animaux.filter((a) => a.statut === "actif");
+    const kg = actifs.reduce((sum, a) => sum + (CONSO_FOIN_KG[a.type] ?? 0), 0);
+    return Math.round(kg / 100) / 10; // arrondi 1 décimale
+  }, [animaux]);
+
+  const foinsRecoltesTonnes = useMemo(() => {
+    const annee = new Date().getFullYear().toString();
+    return activitesFourrage
+      .filter((a) => a.typeActivite === "foin" && a.dateActivite?.startsWith(annee) && (a.poidsTonne ?? 0) > 0)
+      .reduce((sum, a) => sum + (a.poidsTonne ?? 0), 0);
+  }, [activitesFourrage]);
 
   return (
     <div className="fade-in">
@@ -127,6 +142,53 @@ export default function DashboardPage() {
         />
         <KpiCard label="💰 Profit Global" value={formatCurrency(stats.profitGlobal || 0)} subtitle="Année en cours" borderColorClass="border-l-green-500" valueColorClass="text-green-500" />
       </div>
+
+      {/* Objectif foin */}
+      {objectifFoinTonnes > 0 && (
+        <div className="bg-white rounded-lg shadow-sm mb-6 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-lg">🌾</span>
+            <h3 className="text-base font-semibold m-0 flex-1">Objectif foin — {new Date().getFullYear()}</h3>
+            <button
+              onClick={() => router.push("/fourrage")}
+              className="text-xs text-primary hover:underline"
+            >
+              Voir les récoltes →
+            </button>
+          </div>
+          <div className="flex items-end gap-4 mb-2">
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{foinsRecoltesTonnes.toFixed(1)} t</p>
+              <p className="text-xs text-gray-400">récoltées</p>
+            </div>
+            <div className="text-gray-300 text-lg mb-1">/</div>
+            <div>
+              <p className="text-2xl font-bold text-gray-400">{objectifFoinTonnes.toFixed(1)} t</p>
+              <p className="text-xs text-gray-400">objectif ({animaux.filter((a) => a.statut === "actif").length} animaux)</p>
+            </div>
+            {foinsRecoltesTonnes >= objectifFoinTonnes ? (
+              <span className="ml-auto text-sm font-semibold text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                ✅ Objectif atteint
+              </span>
+            ) : (
+              <span className="ml-auto text-sm font-semibold text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+                {(objectifFoinTonnes - foinsRecoltesTonnes).toFixed(1)} t restantes
+              </span>
+            )}
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+            <div
+              className={`h-3 rounded-full transition-all ${
+                foinsRecoltesTonnes >= objectifFoinTonnes ? "bg-green-500" : "bg-amber-400"
+              }`}
+              style={{ width: `${Math.min(100, (foinsRecoltesTonnes / objectifFoinTonnes) * 100).toFixed(1)}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            {Math.min(100, Math.round((foinsRecoltesTonnes / objectifFoinTonnes) * 100))}% — Estimations : ovin 300 kg/an · bovin 3 500 kg/an · caprin 300 kg/an · équin 1 800 kg/an
+          </p>
+        </div>
+      )}
 
       {/* Alertes d'entretien */}
       {sortedMaintenanceAlerts.length > 0 && (

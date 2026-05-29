@@ -59,7 +59,7 @@ export function formatAgeFromBirthDate(dateNaissance: string | undefined): strin
 }
 
 export function getAnimalIcon(type: string): string {
-  const icons: Record<string, string> = { ovin: "🐑", bovin: "🐄", caprin: "🐐", porcin: "🐷" };
+  const icons: Record<string, string> = { ovin: "🐑", bovin: "🐄", caprin: "🐐", porcin: "🐷", equin: "🐴" };
   return icons[type] || "🐾";
 }
 
@@ -69,12 +69,13 @@ export function getAnimalColor(type: string): string {
     bovin: "var(--color-bovin)",
     caprin: "var(--color-caprin)",
     porcin: "var(--color-porcin)",
+    equin: "var(--color-equin)",
   };
   return colors[type] || "#6b7280";
 }
 
 export function getAnimalLabel(type: string): string {
-  const labels: Record<string, string> = { ovin: "Ovin", bovin: "Bovin", caprin: "Caprin", porcin: "Porcin" };
+  const labels: Record<string, string> = { ovin: "Ovin", bovin: "Bovin", caprin: "Caprin", porcin: "Porcin", equin: "Équin" };
   return labels[type] || type;
 }
 
@@ -84,6 +85,7 @@ export function getAnimalTailwindColor(type: string): string {
     bovin: "text-bovin",
     caprin: "text-caprin",
     porcin: "text-porcin",
+    equin: "text-equin",
   };
   return colors[type] || "text-gray-500";
 }
@@ -94,6 +96,7 @@ export function getAnimalBorderColor(type: string): string {
     bovin: "border-l-bovin",
     caprin: "border-l-caprin",
     porcin: "border-l-porcin",
+    equin: "border-l-equin",
   };
   return colors[type] || "border-l-gray-500";
 }
@@ -104,6 +107,7 @@ export function getAnimalBgColor(type: string): string {
     bovin: "bg-bovin/10 text-bovin",
     caprin: "bg-caprin/10 text-caprin",
     porcin: "bg-porcin/10 text-porcin",
+    equin: "bg-equin/10 text-equin",
   };
   return colors[type] || "bg-gray-100 text-gray-500";
 }
