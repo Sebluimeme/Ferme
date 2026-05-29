@@ -1,11 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import { useAppStore } from "@/store/store";
 import KpiCard from "@/components/KpiCard";
 import Modal, { ConfirmModal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
-import type { ActiviteFourrage } from "@/types/fourrage";
+import type { ActiviteFourrage, Partiel } from "@/types/fourrage";
+
+const ParcelSelectorMap = dynamic(() => import("@/components/ParcelSelectorMap"), { ssr: false });
 import {
   createActivite,
   updateActivite,
@@ -55,7 +58,7 @@ function ActiviteForm({
   loading,
 }: {
   initial?: Partial<ActiviteFormData>;
-  partiels: { id: string; nom: string }[];
+  partiels: Partiel[];
   onSubmit: (data: ActiviteFormData) => void;
   onCancel: () => void;
   loading: boolean;
@@ -69,6 +72,7 @@ function ActiviteForm({
     poidsTonne: initial?.poidsTonne ?? "",
     notes: initial?.notes ?? "",
   });
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
 
   const togglePartiel = (id: string) => {
     setForm((prev) => ({
@@ -114,11 +118,41 @@ function ActiviteForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Partiels concernés</label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-gray-700">Partiels concernés</label>
+          {partiels.length > 0 && (
+            <div className="flex rounded-lg overflow-hidden border border-gray-300 text-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode("list")}
+                className={`px-3 py-1 font-medium cursor-pointer transition-colors ${
+                  viewMode === "list" ? "bg-primary text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                Liste
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("map")}
+                className={`px-3 py-1 font-medium cursor-pointer border-l border-gray-300 transition-colors ${
+                  viewMode === "map" ? "bg-primary text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                🗺️ Carte
+              </button>
+            </div>
+          )}
+        </div>
         {partiels.length === 0 ? (
           <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             Aucun partiel créé — allez dans <strong>Partiels</strong> pour en ajouter.
           </p>
+        ) : viewMode === "map" ? (
+          <ParcelSelectorMap
+            partiels={partiels}
+            selectedIds={form.parcelIds}
+            onToggle={togglePartiel}
+          />
         ) : (
           <div className="grid grid-cols-2 gap-2">
             {partiels.map((p) => (
