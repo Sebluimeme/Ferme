@@ -11,6 +11,7 @@ import type { CadastreSelectData } from "@/components/CadastreMap";
 
 const CadastreMap = dynamic(() => import("@/components/CadastreMap"), { ssr: false });
 const ParcelSplitEditor = dynamic(() => import("@/components/ParcelSplitEditor"), { ssr: false });
+const ParcelOverviewMap = dynamic(() => import("@/components/ParcelOverviewMap"), { ssr: false });
 
 // ==================== Types internes ====================
 
@@ -91,13 +92,16 @@ function ParcellaireForm({
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Surface (hectares)</label>
         <input
-          type="number"
-          min="0"
-          step="0.0001"
+          type="text"
+          inputMode="decimal"
+          pattern="[0-9]*[.,]?[0-9]{0,4}"
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           value={form.surface}
-          onChange={(e) => setForm((p) => ({ ...p, surface: e.target.value }))}
-          placeholder="Ex : 2.5"
+          onChange={(e) => {
+            const v = e.target.value.replace(",", ".");
+            if (/^(\d+\.?\d{0,4})?$/.test(v)) setForm((p) => ({ ...p, surface: v }));
+          }}
+          placeholder="Ex : 2.5 ou 1.2345"
         />
       </div>
 
@@ -164,6 +168,7 @@ export default function ParcellairePage() {
   const [saving, setSaving] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [filter, setFilter] = useState<FilterType>("tous");
+  const [showOverviewMap, setShowOverviewMap] = useState(true);
   const [splitTarget, setSplitTarget] = useState<Partiel | null>(null);
   const [splitSaving, setSplitSaving] = useState(false);
 
@@ -340,6 +345,25 @@ export default function ParcellairePage() {
               </button>
             );
           })}
+        </div>
+      )}
+
+      {/* Vue carte générale */}
+      {partiels.length > 0 && (
+        <div className="mb-6">
+          <button
+            onClick={() => setShowOverviewMap((v) => !v)}
+            className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-primary transition-colors mb-3 cursor-pointer"
+          >
+            <span>{showOverviewMap ? "▾" : "▸"}</span>
+            <span>🗺️ Vue générale des terres</span>
+            {partiels.filter((p) => p.geometry).length > 0 && (
+              <span className="text-xs font-normal text-gray-400">
+                {partiels.filter((p) => p.geometry).length} parcelle{partiels.filter((p) => p.geometry).length > 1 ? "s" : ""} sur la carte
+              </span>
+            )}
+          </button>
+          {showOverviewMap && <ParcelOverviewMap partiels={partiels} />}
         </div>
       )}
 
