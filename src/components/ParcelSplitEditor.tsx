@@ -307,15 +307,18 @@ export default function ParcelSplitEditor({ parcelle, onClose, onConfirm, saving
         {stepMsg}
       </div>
 
-      <div style={{ height: "440px" }} className="rounded-xl overflow-hidden border border-gray-200">
+      <div style={{ height: "520px" }} className="rounded-xl overflow-hidden border border-gray-200">
         <MapContainer
           bounds={bounds}
           boundsOptions={{ padding: [40, 40] }}
           style={{ height: "100%", width: "100%" }}
+          maxZoom={22}
         >
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution="&copy; OpenStreetMap contributors"
+            maxNativeZoom={19}
+            maxZoom={22}
           />
           <WMSTileLayer
             url="https://data.geopf.fr/wms-r/wms"
