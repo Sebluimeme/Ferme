@@ -49,21 +49,33 @@ function shoelace(ring: number[][]): number {
   return Math.abs(area) / 2;
 }
 
-function splitRing(ring: number[][], s1: SnapResult, s2: SnapResult): [number[][], number[][]] | null {
+// Split a ring with a multi-point cutting line: start→mids→end (start and end are boundary snaps)
+function splitRing(
+  ring: number[][],
+  s1: SnapResult,
+  s2: SnapResult,
+  mids: number[][]
+): [number[][], number[][]] | null {
   let a = s1, b = s2;
-  if (a.segIndex + a.t > b.segIndex + b.t) [a, b] = [b, a];
+  let orderedMids = mids;
+  if (a.segIndex + a.t > b.segIndex + b.t) {
+    [a, b] = [b, a];
+    orderedMids = [...mids].reverse();
+  }
 
   const pA = [a.lng, a.lat];
   const pB = [b.lng, b.lat];
   const n = ring.length - 1;
 
+  // r1: pA → boundary(a→b) → pB → mids_reversed → pA
   const r1: number[][] = [pA];
   for (let i = a.segIndex + 1; i <= b.segIndex; i++) r1.push([...ring[i]]);
-  r1.push(pB, pA);
+  r1.push(pB, ...[...orderedMids].reverse(), pA);
 
+  // r2: pB → boundary(b→a wrap) → pA → mids_forward → pB
   const r2: number[][] = [pB];
   for (let i = b.segIndex + 1; i <= n + a.segIndex; i++) r2.push([...ring[i % n]]);
-  r2.push(pA, pB);
+  r2.push(pA, ...orderedMids, pB);
 
   if (r1.length < 4 || r2.length < 4) return null;
   return [r1, r2];
@@ -95,34 +107,78 @@ function SplitLayer({ r1, r2 }: { r1: number[][]; r2: number[][] }) {
   return null;
 }
 
-function CuttingLayer({ snaps }: { snaps: SnapResult[] }) {
+interface CuttingLayerProps {
+  snapStart: SnapResult | null;
+  snapEnd: SnapResult | null;
+  intermediates: number[][];
+}
+
+function CuttingLayer({ snapStart, snapEnd, intermediates }: CuttingLayerProps) {
   const map = useMap();
   useEffect(() => {
     const layers: L.Layer[] = [];
-    if (snaps.length >= 2) {
+
+    const path: L.LatLngExpression[] = [];
+    if (snapStart) path.push([snapStart.lat, snapStart.lng]);
+    for (const m of intermediates) path.push([m[1], m[0]]);
+    if (snapEnd) path.push([snapEnd.lat, snapEnd.lng]);
+
+    if (path.length >= 2) {
       layers.push(
-        L.polyline(snaps.map((s) => [s.lat, s.lng] as L.LatLngExpression), {
-          color: "#ef4444", weight: 2, dashArray: "6 4",
+        L.polyline(path, { color: "#ef4444", weight: 2, dashArray: "6 4" }).addTo(map)
+      );
+    }
+
+    if (snapStart) {
+      layers.push(
+        L.circleMarker([snapStart.lat, snapStart.lng], {
+          radius: 8, fillColor: "#22c55e", color: "#fff", weight: 2, fillOpacity: 1,
         }).addTo(map)
       );
     }
-    snaps.forEach((s) => {
+
+    intermediates.forEach((m) => {
       layers.push(
-        L.circleMarker([s.lat, s.lng], {
-          radius: 7, fillColor: "#ef4444", color: "#fff", weight: 2, fillOpacity: 1,
+        L.circleMarker([m[1], m[0]], {
+          radius: 5, fillColor: "#3b82f6", color: "#fff", weight: 2, fillOpacity: 1,
         }).addTo(map)
       );
     });
+
+    if (snapEnd) {
+      layers.push(
+        L.circleMarker([snapEnd.lat, snapEnd.lng], {
+          radius: 8, fillColor: "#ef4444", color: "#fff", weight: 2, fillOpacity: 1,
+        }).addTo(map)
+      );
+    }
+
     return () => { layers.forEach((l) => l.remove()); };
-  }, [map, snaps]);
+  }, [map, snapStart, snapEnd, intermediates]);
   return null;
 }
 
-function ClickHandler({ ring, count, onSnap }: { ring: number[][]; count: number; onSnap: (s: SnapResult) => void }) {
+interface ClickHandlerProps {
+  ring: number[][];
+  snapStart: SnapResult | null;
+  closingMode: boolean;
+  isDone: boolean;
+  onSnapStart: (s: SnapResult) => void;
+  onIntermediate: (pt: number[]) => void;
+  onSnapEnd: (s: SnapResult) => void;
+}
+
+function ClickHandler({ ring, snapStart, closingMode, isDone, onSnapStart, onIntermediate, onSnapEnd }: ClickHandlerProps) {
   useMapEvents({
     click(e) {
-      if (count >= 2) return;
-      onSnap(snapToRing(e.latlng.lng, e.latlng.lat, ring));
+      if (isDone) return;
+      if (!snapStart) {
+        onSnapStart(snapToRing(e.latlng.lng, e.latlng.lat, ring));
+      } else if (closingMode) {
+        onSnapEnd(snapToRing(e.latlng.lng, e.latlng.lat, ring));
+      } else {
+        onIntermediate([e.latlng.lng, e.latlng.lat]);
+      }
     },
   });
   return null;
@@ -146,18 +202,51 @@ export default function ParcelSplitEditor({ parcelle, onClose, onConfirm, saving
       ? (geo.coordinates as unknown as number[][][][])[0][0]
       : [];
 
-  const [snaps, setSnaps] = useState<SnapResult[]>([]);
+  const [snapStart, setSnapStart] = useState<SnapResult | null>(null);
+  const [snapEnd, setSnapEnd] = useState<SnapResult | null>(null);
+  const [intermediates, setIntermediates] = useState<number[][]>([]);
+  const [closingMode, setClosingMode] = useState(false);
   const [showNames, setShowNames] = useState(false);
   const [name1, setName1] = useState(`${parcelle.nom} A`);
   const [name2, setName2] = useState(`${parcelle.nom} B`);
 
-  const handleSnap = useCallback(
-    (s: SnapResult) => setSnaps((prev) => (prev.length < 2 ? [...prev, s] : prev)),
-    []
-  );
+  const isDone = snapStart !== null && snapEnd !== null;
 
-  const splitResult = snaps.length === 2 ? splitRing(ring, snaps[0], snaps[1]) : null;
-  const splitError = snaps.length === 2 && splitResult === null;
+  const phase: "idle" | "drawing" | "closing" | "done" = isDone
+    ? "done"
+    : closingMode
+    ? "closing"
+    : snapStart
+    ? "drawing"
+    : "idle";
+
+  const handleSnapStart = useCallback((s: SnapResult) => setSnapStart(s), []);
+  const handleIntermediate = useCallback((pt: number[]) => setIntermediates((prev) => [...prev, pt]), []);
+  const handleSnapEnd = useCallback((s: SnapResult) => {
+    setSnapEnd(s);
+    setClosingMode(false);
+  }, []);
+
+  const handleUndo = () => {
+    if (closingMode) {
+      setClosingMode(false);
+    } else if (intermediates.length > 0) {
+      setIntermediates((prev) => prev.slice(0, -1));
+    } else if (snapStart) {
+      setSnapStart(null);
+    }
+  };
+
+  const handleReset = () => {
+    setSnapStart(null);
+    setSnapEnd(null);
+    setIntermediates([]);
+    setClosingMode(false);
+    setShowNames(false);
+  };
+
+  const splitResult = snapStart && snapEnd ? splitRing(ring, snapStart, snapEnd, intermediates) : null;
+  const splitError = isDone && splitResult === null;
 
   const handleConfirm = () => {
     if (!splitResult) return;
@@ -192,19 +281,27 @@ export default function ParcelSplitEditor({ parcelle, onClose, onConfirm, saving
   ];
 
   const stepMsg =
-    snaps.length === 0
-      ? "Cliquez n'importe où — le point s'ancre automatiquement sur le bord de la parcelle"
-      : snaps.length === 1
-      ? "Placez le 2e point de coupe"
-      : splitError
-      ? "⚠️ Points trop proches, réinitialisez et placez les points plus loin"
-      : "Aperçu prêt — ajustez les noms puis confirmez";
+    splitError
+      ? "⚠️ Tracé invalide — réinitialisez et tracez un chemin qui traverse la parcelle"
+      : phase === "done"
+      ? "✓ Tracé validé — nommez les parcelles puis confirmez"
+      : phase === "idle"
+      ? "① Cliquez sur le bord de la parcelle pour poser le point de départ (ancré automatiquement)"
+      : phase === "drawing"
+      ? `② Cliquez n'importe où pour ajouter des points${intermediates.length > 0 ? ` (${intermediates.length} intermédiaire${intermediates.length > 1 ? "s" : ""})` : ""} — puis "Terminer le tracé"`
+      : "③ Cliquez sur le bord de la parcelle pour terminer et ancrer le tracé";
+
+  const canUndo = phase !== "idle" && !isDone;
 
   return (
     <div className="flex flex-col gap-4">
       <div
         className={`border rounded-lg px-4 py-2 text-sm ${
-          splitError ? "bg-red-50 border-red-200 text-red-700" : "bg-blue-50 border-blue-200 text-blue-700"
+          splitError
+            ? "bg-red-50 border-red-200 text-red-700"
+            : phase === "done"
+            ? "bg-green-50 border-green-200 text-green-700"
+            : "bg-blue-50 border-blue-200 text-blue-700"
         }`}
       >
         {stepMsg}
@@ -231,19 +328,43 @@ export default function ParcelSplitEditor({ parcelle, onClose, onConfirm, saving
           />
           <OriginalLayer ring={ring} hidden={!!splitResult} />
           {splitResult && <SplitLayer r1={splitResult[0]} r2={splitResult[1]} />}
-          <CuttingLayer snaps={snaps} />
-          <ClickHandler ring={ring} count={snaps.length} onSnap={handleSnap} />
+          <CuttingLayer snapStart={snapStart} snapEnd={snapEnd} intermediates={intermediates} />
+          <ClickHandler
+            ring={ring}
+            snapStart={snapStart}
+            closingMode={closingMode}
+            isDone={isDone}
+            onSnapStart={handleSnapStart}
+            onIntermediate={handleIntermediate}
+            onSnapEnd={handleSnapEnd}
+          />
         </MapContainer>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 flex-wrap">
         <button
-          onClick={() => { setSnaps([]); setShowNames(false); }}
-          disabled={snaps.length === 0}
+          onClick={handleReset}
+          disabled={phase === "idle"}
           className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-200 cursor-pointer disabled:opacity-40"
         >
           Réinitialiser
         </button>
+        {canUndo && (
+          <button
+            onClick={handleUndo}
+            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-200 cursor-pointer"
+          >
+            ↩ Annuler dernier
+          </button>
+        )}
+        {phase === "drawing" && (
+          <button
+            onClick={() => setClosingMode(true)}
+            className="px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer"
+          >
+            Terminer le tracé →
+          </button>
+        )}
         <div className="flex-1" />
         <button
           onClick={onClose}
