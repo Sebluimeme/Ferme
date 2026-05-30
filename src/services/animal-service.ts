@@ -23,7 +23,7 @@ export function validateAnimalData(data: AnimalFormData): { valid: boolean; erro
   const hasNumeroBoucle = data.numeroBoucle && data.numeroBoucle.trim() !== "";
   if (!hasNom && !hasNumeroBoucle) errors.push("Un nom ou un numéro de boucle est requis (au moins un des deux)");
   if (!data.type) errors.push("Le type d'animal est obligatoire");
-  if (!["ovin", "bovin", "caprin", "porcin"].includes(data.type)) errors.push("Type d'animal invalide");
+  if (!["ovin", "bovin", "caprin", "porcin", "equin"].includes(data.type)) errors.push("Type d'animal invalide");
   if (!data.sexe || !["M", "F"].includes(data.sexe)) errors.push("Le sexe est obligatoire (M ou F)");
   if (data.dateNaissance) {
     const date = new Date(data.dateNaissance);
@@ -85,6 +85,7 @@ export function getAnimalStats(animaux: Animal[]) {
       bovins: animaux.filter((a) => a.type === "bovin" && a.statut === "actif").length,
       caprins: animaux.filter((a) => a.type === "caprin" && a.statut === "actif").length,
       porcins: animaux.filter((a) => a.type === "porcin" && a.statut === "actif").length,
+      equins: animaux.filter((a) => a.type === "equin" && a.statut === "actif").length,
     },
   };
 }

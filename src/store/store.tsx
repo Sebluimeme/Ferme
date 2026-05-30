@@ -14,7 +14,7 @@ export interface Animal {
   id: string;
   numeroBoucle?: string;
   nom?: string;
-  type: "ovin" | "bovin" | "caprin" | "porcin";
+  type: "ovin" | "bovin" | "caprin" | "porcin" | "equin";
   sexe: "M" | "F";
   race?: string;
   dateNaissance?: string;
