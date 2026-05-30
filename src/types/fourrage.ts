@@ -1,6 +1,7 @@
 export interface Partiel {
   id: string;
   nom: string;
+  type?: "pature" | "fauche"; // classification usage
   surface?: number; // hectares
   description?: string;
   dateCreation?: string;
@@ -9,7 +10,7 @@ export interface Partiel {
   codeInsee?: string;        // code commune INSEE
   section?: string;          // section cadastrale
   numeroParcelle?: string;   // numéro de parcelle
-  geometry?: object;         // GeoJSON polygon (pour affichage futur)
+  geometry?: object;         // GeoJSON polygon
 }
 
 export interface ActiviteFourrage {

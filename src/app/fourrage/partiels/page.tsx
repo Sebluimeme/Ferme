@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useAppStore } from "@/store/store";
 import Modal, { ConfirmModal } from "@/components/Modal";
@@ -9,32 +9,34 @@ import type { Partiel } from "@/types/fourrage";
 import { createPartiel, updatePartiel, deletePartiel } from "@/services/fourrage-service";
 import type { CadastreSelectData } from "@/components/CadastreMap";
 
-// Import dynamique pour éviter le crash SSR (window is not defined)
 const CadastreMap = dynamic(() => import("@/components/CadastreMap"), { ssr: false });
+const ParcelSplitEditor = dynamic(() => import("@/components/ParcelSplitEditor"), { ssr: false });
 
 // ==================== Types internes ====================
 
-interface PartielFormData {
+interface ParcellaireFD {
   nom: string;
+  type: "pature" | "fauche" | "";
   surface: string;
   description: string;
 }
 
-// ==================== Formulaire partiel ====================
+// ==================== Formulaire ====================
 
-function PartielForm({
+function ParcellaireForm({
   initial,
   onSubmit,
   onCancel,
   loading,
 }: {
-  initial?: Partial<PartielFormData>;
-  onSubmit: (data: PartielFormData) => void;
+  initial?: Partial<ParcellaireFD>;
+  onSubmit: (data: ParcellaireFD) => void;
   onCancel: () => void;
   loading: boolean;
 }) {
-  const [form, setForm] = useState<PartielFormData>({
+  const [form, setForm] = useState<ParcellaireFD>({
     nom: initial?.nom ?? "",
+    type: initial?.type ?? "",
     surface: initial?.surface ?? "",
     description: initial?.description ?? "",
   });
@@ -47,7 +49,7 @@ function PartielForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Nom du partiel *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Nom de la parcelle *</label>
         <input
           type="text"
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -58,6 +60,34 @@ function PartielForm({
           autoFocus
         />
       </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Usage</label>
+        <div className="flex gap-2">
+          {(["", "pature", "fauche"] as const).map((v) => {
+            const label = v === "" ? "Non défini" : v === "pature" ? "🐄 Pâture" : "🌾 Fauche";
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setForm((p) => ({ ...p, type: v }))}
+                className={`flex-1 py-2 px-3 text-sm rounded-lg border transition-colors cursor-pointer ${
+                  form.type === v
+                    ? v === "pature"
+                      ? "bg-green-100 border-green-500 text-green-800 font-semibold"
+                      : v === "fauche"
+                      ? "bg-yellow-100 border-yellow-500 text-yellow-800 font-semibold"
+                      : "bg-gray-200 border-gray-500 text-gray-800 font-semibold"
+                    : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Surface (hectares)</label>
         <input
@@ -70,6 +100,7 @@ function PartielForm({
           placeholder="Ex : 2.5"
         />
       </div>
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
         <textarea
@@ -80,6 +111,7 @@ function PartielForm({
           placeholder="Type de sol, exposition, notes..."
         />
       </div>
+
       <div className="flex justify-end gap-3 pt-2">
         <button
           type="button"
@@ -100,9 +132,28 @@ function PartielForm({
   );
 }
 
-// ==================== Page partiels ====================
+// ==================== Badges ====================
 
-export default function PartielsPage() {
+function TypeBadge({ type }: { type?: string }) {
+  if (!type) return null;
+  if (type === "pature")
+    return (
+      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+        🐄 Pâture
+      </span>
+    );
+  return (
+    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
+      🌾 Fauche
+    </span>
+  );
+}
+
+type FilterType = "tous" | "pature" | "fauche";
+
+// ==================== Page ====================
+
+export default function ParcellairePage() {
   const { state } = useAppStore();
   const { showToast } = useToast();
   const { partiels, activitesFourrage } = state;
@@ -112,8 +163,10 @@ export default function PartielsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Partiel | null>(null);
   const [saving, setSaving] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [filter, setFilter] = useState<FilterType>("tous");
+  const [splitTarget, setSplitTarget] = useState<Partiel | null>(null);
+  const [splitSaving, setSplitSaving] = useState(false);
 
-  // Données pré-remplies depuis le cadastre (stockées pour la création)
   const [cadastrePrefill, setCadastrePrefill] = useState<{
     nom: string;
     surface: string;
@@ -127,10 +180,17 @@ export default function PartielsPage() {
   const getActivitesCount = (partielId: string) =>
     activitesFourrage.filter((a) => a.parcelIds?.includes(partielId)).length;
 
+  const filteredPartiels = useMemo(() => {
+    if (filter === "tous") return partiels;
+    return partiels.filter((p) => p.type === filter);
+  }, [partiels, filter]);
+
+  // Stats par type
+  const nbPature = partiels.filter((p) => p.type === "pature").length;
+  const nbFauche = partiels.filter((p) => p.type === "fauche").length;
+
   const handleCadastreSelect = (data: CadastreSelectData) => {
-    // Fermer la carte
     setShowMap(false);
-    // Pré-remplir les données cadastrales
     setCadastrePrefill({
       nom: data.nom,
       surface: data.surface.toString(),
@@ -140,19 +200,18 @@ export default function PartielsPage() {
       numeroParcelle: data.numeroParcelle,
       geometry: data.geometry,
     });
-    // Ouvrir le modal de création
     setModalOpen(true);
   };
 
-  const handleCreate = async (data: PartielFormData) => {
+  const handleCreate = async (data: ParcellaireFD) => {
     setSaving(true);
     try {
       const payload: Omit<Partiel, "id" | "dateCreation" | "derniereMAJ"> = {
         nom: data.nom.trim(),
         surface: data.surface ? parseFloat(data.surface) : undefined,
         description: data.description.trim() || undefined,
+        type: data.type || undefined,
       };
-      // Ajouter les champs cadastraux si disponibles
       if (cadastrePrefill) {
         if (cadastrePrefill.cadastreRef) payload.cadastreRef = cadastrePrefill.cadastreRef;
         if (cadastrePrefill.codeInsee) payload.codeInsee = cadastrePrefill.codeInsee;
@@ -162,7 +221,7 @@ export default function PartielsPage() {
       }
       const result = await createPartiel(payload);
       if (result.success) {
-        showToast({ type: "success", title: "Partiel créé" });
+        showToast({ type: "success", title: "Parcelle créée" });
         setModalOpen(false);
         setCadastrePrefill(null);
       } else {
@@ -173,7 +232,7 @@ export default function PartielsPage() {
     }
   };
 
-  const handleUpdate = async (data: PartielFormData) => {
+  const handleUpdate = async (data: ParcellaireFD) => {
     if (!editPartiel) return;
     setSaving(true);
     try {
@@ -181,9 +240,10 @@ export default function PartielsPage() {
         nom: data.nom.trim(),
         surface: data.surface ? parseFloat(data.surface) : undefined,
         description: data.description.trim() || undefined,
+        type: data.type || undefined,
       });
       if (result.success) {
-        showToast({ type: "success", title: "Partiel mis à jour" });
+        showToast({ type: "success", title: "Parcelle mise à jour" });
         setEditPartiel(null);
       } else {
         showToast({ type: "error", title: "Erreur", message: result.error });
@@ -197,11 +257,39 @@ export default function PartielsPage() {
     if (!deleteTarget) return;
     const result = await deletePartiel(deleteTarget.id);
     if (result.success) {
-      showToast({ type: "success", title: "Partiel supprimé" });
+      showToast({ type: "success", title: "Parcelle supprimée" });
     } else {
       showToast({ type: "error", title: "Erreur", message: result.error });
     }
     setDeleteTarget(null);
+  };
+
+  const handleSplit = async (
+    r1: number[][], r2: number[][], n1: string, n2: string, s1?: number, s2?: number
+  ) => {
+    if (!splitTarget) return;
+    setSplitSaving(true);
+    try {
+      const base = {
+        type: splitTarget.type,
+        description: splitTarget.description,
+        codeInsee: splitTarget.codeInsee,
+        section: splitTarget.section,
+      };
+      const [res1, res2] = await Promise.all([
+        createPartiel({ ...base, nom: n1, surface: s1, geometry: { type: "Polygon", coordinates: [r1] } }),
+        createPartiel({ ...base, nom: n2, surface: s2, geometry: { type: "Polygon", coordinates: [r2] } }),
+      ]);
+      if (res1.success && res2.success) {
+        await deletePartiel(splitTarget.id);
+        showToast({ type: "success", title: `"${splitTarget.nom}" divisée en 2 parcelles` });
+        setSplitTarget(null);
+      } else {
+        showToast({ type: "error", title: "Erreur lors de la division" });
+      }
+    } finally {
+      setSplitSaving(false);
+    }
   };
 
   return (
@@ -209,7 +297,7 @@ export default function PartielsPage() {
       {/* En-tête */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">🗺️ Partiels</h1>
+          <h1 className="text-3xl font-bold text-gray-900">🗺️ Parcellaire</h1>
           <p className="text-gray-500 mt-1">Gérez vos parcelles fourragères</p>
         </div>
         <div className="flex gap-3">
@@ -223,21 +311,52 @@ export default function PartielsPage() {
             onClick={() => { setCadastrePrefill(null); setModalOpen(true); }}
             className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md"
           >
-            + Nouveau partiel
+            + Nouvelle parcelle
           </button>
         </div>
       </div>
 
-      {/* Grille partiels */}
-      {partiels.length === 0 ? (
+      {/* Filtres */}
+      {partiels.length > 0 && (
+        <div className="flex gap-2 mb-5">
+          {(["tous", "pature", "fauche"] as const).map((f) => {
+            const label =
+              f === "tous"
+                ? `Toutes (${partiels.length})`
+                : f === "pature"
+                ? `🐄 Pâture (${nbPature})`
+                : `🌾 Fauche (${nbFauche})`;
+            return (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-4 py-1.5 text-sm rounded-full font-medium transition-colors cursor-pointer ${
+                  filter === f
+                    ? "bg-primary text-white shadow-sm"
+                    : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Grille parcelles */}
+      {filteredPartiels.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <div className="text-5xl mb-3">🗺️</div>
-          <p className="text-lg font-medium">Aucun partiel créé</p>
-          <p className="text-sm mt-1">Cliquez sur &quot;+ Nouveau partiel&quot; pour commencer.</p>
+          <p className="text-lg font-medium">
+            {partiels.length === 0 ? "Aucune parcelle créée" : "Aucune parcelle dans cette catégorie"}
+          </p>
+          {partiels.length === 0 && (
+            <p className="text-sm mt-1">Cliquez sur &quot;+ Nouvelle parcelle&quot; pour commencer.</p>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {partiels.map((partiel) => {
+          {filteredPartiels.map((partiel) => {
             const nbActivites = getActivitesCount(partiel.id);
             return (
               <div
@@ -246,7 +365,10 @@ export default function PartielsPage() {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-base font-bold text-gray-900 truncate">{partiel.nom}</h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base font-bold text-gray-900 truncate">{partiel.nom}</h3>
+                      <TypeBadge type={partiel.type} />
+                    </div>
                     {partiel.surface != null && (
                       <p className="text-sm text-primary font-semibold mt-0.5">
                         {partiel.surface} ha
@@ -257,6 +379,15 @@ export default function PartielsPage() {
                     )}
                   </div>
                   <div className="flex gap-1 shrink-0 ml-2">
+                    {partiel.geometry && (
+                      <button
+                        onClick={() => setSplitTarget(partiel)}
+                        className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg cursor-pointer transition-colors"
+                        title="Diviser la parcelle"
+                      >
+                        ✂️
+                      </button>
+                    )}
                     <button
                       onClick={() => setEditPartiel(partiel)}
                       className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg cursor-pointer transition-colors"
@@ -308,7 +439,7 @@ export default function PartielsPage() {
       <Modal
         isOpen={modalOpen}
         onClose={() => { setModalOpen(false); setCadastrePrefill(null); }}
-        title="Nouveau partiel"
+        title="Nouvelle parcelle"
         size="small"
       >
         {cadastrePrefill && (
@@ -316,7 +447,7 @@ export default function PartielsPage() {
             Données pré-remplies depuis le cadastre — {cadastrePrefill.cadastreRef}
           </div>
         )}
-        <PartielForm
+        <ParcellaireForm
           initial={cadastrePrefill ?? undefined}
           onSubmit={handleCreate}
           onCancel={() => { setModalOpen(false); setCadastrePrefill(null); }}
@@ -328,13 +459,14 @@ export default function PartielsPage() {
       <Modal
         isOpen={!!editPartiel}
         onClose={() => setEditPartiel(null)}
-        title="Modifier le partiel"
+        title="Modifier la parcelle"
         size="small"
       >
         {editPartiel && (
-          <PartielForm
+          <ParcellaireForm
             initial={{
               nom: editPartiel.nom,
+              type: editPartiel.type ?? "",
               surface: editPartiel.surface?.toString() ?? "",
               description: editPartiel.description ?? "",
             }}
@@ -350,11 +482,28 @@ export default function PartielsPage() {
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
-        title="Supprimer le partiel"
-        message={`Êtes-vous sûr de vouloir supprimer le partiel <strong>${deleteTarget?.nom ?? ""}</strong> ? Les activités associées ne seront pas supprimées.`}
+        title="Supprimer la parcelle"
+        message={`Êtes-vous sûr de vouloir supprimer la parcelle <strong>${deleteTarget?.nom ?? ""}</strong> ? Les activités associées ne seront pas supprimées.`}
         confirmText="Supprimer"
         danger
       />
+
+      {/* Modal division */}
+      <Modal
+        isOpen={!!splitTarget}
+        onClose={() => setSplitTarget(null)}
+        title={`✂️ Diviser "${splitTarget?.nom ?? ""}"`}
+        size="large"
+      >
+        {splitTarget && (
+          <ParcelSplitEditor
+            parcelle={splitTarget}
+            onClose={() => setSplitTarget(null)}
+            onConfirm={handleSplit}
+            saving={splitSaving}
+          />
+        )}
+      </Modal>
     </div>
   );
 }

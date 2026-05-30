@@ -35,7 +35,7 @@ const sections: NavSection[] = [
     title: "Culture",
     items: [
       { icon: "🌾", label: "Fourrage", route: "/fourrage" },
-      { icon: "🗺️", label: "Partiels", route: "/fourrage/partiels" },
+      { icon: "🗺️", label: "Parcellaire", route: "/fourrage/partiels" },
     ],
   },
   {
