@@ -25,13 +25,13 @@ interface ActiviteFormData {
   dateActivite: string;
   parcelIds: string[];
   nombreBottes: string;
-  poidsTonne: string;
+  poidsParBotte: string;
   notes: string;
 }
 
 interface BottesFormData {
   nombreBottes: string;
-  poidsTonne: string;
+  poidsParBotte: string;
 }
 
 const TYPE_LABELS: Record<TypeActivite, string> = {
@@ -69,9 +69,13 @@ function ActiviteForm({
     dateActivite: initial?.dateActivite ?? today,
     parcelIds: initial?.parcelIds ?? [],
     nombreBottes: initial?.nombreBottes ?? "",
-    poidsTonne: initial?.poidsTonne ?? "",
+    poidsParBotte: initial?.poidsParBotte ?? "",
     notes: initial?.notes ?? "",
   });
+
+  const poidsTotalT = form.nombreBottes && form.poidsParBotte
+    ? (parseInt(form.nombreBottes) * parseFloat(form.poidsParBotte)) / 1000
+    : null;
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
 
   const togglePartiel = (id: string) => {
@@ -183,18 +187,24 @@ function ActiviteForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Poids (tonnes)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Poids par botte (kg)</label>
           <input
             type="number"
             min="0"
-            step="0.1"
+            step="1"
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            value={form.poidsTonne}
-            onChange={(e) => setForm((p) => ({ ...p, poidsTonne: e.target.value }))}
-            placeholder="Ex : 4.5"
+            value={form.poidsParBotte}
+            onChange={(e) => setForm((p) => ({ ...p, poidsParBotte: e.target.value }))}
+            placeholder="Ex : 300"
           />
         </div>
       </div>
+      {poidsTotalT !== null && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2.5 text-sm flex items-center justify-between">
+          <span className="text-gray-600">Poids total calculé</span>
+          <span className="font-bold text-gray-900">{poidsTotalT.toFixed(3)} t</span>
+        </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
@@ -238,7 +248,11 @@ function BottesForm({
   onCancel: () => void;
   loading: boolean;
 }) {
-  const [form, setForm] = useState<BottesFormData>({ nombreBottes: "", poidsTonne: "" });
+  const [form, setForm] = useState<BottesFormData>({ nombreBottes: "", poidsParBotte: "" });
+
+  const poidsTotalT = form.nombreBottes && form.poidsParBotte
+    ? (parseInt(form.nombreBottes) * parseFloat(form.poidsParBotte)) / 1000
+    : null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,17 +274,23 @@ function BottesForm({
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Poids (tonnes)</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Poids par botte (kg)</label>
         <input
           type="number"
           min="0"
-          step="0.1"
+          step="1"
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          value={form.poidsTonne}
-          onChange={(e) => setForm((p) => ({ ...p, poidsTonne: e.target.value }))}
-          placeholder="Ex : 4.5"
+          value={form.poidsParBotte}
+          onChange={(e) => setForm((p) => ({ ...p, poidsParBotte: e.target.value }))}
+          placeholder="Ex : 300"
         />
       </div>
+      {poidsTotalT !== null && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2.5 text-sm flex items-center justify-between">
+          <span className="text-gray-600">Poids total calculé</span>
+          <span className="font-bold text-gray-900">{poidsTotalT.toFixed(3)} t</span>
+        </div>
+      )}
       <div className="flex justify-end gap-3 pt-2">
         <button
           type="button"
@@ -361,14 +381,18 @@ export default function FourragePage() {
   const handleCreate = async (data: ActiviteFormData) => {
     setSaving(true);
     try {
+      const nbBottes = data.nombreBottes ? parseInt(data.nombreBottes) : undefined;
+      const poidsTonne = nbBottes && data.poidsParBotte
+        ? (nbBottes * parseFloat(data.poidsParBotte)) / 1000
+        : undefined;
       const result = await createActivite({
         typeActivite: data.typeActivite,
         dateActivite: data.dateActivite,
         parcelIds: data.parcelIds,
-        nombreBottes: data.nombreBottes ? parseInt(data.nombreBottes) : undefined,
-        poidsTonne: data.poidsTonne ? parseFloat(data.poidsTonne) : undefined,
+        nombreBottes: nbBottes,
+        poidsTonne,
         notes: data.notes || undefined,
-        statut: data.nombreBottes ? "terminee" : "en_cours",
+        statut: nbBottes ? "terminee" : "en_cours",
       });
       if (result.success) {
         showToast({ type: "success", title: "Activité créée" });
@@ -385,14 +409,18 @@ export default function FourragePage() {
     if (!editActivite) return;
     setSaving(true);
     try {
+      const nbBottes = data.nombreBottes ? parseInt(data.nombreBottes) : undefined;
+      const poidsTonne = nbBottes && data.poidsParBotte
+        ? (nbBottes * parseFloat(data.poidsParBotte)) / 1000
+        : undefined;
       const result = await updateActivite(editActivite.id, {
         typeActivite: data.typeActivite,
         dateActivite: data.dateActivite,
         parcelIds: data.parcelIds,
-        nombreBottes: data.nombreBottes ? parseInt(data.nombreBottes) : undefined,
-        poidsTonne: data.poidsTonne ? parseFloat(data.poidsTonne) : undefined,
+        nombreBottes: nbBottes,
+        poidsTonne,
         notes: data.notes || undefined,
-        statut: data.nombreBottes ? "terminee" : "en_cours",
+        statut: nbBottes ? "terminee" : "en_cours",
       });
       if (result.success) {
         showToast({ type: "success", title: "Activité mise à jour" });
@@ -420,11 +448,11 @@ export default function FourragePage() {
     if (!bottesModal) return;
     setSaving(true);
     try {
-      const result = await addBottesActivite(
-        bottesModal.id,
-        parseInt(data.nombreBottes),
-        data.poidsTonne ? parseFloat(data.poidsTonne) : undefined
-      );
+      const nbBottes = parseInt(data.nombreBottes);
+      const poidsTonne = data.poidsParBotte
+        ? (nbBottes * parseFloat(data.poidsParBotte)) / 1000
+        : undefined;
+      const result = await addBottesActivite(bottesModal.id, nbBottes, poidsTonne);
       if (result.success) {
         showToast({ type: "success", title: "Bottes enregistrées" });
         setBottesModal(null);
@@ -636,7 +664,9 @@ export default function FourragePage() {
               dateActivite: editActivite.dateActivite,
               parcelIds: editActivite.parcelIds ?? [],
               nombreBottes: editActivite.nombreBottes?.toString() ?? "",
-              poidsTonne: editActivite.poidsTonne?.toString() ?? "",
+              poidsParBotte: editActivite.nombreBottes && editActivite.poidsTonne
+                ? Math.round((editActivite.poidsTonne * 1000) / editActivite.nombreBottes).toString()
+                : "",
               notes: editActivite.notes ?? "",
             }}
             onSubmit={handleUpdate}
