@@ -626,14 +626,14 @@ export default function FourragePage() {
             <KpiCard
               label="Rdt foin moyen"
               value={rdtFoin != null ? `${rdtFoin.toFixed(2)} t/ha` : "—"}
-              subtitle={surfaceFauche > 0 ? `${surfaceFauche.toFixed(1)} ha en fauche` : "surface non définie"}
+              subtitle={surfaceFoin > 0 ? `${surfaceFoin.toFixed(1)} ha en fauche` : "surface non définie"}
               borderColorClass="border-l-green-500"
               valueColorClass="text-green-600"
             />
             <KpiCard
               label="Rdt regain moyen"
               value={rdtRegain != null ? `${rdtRegain.toFixed(2)} t/ha` : "—"}
-              subtitle={surfaceFauche > 0 ? `${surfaceFauche.toFixed(1)} ha en fauche` : "surface non définie"}
+              subtitle={surfaceRegain > 0 ? `${surfaceRegain.toFixed(1)} ha en regain` : "surface non définie"}
               borderColorClass="border-l-orange-500"
               valueColorClass="text-orange-600"
             />
