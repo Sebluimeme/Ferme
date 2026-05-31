@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, WMSTileLayer, GeoJSON, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -43,10 +43,14 @@ function parcelColor(type?: string) {
 interface Props {
   partiels: Partiel[];
   onDoubleClick?: (partiel: Partiel) => void;
+  onSplit?: (partiel: Partiel) => void;
+  onDelete?: (partiel: Partiel) => void;
 }
 
-export default function ParcelOverviewMap({ partiels, onDoubleClick }: Props) {
+export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, onDelete }: Props) {
   const [satellite, setSatellite] = useState(false);
+  const [selectedPartiel, setSelectedPartiel] = useState<Partiel | null>(null);
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const withGeo = partiels.filter((p) => p.geometry);
 
   if (withGeo.length === 0) {
@@ -92,29 +96,115 @@ export default function ParcelOverviewMap({ partiels, onDoubleClick }: Props) {
             attribution="&copy; IGN"
           />
           {withGeo.map((p) => {
+            const isSelected = selectedPartiel?.id === p.id;
             const { color, fill } = parcelColor(p.type);
             return (
               <GeoJSON
                 key={p.id}
                 data={p.geometry as GeoJSON.GeoJsonObject}
-                style={{ color, weight: 2.5, fillColor: fill, fillOpacity: 0.35 }}
+                style={{
+                  color: isSelected ? "#1d4ed8" : color,
+                  weight: isSelected ? 3.5 : 2.5,
+                  fillColor: isSelected ? "#3b82f6" : fill,
+                  fillOpacity: isSelected ? 0.55 : 0.35,
+                }}
                 onEachFeature={(_, layer) => {
                   const label = p.surface
                     ? `<strong>${p.nom}</strong><br/>${p.surface} ha`
                     : `<strong>${p.nom}</strong>`;
                   layer.bindTooltip(label, { sticky: false, permanent: false, direction: "center" });
-                  if (onDoubleClick) {
-                    layer.on("dblclick", (e) => {
-                      L.DomEvent.stopPropagation(e);
-                      onDoubleClick(p);
-                    });
-                  }
+
+                  layer.on("click", (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    if (clickTimerRef.current) {
+                      clearTimeout(clickTimerRef.current);
+                      clickTimerRef.current = null;
+                    }
+                    clickTimerRef.current = setTimeout(() => {
+                      clickTimerRef.current = null;
+                      setSelectedPartiel((prev) => (prev?.id === p.id ? null : p));
+                    }, 280);
+                  });
+
+                  layer.on("dblclick", (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    if (clickTimerRef.current) {
+                      clearTimeout(clickTimerRef.current);
+                      clickTimerRef.current = null;
+                    }
+                    setSelectedPartiel(null);
+                    if (onDoubleClick) onDoubleClick(p);
+                  });
                 }}
               />
             );
           })}
           <FitBounds partiels={partiels} />
         </MapContainer>
+
+        {/* Panneau d'info parcelle sélectionnée */}
+        {selectedPartiel && (
+          <div className="absolute bottom-0 left-0 right-0 z-[1000] bg-white border-t border-gray-200 shadow-lg px-4 py-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-gray-900 text-sm">{selectedPartiel.nom}</span>
+                  {selectedPartiel.surface != null && (
+                    <span className="text-xs font-semibold text-primary">{selectedPartiel.surface} ha</span>
+                  )}
+                  {selectedPartiel.type && (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      selectedPartiel.type === "pature"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}>
+                      {selectedPartiel.type === "pature" ? "🐄 Pâture" : "🌾 Fauche"}
+                    </span>
+                  )}
+                </div>
+                {selectedPartiel.cadastreRef && (
+                  <p className="text-xs text-gray-400 font-mono mt-0.5">{selectedPartiel.cadastreRef}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {selectedPartiel.geometry && onSplit && (
+                  <button
+                    onClick={() => { onSplit(selectedPartiel); setSelectedPartiel(null); }}
+                    className="px-2.5 py-1.5 text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 cursor-pointer transition-colors"
+                    title="Diviser"
+                  >
+                    ✂️ Diviser
+                  </button>
+                )}
+                {onDoubleClick && (
+                  <button
+                    onClick={() => { onDoubleClick(selectedPartiel); setSelectedPartiel(null); }}
+                    className="px-2.5 py-1.5 text-xs font-semibold bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
+                    title="Modifier"
+                  >
+                    ✏️ Modifier
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={() => { onDelete(selectedPartiel); setSelectedPartiel(null); }}
+                    className="px-2.5 py-1.5 text-xs font-semibold bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 cursor-pointer transition-colors"
+                    title="Supprimer"
+                  >
+                    🗑️ Supprimer
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedPartiel(null)}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors"
+                  title="Fermer"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       {/* Légende */}
       <div className="px-4 py-2.5 border-t border-gray-100 flex gap-4 text-xs text-gray-500 flex-wrap">

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import { useAppStore } from "@/store/store";
 import Modal, { ConfirmModal } from "@/components/Modal";
@@ -153,21 +153,18 @@ function TypeBadge({ type }: { type?: string }) {
   );
 }
 
-type FilterType = "tous" | "pature" | "fauche";
-
 // ==================== Page ====================
 
 export default function ParcellairePage() {
   const { state } = useAppStore();
   const { showToast } = useToast();
-  const { partiels, activitesFourrage } = state;
+  const { partiels } = state;
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editPartiel, setEditPartiel] = useState<Partiel | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Partiel | null>(null);
   const [saving, setSaving] = useState(false);
   const [showMap, setShowMap] = useState(false);
-  const [filter, setFilter] = useState<FilterType>("tous");
   const [showOverviewMap, setShowOverviewMap] = useState(true);
   const [splitTarget, setSplitTarget] = useState<Partiel | null>(null);
   const [splitSaving, setSplitSaving] = useState(false);
@@ -182,17 +179,7 @@ export default function ParcellairePage() {
     geometry?: object;
   } | null>(null);
 
-  const getActivitesCount = (partielId: string) =>
-    activitesFourrage.filter((a) => a.parcelIds?.includes(partielId)).length;
-
-  const filteredPartiels = useMemo(() => {
-    if (filter === "tous") return partiels;
-    return partiels.filter((p) => p.type === filter);
-  }, [partiels, filter]);
-
-  // Stats par type
-  const nbPature = partiels.filter((p) => p.type === "pature").length;
-  const nbFauche = partiels.filter((p) => p.type === "fauche").length;
+  const parcelsSansGeo = partiels.filter((p) => !p.geometry);
 
   const handleCadastreSelect = (data: CadastreSelectData) => {
     setShowMap(false);
@@ -321,33 +308,6 @@ export default function ParcellairePage() {
         </div>
       </div>
 
-      {/* Filtres */}
-      {partiels.length > 0 && (
-        <div className="flex gap-2 mb-5">
-          {(["tous", "pature", "fauche"] as const).map((f) => {
-            const label =
-              f === "tous"
-                ? `Toutes (${partiels.length})`
-                : f === "pature"
-                ? `🐄 Pâture (${nbPature})`
-                : `🌾 Fauche (${nbFauche})`;
-            return (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-4 py-1.5 text-sm rounded-full font-medium transition-colors cursor-pointer ${
-                  filter === f
-                    ? "bg-primary text-white shadow-sm"
-                    : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {/* Vue carte générale */}
       {partiels.length > 0 && (
         <div className="mb-6">
@@ -363,85 +323,63 @@ export default function ParcellairePage() {
               </span>
             )}
           </button>
-          {showOverviewMap && <ParcelOverviewMap partiels={partiels} onDoubleClick={(p) => setEditPartiel(p)} />}
+          {showOverviewMap && (
+            <ParcelOverviewMap
+              partiels={partiels}
+              onDoubleClick={(p) => setEditPartiel(p)}
+              onSplit={(p) => setSplitTarget(p)}
+              onDelete={(p) => setDeleteTarget(p)}
+            />
+          )}
         </div>
       )}
 
-      {/* Grille parcelles */}
-      {filteredPartiels.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <div className="text-5xl mb-3">🗺️</div>
-          <p className="text-lg font-medium">
-            {partiels.length === 0 ? "Aucune parcelle créée" : "Aucune parcelle dans cette catégorie"}
+      {/* Parcelles sans géométrie */}
+      {parcelsSansGeo.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+            Parcelles sans carte ({parcelsSansGeo.length})
           </p>
-          {partiels.length === 0 && (
-            <p className="text-sm mt-1">Cliquez sur &quot;+ Nouvelle parcelle&quot; pour commencer.</p>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredPartiels.map((partiel) => {
-            const nbActivites = getActivitesCount(partiel.id);
-            return (
+          <div className="flex flex-col gap-1">
+            {parcelsSansGeo.map((partiel) => (
               <div
                 key={partiel.id}
-                onDoubleClick={() => setEditPartiel(partiel)}
-                className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3 cursor-pointer"
+                className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 hover:bg-gray-50 transition-colors"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-base font-bold text-gray-900 truncate">{partiel.nom}</h3>
-                      <TypeBadge type={partiel.type} />
-                    </div>
-                    {partiel.surface != null && (
-                      <p className="text-sm text-primary font-semibold mt-0.5">
-                        {partiel.surface} ha
-                      </p>
-                    )}
-                    {partiel.cadastreRef && (
-                      <p className="text-xs text-gray-400 mt-0.5 font-mono">{partiel.cadastreRef}</p>
-                    )}
-                  </div>
-                  <div className="flex gap-1 shrink-0 ml-2">
-                    {partiel.geometry && (
-                      <button
-                        onClick={() => setSplitTarget(partiel)}
-                        className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg cursor-pointer transition-colors"
-                        title="Diviser la parcelle"
-                      >
-                        ✂️
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setEditPartiel(partiel)}
-                      className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg cursor-pointer transition-colors"
-                      title="Modifier"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => setDeleteTarget(partiel)}
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
-                      title="Supprimer"
-                    >
-                      🗑️
-                    </button>
-                  </div>
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="font-semibold text-gray-900 text-sm truncate">{partiel.nom}</span>
+                  {partiel.surface != null && (
+                    <span className="text-xs text-primary font-semibold shrink-0">{partiel.surface} ha</span>
+                  )}
+                  <TypeBadge type={partiel.type} />
                 </div>
-
-                {partiel.description && (
-                  <p className="text-sm text-gray-500 line-clamp-2">{partiel.description}</p>
-                )}
-
-                <div className="pt-2 border-t border-gray-100">
-                  <span className="text-xs font-medium text-gray-500">
-                    {nbActivites} activité{nbActivites !== 1 ? "s" : ""}
-                  </span>
+                <div className="flex gap-1 shrink-0 ml-2">
+                  <button
+                    onClick={() => setEditPartiel(partiel)}
+                    className="p-1.5 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg cursor-pointer transition-colors"
+                    title="Modifier"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget(partiel)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                    title="Supprimer"
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
+        </div>
+      )}
+
+      {partiels.length === 0 && (
+        <div className="text-center py-16 text-gray-400">
+          <div className="text-5xl mb-3">🗺️</div>
+          <p className="text-lg font-medium">Aucune parcelle créée</p>
+          <p className="text-sm mt-1">Cliquez sur &quot;+ Nouvelle parcelle&quot; pour commencer.</p>
         </div>
       )}
 

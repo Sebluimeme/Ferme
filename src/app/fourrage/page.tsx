@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useAppStore } from "@/store/store";
 import KpiCard from "@/components/KpiCard";
@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import type { ActiviteFourrage, Partiel } from "@/types/fourrage";
 
 const ParcelSelectorMap = dynamic(() => import("@/components/ParcelSelectorMap"), { ssr: false });
+const WeatherWidget = dynamic(() => import("@/components/WeatherWidget"), { ssr: false });
 import {
   createActivite,
   updateActivite,
@@ -18,7 +19,7 @@ import {
 
 // ==================== Types internes ====================
 
-type TypeActivite = "foin" | "ensilage" | "fauche" | "paturage";
+type TypeActivite = "foin" | "ensilage" | "fauche" | "paturage" | "regain";
 
 interface ActiviteFormData {
   typeActivite: TypeActivite;
@@ -39,6 +40,7 @@ const TYPE_LABELS: Record<TypeActivite, string> = {
   ensilage: "Ensilage",
   fauche: "Fauche",
   paturage: "Pâturage",
+  regain: "Regain",
 };
 
 const TYPE_COLORS: Record<TypeActivite, string> = {
@@ -46,6 +48,7 @@ const TYPE_COLORS: Record<TypeActivite, string> = {
   ensilage: "bg-green-100 text-green-800",
   fauche: "bg-blue-100 text-blue-800",
   paturage: "bg-emerald-100 text-emerald-800",
+  regain: "bg-amber-100 text-amber-800",
 };
 
 // ==================== Formulaire activité ====================
@@ -104,6 +107,7 @@ function ActiviteForm({
             required
           >
             <option value="foin">Foin</option>
+            <option value="regain">Regain</option>
             <option value="ensilage">Ensilage</option>
             <option value="fauche">Fauche</option>
             <option value="paturage">Pâturage</option>
@@ -369,6 +373,32 @@ export default function FourragePage() {
     (a, b) => new Date(b.dateActivite).getTime() - new Date(a.dateActivite).getTime()
   );
 
+  // Analytics foin / regain
+  const activitesFoin = activitesFourrage.filter((a) => a.typeActivite === "foin");
+  const activitesRegain = activitesFourrage.filter((a) => a.typeActivite === "regain");
+  const totalFoinT = activitesFoin.reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
+  const totalRegainT = activitesRegain.reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
+  const surfaceFauche = partiels.filter((p) => p.type === "fauche" && p.surface != null).reduce((s, p) => s + (p.surface ?? 0), 0);
+  const rdtFoin = surfaceFauche > 0 && totalFoinT > 0 ? totalFoinT / surfaceFauche : null;
+  const rdtRegain = surfaceFauche > 0 && totalRegainT > 0 ? totalRegainT / surfaceFauche : null;
+
+  // Rendement par parcelle (activités à 1 seule parcelle uniquement)
+  const rdtParParcelle = useMemo(() =>
+    partiels
+      .filter((p) => p.surface && p.surface > 0)
+      .map((p) => {
+        const acts = [...activitesFoin, ...activitesRegain].filter(
+          (a) => a.parcelIds?.length === 1 && a.parcelIds[0] === p.id && a.poidsTonne
+        );
+        if (!acts.length) return null;
+        const totalT = acts.reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
+        const foinT = activitesFoin.filter((a) => a.parcelIds?.length === 1 && a.parcelIds[0] === p.id).reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
+        const regainT = activitesRegain.filter((a) => a.parcelIds?.length === 1 && a.parcelIds[0] === p.id).reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
+        return { parcelle: p, totalT, foinT, regainT, rdt: totalT / p.surface! };
+      })
+      .filter(Boolean) as { parcelle: Partiel; totalT: number; foinT: number; regainT: number; rdt: number }[],
+  [partiels, activitesFoin, activitesRegain]);
+
   const getPartielsNoms = (ids: string[] | null | undefined) =>
     (ids ?? [])
       .map((id) => partiels.find((p) => p.id === id)?.nom ?? id)
@@ -563,6 +593,84 @@ export default function FourragePage() {
                 ))}
               </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Widget météo */}
+      <WeatherWidget partiels={partiels} />
+
+      {/* Analytics récoltes foin / regain */}
+      {(totalFoinT > 0 || totalRegainT > 0) && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-8">
+          <h2 className="text-base font-semibold text-gray-800 mb-4">📊 Analytics récoltes</h2>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+            <KpiCard
+              label="Foin total"
+              value={totalFoinT > 0 ? `${totalFoinT.toFixed(1)} t` : "—"}
+              subtitle="toutes saisons"
+              borderColorClass="border-l-yellow-500"
+              valueColorClass="text-yellow-600"
+            />
+            <KpiCard
+              label="Regain total"
+              value={totalRegainT > 0 ? `${totalRegainT.toFixed(1)} t` : "—"}
+              subtitle="toutes saisons"
+              borderColorClass="border-l-amber-500"
+              valueColorClass="text-amber-600"
+            />
+            <KpiCard
+              label="Rdt foin moyen"
+              value={rdtFoin != null ? `${rdtFoin.toFixed(2)} t/ha` : "—"}
+              subtitle={surfaceFauche > 0 ? `${surfaceFauche.toFixed(1)} ha en fauche` : "surface non définie"}
+              borderColorClass="border-l-green-500"
+              valueColorClass="text-green-600"
+            />
+            <KpiCard
+              label="Rdt regain moyen"
+              value={rdtRegain != null ? `${rdtRegain.toFixed(2)} t/ha` : "—"}
+              subtitle={surfaceFauche > 0 ? `${surfaceFauche.toFixed(1)} ha en fauche` : "surface non définie"}
+              borderColorClass="border-l-orange-500"
+              valueColorClass="text-orange-600"
+            />
+          </div>
+
+          {rdtParParcelle.length > 0 && (
+            <>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Rendement par parcelle</p>
+              <div className="overflow-x-auto rounded-lg border border-gray-100">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-xs text-gray-500 font-semibold">
+                      <th className="text-left px-4 py-2.5">Parcelle</th>
+                      <th className="text-right px-4 py-2.5">Surface</th>
+                      <th className="text-right px-4 py-2.5">Foin récolté</th>
+                      <th className="text-right px-4 py-2.5">Regain récolté</th>
+                      <th className="text-right px-4 py-2.5">Rdt t/ha</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {rdtParParcelle.map((r) => (
+                      <tr key={r.parcelle.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5 font-medium text-gray-900">{r.parcelle.nom}</td>
+                        <td className="px-4 py-2.5 text-right text-gray-500">{r.parcelle.surface} ha</td>
+                        <td className="px-4 py-2.5 text-right text-yellow-700">
+                          {r.foinT > 0 ? `${r.foinT.toFixed(2)} t` : "—"}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-amber-700">
+                          {r.regainT > 0 ? `${r.regainT.toFixed(2)} t` : "—"}
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-gray-800">
+                          {r.rdt.toFixed(2)} t/ha
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">* Uniquement les chantiers avec une seule parcelle sélectionnée</p>
+            </>
           )}
         </div>
       )}

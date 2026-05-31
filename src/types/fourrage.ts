@@ -15,7 +15,7 @@ export interface Partiel {
 
 export interface ActiviteFourrage {
   id: string;
-  typeActivite: "foin" | "ensilage" | "fauche" | "paturage";
+  typeActivite: "foin" | "ensilage" | "fauche" | "paturage" | "regain";
   dateActivite: string; // ISO date string
   parcelIds?: string[]; // IDs des partiels concernés (peut être absent si tableau vide en DB)
   nombreBottes?: number;
