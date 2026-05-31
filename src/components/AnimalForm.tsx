@@ -78,6 +78,7 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
             <option value="bovin">🐄 Bovin</option>
             <option value="caprin">🐐 Caprin</option>
             <option value="porcin">🐷 Porcin</option>
+            <option value="equin">🐴 Équin</option>
           </select>
         </div>
         <div>
