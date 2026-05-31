@@ -363,7 +363,7 @@ export default function ParcellairePage() {
               </span>
             )}
           </button>
-          {showOverviewMap && <ParcelOverviewMap partiels={partiels} />}
+          {showOverviewMap && <ParcelOverviewMap partiels={partiels} onDoubleClick={(p) => setEditPartiel(p)} />}
         </div>
       )}
 

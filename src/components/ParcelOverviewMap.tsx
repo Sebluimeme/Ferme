@@ -42,9 +42,10 @@ function parcelColor(type?: string) {
 
 interface Props {
   partiels: Partiel[];
+  onDoubleClick?: (partiel: Partiel) => void;
 }
 
-export default function ParcelOverviewMap({ partiels }: Props) {
+export default function ParcelOverviewMap({ partiels, onDoubleClick }: Props) {
   const withGeo = partiels.filter((p) => p.geometry);
 
   if (withGeo.length === 0) {
@@ -86,6 +87,12 @@ export default function ParcelOverviewMap({ partiels }: Props) {
                     ? `<strong>${p.nom}</strong><br/>${p.surface} ha`
                     : `<strong>${p.nom}</strong>`;
                   layer.bindTooltip(label, { sticky: false, permanent: false, direction: "center" });
+                  if (onDoubleClick) {
+                    layer.on("dblclick", (e) => {
+                      L.DomEvent.stopPropagation(e);
+                      onDoubleClick(p);
+                    });
+                  }
                 }}
               />
             );
