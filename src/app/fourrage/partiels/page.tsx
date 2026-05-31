@@ -385,7 +385,8 @@ export default function ParcellairePage() {
             return (
               <div
                 key={partiel.id}
-                className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3"
+                onDoubleClick={() => setEditPartiel(partiel)}
+                className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3 cursor-pointer"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
