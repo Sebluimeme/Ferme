@@ -209,6 +209,7 @@ export default function ParcelSplitEditor({ parcelle, onClose, onConfirm, saving
   const [showNames, setShowNames] = useState(false);
   const [name1, setName1] = useState(`${parcelle.nom} A`);
   const [name2, setName2] = useState(`${parcelle.nom} B`);
+  const [satellite, setSatellite] = useState(false);
 
   const isDone = snapStart !== null && snapEnd !== null;
 
@@ -307,26 +308,41 @@ export default function ParcelSplitEditor({ parcelle, onClose, onConfirm, saving
         {stepMsg}
       </div>
 
-      <div style={{ height: "520px" }} className="rounded-xl overflow-hidden border border-gray-200">
+      <div style={{ height: "520px" }} className="relative rounded-xl overflow-hidden border border-gray-200">
+        <button
+          onClick={() => setSatellite(!satellite)}
+          className="absolute top-2 right-2 z-[1000] px-2 py-1 text-xs font-semibold bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 transition-colors"
+        >
+          {satellite ? "🗺️ Plan" : "🛰️ Satellite"}
+        </button>
         <MapContainer
           bounds={bounds}
           boundsOptions={{ padding: [40, 40] }}
           style={{ height: "100%", width: "100%" }}
           maxZoom={22}
         >
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution="&copy; OpenStreetMap contributors"
-            maxNativeZoom={19}
-            maxZoom={22}
-          />
+          {satellite ? (
+            <TileLayer
+              url="https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&STYLE=normal&FORMAT=image/jpeg"
+              attribution='&copy; <a href="https://www.geoportail.gouv.fr/">IGN</a>'
+              maxNativeZoom={20}
+              maxZoom={22}
+            />
+          ) : (
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution="&copy; OpenStreetMap contributors"
+              maxNativeZoom={19}
+              maxZoom={22}
+            />
+          )}
           <WMSTileLayer
             url="https://data.geopf.fr/wms-r/wms"
             layers="CADASTRALPARCELS.PARCELLAIRE_EXPRESS"
             format="image/png"
             transparent={true}
             version="1.3.0"
-            opacity={0.5}
+            opacity={satellite ? 0.7 : 0.5}
             attribution='&copy; <a href="https://www.geoportail.gouv.fr/">IGN</a>'
           />
           <OriginalLayer ring={ring} hidden={!!splitResult} />

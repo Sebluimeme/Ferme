@@ -55,6 +55,7 @@ export default function CadastreMap({ onSelect, onClose }: CadastreMapProps) {
   const [selectedParcelle, setSelectedParcelle] = useState<ParcelleInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [satellite, setSatellite] = useState(false);
 
   const handleMapClick = async (lat: number, lng: number) => {
     setLoading(true);
@@ -155,17 +156,31 @@ export default function CadastreMap({ onSelect, onClose }: CadastreMapProps) {
       )}
 
       {/* Carte */}
-      <div className="flex-1 rounded-xl overflow-hidden border border-gray-200" style={{ minHeight: "420px" }}>
+      <div className="relative flex-1 rounded-xl overflow-hidden border border-gray-200" style={{ minHeight: "420px" }}>
+        <button
+          onClick={() => setSatellite(!satellite)}
+          className="absolute top-2 right-2 z-[1000] px-2 py-1 text-xs font-semibold bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 transition-colors"
+        >
+          {satellite ? "🗺️ Plan" : "🛰️ Satellite"}
+        </button>
         <MapContainer
           center={[48.172, 7.141]}
           zoom={15}
           style={{ height: "100%", width: "100%" }}
         >
-          {/* Fond OSM */}
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          {satellite ? (
+            <TileLayer
+              url="https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&STYLE=normal&FORMAT=image/jpeg"
+              attribution='&copy; <a href="https://www.geoportail.gouv.fr/">IGN</a>'
+              maxNativeZoom={20}
+              maxZoom={22}
+            />
+          ) : (
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          )}
 
           {/* Overlay cadastral IGN */}
           <WMSTileLayer
@@ -174,7 +189,7 @@ export default function CadastreMap({ onSelect, onClose }: CadastreMapProps) {
             format="image/png"
             transparent={true}
             version="1.3.0"
-            opacity={0.7}
+            opacity={satellite ? 0.85 : 0.7}
             attribution='&copy; <a href="https://www.geoportail.gouv.fr/">IGN</a>'
           />
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { MapContainer, TileLayer, WMSTileLayer, GeoJSON, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -46,6 +46,7 @@ interface Props {
 }
 
 export default function ParcelOverviewMap({ partiels, onDoubleClick }: Props) {
+  const [satellite, setSatellite] = useState(false);
   const withGeo = partiels.filter((p) => p.geometry);
 
   if (withGeo.length === 0) {
@@ -60,19 +61,34 @@ export default function ParcelOverviewMap({ partiels, onDoubleClick }: Props) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="rounded-xl overflow-hidden" style={{ height: "380px" }}>
+      <div className="relative rounded-xl overflow-hidden" style={{ height: "380px" }}>
+        <button
+          onClick={() => setSatellite(!satellite)}
+          className="absolute top-2 right-2 z-[1000] px-2 py-1 text-xs font-semibold bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 transition-colors"
+        >
+          {satellite ? "🗺️ Plan" : "🛰️ Satellite"}
+        </button>
         <MapContainer center={[48.172, 7.141]} zoom={14} style={{ height: "100%", width: "100%" }}>
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          {satellite ? (
+            <TileLayer
+              url="https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&STYLE=normal&FORMAT=image/jpeg"
+              attribution='&copy; <a href="https://www.geoportail.gouv.fr/">IGN</a>'
+              maxNativeZoom={20}
+              maxZoom={22}
+            />
+          ) : (
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          )}
           <WMSTileLayer
             url="https://data.geopf.fr/wms-r/wms"
             layers="CADASTRALPARCELS.PARCELLAIRE_EXPRESS"
             format="image/png"
             transparent={true}
             version="1.3.0"
-            opacity={0.4}
+            opacity={satellite ? 0.6 : 0.4}
             attribution="&copy; IGN"
           />
           {withGeo.map((p) => {
