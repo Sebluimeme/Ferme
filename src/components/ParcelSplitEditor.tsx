@@ -209,7 +209,7 @@ export default function ParcelSplitEditor({ parcelle, onClose, onConfirm, saving
   const [showNames, setShowNames] = useState(false);
   const [name1, setName1] = useState(`${parcelle.nom} A`);
   const [name2, setName2] = useState(`${parcelle.nom} B`);
-  const [satellite, setSatellite] = useState(false);
+  const [satellite, setSatellite] = useState(true);
 
   const isDone = snapStart !== null && snapEnd !== null;
 

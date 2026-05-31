@@ -55,7 +55,7 @@ export default function CadastreMap({ onSelect, onClose }: CadastreMapProps) {
   const [selectedParcelle, setSelectedParcelle] = useState<ParcelleInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [satellite, setSatellite] = useState(false);
+  const [satellite, setSatellite] = useState(true);
 
   const handleMapClick = async (lat: number, lng: number) => {
     setLoading(true);

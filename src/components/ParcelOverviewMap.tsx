@@ -48,7 +48,7 @@ interface Props {
 }
 
 export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, onDelete }: Props) {
-  const [satellite, setSatellite] = useState(false);
+  const [satellite, setSatellite] = useState(true);
   const [selectedPartiel, setSelectedPartiel] = useState<Partiel | null>(null);
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const withGeo = partiels.filter((p) => p.geometry);
