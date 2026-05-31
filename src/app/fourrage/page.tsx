@@ -378,9 +378,12 @@ export default function FourragePage() {
   const activitesRegain = activitesFourrage.filter((a) => a.typeActivite === "regain");
   const totalFoinT = activitesFoin.reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
   const totalRegainT = activitesRegain.reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
-  const surfaceFauche = partiels.filter((p) => p.type === "fauche" && p.surface != null).reduce((s, p) => s + (p.surface ?? 0), 0);
-  const rdtFoin = surfaceFauche > 0 && totalFoinT > 0 ? totalFoinT / surfaceFauche : null;
-  const rdtRegain = surfaceFauche > 0 && totalRegainT > 0 ? totalRegainT / surfaceFauche : null;
+  const parcellesFoinIds = new Set(activitesFoin.flatMap((a) => a.parcelIds ?? []));
+  const parcellesRegainIds = new Set(activitesRegain.flatMap((a) => a.parcelIds ?? []));
+  const surfaceFoin = partiels.filter((p) => parcellesFoinIds.has(p.id) && p.surface != null).reduce((s, p) => s + (p.surface ?? 0), 0);
+  const surfaceRegain = partiels.filter((p) => parcellesRegainIds.has(p.id) && p.surface != null).reduce((s, p) => s + (p.surface ?? 0), 0);
+  const rdtFoin = surfaceFoin > 0 && totalFoinT > 0 ? totalFoinT / surfaceFoin : null;
+  const rdtRegain = surfaceRegain > 0 && totalRegainT > 0 ? totalRegainT / surfaceRegain : null;
 
   // Rendement par parcelle (activités à 1 seule parcelle uniquement)
   const rdtParParcelle = useMemo(() =>
