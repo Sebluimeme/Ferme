@@ -7,6 +7,7 @@ import KpiCard from "@/components/KpiCard";
 import Modal, { ConfirmModal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import type { ActiviteFourrage, Partiel } from "@/types/fourrage";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const ParcelSelectorMap = dynamic(() => import("@/components/ParcelSelectorMap"), { ssr: false });
 const WeatherWidget = dynamic(() => import("@/components/WeatherWidget"), { ssr: false });
@@ -318,6 +319,7 @@ function BottesForm({
 // ==================== Page principale ====================
 
 const DUREE_STABULATION = 180;
+const MOIS_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
 const CONSO_KG_JOUR: Record<string, number> = {
   bovin: 9,
   ovin: 2,
@@ -401,6 +403,19 @@ export default function FourragePage() {
       })
       .filter(Boolean) as { parcelle: Partiel; totalT: number; foinT: number; regainT: number; rdt: number }[],
   [partiels, activitesFoin, activitesRegain]);
+
+  // Données mensuelles pour la courbe annuelle
+  const donneesMensuelles = useMemo(() => {
+    return MOIS_LABELS.map((mois, idx) => {
+      const foin = activitesFoin
+        .filter((a) => { const d = new Date(a.dateActivite); return d.getMonth() === idx && d.getFullYear() === thisYear; })
+        .reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
+      const regain = activitesRegain
+        .filter((a) => { const d = new Date(a.dateActivite); return d.getMonth() === idx && d.getFullYear() === thisYear; })
+        .reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
+      return { mois, foin: foin || null, regain: regain || null };
+    });
+  }, [activitesFoin, activitesRegain, thisYear]);
 
   const getPartielsNoms = (ids: string[] | null | undefined) =>
     (ids ?? [])
@@ -536,7 +551,7 @@ export default function FourragePage() {
         <KpiCard
           label="Surface totale"
           value={surfaceTotale > 0 ? `${surfaceTotale.toFixed(1)} ha` : "—"}
-          subtitle="tous partiels"
+          subtitle="prairies gérées"
           borderColorClass="border-l-purple-500"
           valueColorClass="text-purple-600"
         />
@@ -639,9 +654,23 @@ export default function FourragePage() {
             />
           </div>
 
+          {/* Courbe annuelle */}
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Récoltes {thisYear} — par mois (tonnes)</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={donneesMensuelles} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="mois" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} unit=" t" />
+              <Tooltip formatter={(v: number | undefined) => v != null ? `${v.toFixed(2)} t` : "—"} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="foin" name="Foin" fill="#eab308" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="regain" name="Regain" fill="#f59e0b" radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+
           {rdtParParcelle.length > 0 && (
             <>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Rendement par parcelle</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-5 mb-2">Rendement par parcelle</p>
               <div className="overflow-x-auto rounded-lg border border-gray-100">
                 <table className="w-full text-sm">
                   <thead>
