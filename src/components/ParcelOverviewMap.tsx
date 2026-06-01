@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { MapContainer, TileLayer, WMSTileLayer, GeoJSON, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, WMSTileLayer, GeoJSON, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Partiel } from "@/types/fourrage";
+import type { CadastreSelectData } from "@/components/CadastreMap";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -34,10 +35,32 @@ function FitBounds({ partiels }: { partiels: Partiel[] }) {
   return null;
 }
 
+interface CadastreClickHandlerProps {
+  onMapClick: (lat: number, lng: number) => void;
+}
+function CadastreClickHandler({ onMapClick }: CadastreClickHandlerProps) {
+  useMapEvents({
+    click(e) {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
 function parcelColor(type?: string) {
   if (type === "pature") return { color: "#16a34a", fill: "#22c55e" };
   if (type === "fauche") return { color: "#ca8a04", fill: "#facc15" };
   return { color: "#3b82f6", fill: "#93c5fd" };
+}
+
+interface CadastreInfo {
+  section: string;
+  numero: string;
+  nomCommune: string;
+  codeInsee: string;
+  surfaceHa: number;
+  geometry: GeoJSON.Geometry;
+  feature: GeoJSON.Feature;
 }
 
 interface Props {
@@ -45,20 +68,78 @@ interface Props {
   onDoubleClick?: (partiel: Partiel) => void;
   onSplit?: (partiel: Partiel) => void;
   onDelete?: (partiel: Partiel) => void;
+  onAdd?: (data: CadastreSelectData) => void;
 }
 
-export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, onDelete }: Props) {
+export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, onDelete, onAdd }: Props) {
   const [satellite, setSatellite] = useState(true);
   const [selectedPartiel, setSelectedPartiel] = useState<Partiel | null>(null);
+  const [cadastreInfo, setCadastreInfo] = useState<CadastreInfo | null>(null);
+  const [cadastreLoading, setCadastreLoading] = useState(false);
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const withGeo = partiels.filter((p) => p.geometry);
+
+  const handleMapClick = async (lat: number, lng: number) => {
+    // Si un clic sur une parcelle connue est en cours (via GeoJSON), on ignore
+    // (le stopPropagation sur GeoJSON empêche ce handler de se déclencher)
+    setSelectedPartiel(null);
+    setCadastreLoading(true);
+    setCadastreInfo(null);
+    try {
+      const geom = JSON.stringify({ type: "Point", coordinates: [lng, lat] });
+      const url = `https://apicarto.ign.fr/api/cadastre/parcelle?geom=${encodeURIComponent(geom)}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      if (!data.features?.length) { setCadastreLoading(false); return; }
+      const feature = data.features[0];
+      const props = feature.properties;
+      setCadastreInfo({
+        section: props.section || "",
+        numero: props.numero || "",
+        nomCommune: props.nom_com || "",
+        codeInsee: props.code_com || props.code_arr || "",
+        surfaceHa: Math.round((props.contenance || 0)) / 10000,
+        geometry: feature.geometry,
+        feature,
+      });
+    } catch {
+      // Pas de parcelle ou erreur silencieuse
+    }
+    setCadastreLoading(false);
+  };
+
+  const handleAddCadastre = () => {
+    if (!cadastreInfo || !onAdd) return;
+    const cadastreRef = `${cadastreInfo.codeInsee}/${cadastreInfo.section}/${cadastreInfo.numero}`;
+    onAdd({
+      nom: `Parcelle ${cadastreInfo.section}${cadastreInfo.numero}`,
+      surface: Math.round(cadastreInfo.surfaceHa * 10000) / 10000,
+      cadastreRef,
+      codeInsee: cadastreInfo.codeInsee,
+      section: cadastreInfo.section,
+      numeroParcelle: cadastreInfo.numero,
+      geometry: cadastreInfo.geometry,
+    });
+    setCadastreInfo(null);
+  };
+
+  // Vérifie si la parcelle cadastrale est déjà dans la DB
+  const dejaAjoutee = cadastreInfo
+    ? partiels.some(
+        (p) =>
+          p.section === cadastreInfo.section &&
+          p.numeroParcelle === cadastreInfo.numero &&
+          p.codeInsee === cadastreInfo.codeInsee
+      )
+    : false;
 
   if (withGeo.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 text-center text-gray-400">
         <div className="text-3xl mb-2">🗺️</div>
         <p className="text-sm">Aucune parcelle avec géométrie cadastrale.</p>
-        <p className="text-xs mt-1">Utilisez le bouton 📍 Cadastre pour importer des parcelles avec contour.</p>
+        <p className="text-xs mt-1">Cliquez sur &quot;+ Nouvelle parcelle&quot; pour importer des parcelles depuis le cadastre.</p>
       </div>
     );
   }
@@ -72,6 +153,13 @@ export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, on
         >
           {satellite ? "🗺️ Plan" : "🛰️ Satellite"}
         </button>
+
+        {cadastreLoading && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-full shadow-sm text-gray-600">
+            Identification...
+          </div>
+        )}
+
         <MapContainer center={[48.172, 7.141]} zoom={14} style={{ height: "100%", width: "100%" }}>
           {satellite ? (
             <TileLayer
@@ -95,6 +183,8 @@ export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, on
             opacity={satellite ? 0.6 : 0.4}
             attribution="&copy; IGN"
           />
+
+          {/* Parcelles déjà dans la DB */}
           {withGeo.map((p) => {
             const isSelected = selectedPartiel?.id === p.id;
             const { color, fill } = parcelColor(p.type);
@@ -116,6 +206,7 @@ export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, on
 
                   layer.on("click", (e) => {
                     L.DomEvent.stopPropagation(e);
+                    setCadastreInfo(null);
                     if (clickTimerRef.current) {
                       clearTimeout(clickTimerRef.current);
                       clickTimerRef.current = null;
@@ -139,10 +230,26 @@ export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, on
               />
             );
           })}
+
+          {/* Parcelle cadastrale cliquée (non dans DB) mise en surbrillance */}
+          {cadastreInfo && (
+            <GeoJSON
+              key={`cadastre-${cadastreInfo.codeInsee}-${cadastreInfo.section}-${cadastreInfo.numero}`}
+              data={cadastreInfo.feature}
+              style={{
+                color: "#8b5cf6",
+                weight: 3,
+                fillColor: "#8b5cf6",
+                fillOpacity: 0.25,
+              }}
+            />
+          )}
+
+          <CadastreClickHandler onMapClick={handleMapClick} />
           <FitBounds partiels={partiels} />
         </MapContainer>
 
-        {/* Panneau d'info parcelle sélectionnée */}
+        {/* Panneau — parcelle DB sélectionnée */}
         {selectedPartiel && (
           <div className="absolute bottom-0 left-0 right-0 z-[1000] bg-white border-t border-gray-200 shadow-lg px-4 py-3">
             <div className="flex items-start justify-between gap-2">
@@ -171,7 +278,6 @@ export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, on
                   <button
                     onClick={() => { onSplit(selectedPartiel); setSelectedPartiel(null); }}
                     className="px-2.5 py-1.5 text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-100 cursor-pointer transition-colors"
-                    title="Diviser"
                   >
                     ✂️ Diviser
                   </button>
@@ -180,7 +286,6 @@ export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, on
                   <button
                     onClick={() => { onDoubleClick(selectedPartiel); setSelectedPartiel(null); }}
                     className="px-2.5 py-1.5 text-xs font-semibold bg-gray-50 text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
-                    title="Modifier"
                   >
                     ✏️ Modifier
                   </button>
@@ -189,7 +294,6 @@ export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, on
                   <button
                     onClick={() => { onDelete(selectedPartiel); setSelectedPartiel(null); }}
                     className="px-2.5 py-1.5 text-xs font-semibold bg-red-50 text-red-600 border border-red-200 rounded-lg hover:bg-red-100 cursor-pointer transition-colors"
-                    title="Supprimer"
                   >
                     🗑️ Supprimer
                   </button>
@@ -197,7 +301,48 @@ export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, on
                 <button
                   onClick={() => setSelectedPartiel(null)}
                   className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors"
-                  title="Fermer"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Panneau — parcelle cadastrale cliquée (pas dans DB) */}
+        {cadastreInfo && !selectedPartiel && (
+          <div className="absolute bottom-0 left-0 right-0 z-[1000] bg-white border-t border-gray-200 shadow-lg px-4 py-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-gray-900 text-sm">
+                    Parcelle {cadastreInfo.section} {cadastreInfo.numero}
+                  </span>
+                  <span className="text-xs font-semibold text-purple-600">
+                    {cadastreInfo.surfaceHa.toFixed(4)} ha
+                  </span>
+                  {dejaAjoutee && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                      ✓ Dans votre parcellaire
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {cadastreInfo.nomCommune} · {cadastreInfo.codeInsee}/{cadastreInfo.section}/{cadastreInfo.numero}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {!dejaAjoutee && onAdd && (
+                  <button
+                    onClick={handleAddCadastre}
+                    className="px-3 py-1.5 text-xs font-semibold bg-primary text-white rounded-lg hover:bg-primary-dark cursor-pointer transition-colors shadow-sm"
+                  >
+                    + Ajouter cette parcelle
+                  </button>
+                )}
+                <button
+                  onClick={() => setCadastreInfo(null)}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors"
                 >
                   ✕
                 </button>
@@ -206,6 +351,7 @@ export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, on
           </div>
         )}
       </div>
+
       {/* Légende */}
       <div className="px-4 py-2.5 border-t border-gray-100 flex gap-4 text-xs text-gray-500 flex-wrap">
         <span className="flex items-center gap-1.5">
@@ -220,7 +366,12 @@ export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, on
           <span className="inline-block w-3 h-3 rounded-sm bg-blue-300 border border-blue-500" />
           Non défini
         </span>
-        <span className="ml-auto text-gray-400">{withGeo.length} parcelle{withGeo.length > 1 ? "s" : ""} affichée{withGeo.length > 1 ? "s" : ""}</span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-3 h-3 rounded-sm bg-purple-300 border border-purple-500" />
+          Cadastre (non ajouté)
+        </span>
+        <span className="ml-auto text-gray-400 text-xs italic">Cliquez sur une parcelle pour l&apos;identifier</span>
+        <span className="text-gray-400">{withGeo.length} parcelle{withGeo.length > 1 ? "s" : ""} affichée{withGeo.length > 1 ? "s" : ""}</span>
       </div>
     </div>
   );

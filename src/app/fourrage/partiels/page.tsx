@@ -295,12 +295,6 @@ export default function ParcellairePage() {
         <div className="flex gap-3">
           <button
             onClick={() => setShowMap(true)}
-            className="px-4 py-2.5 text-sm font-semibold text-primary border border-primary rounded-xl hover:bg-primary/5 cursor-pointer"
-          >
-            📍 Cadastre
-          </button>
-          <button
-            onClick={() => { setCadastrePrefill(null); setModalOpen(true); }}
             className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md"
           >
             + Nouvelle parcelle
@@ -329,6 +323,7 @@ export default function ParcellairePage() {
               onDoubleClick={(p) => setEditPartiel(p)}
               onSplit={(p) => setSplitTarget(p)}
               onDelete={(p) => setDeleteTarget(p)}
+              onAdd={handleCadastreSelect}
             />
           )}
         </div>
