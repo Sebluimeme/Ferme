@@ -65,7 +65,7 @@ export default function ParcelOverviewMap({ partiels, onDoubleClick, onSplit, on
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="relative rounded-xl overflow-hidden" style={{ height: "380px" }}>
+      <div className="relative rounded-xl overflow-hidden" style={{ height: "550px" }}>
         <button
           onClick={() => setSatellite(!satellite)}
           className="absolute top-2 right-2 z-[1000] px-2 py-1 text-xs font-semibold bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 transition-colors"

@@ -334,32 +334,80 @@ export default function ParcellairePage() {
         </div>
       )}
 
+      {/* Parcelles avec géométrie — liste avec actions */}
+      {partiels.filter((p) => p.geometry).length > 0 && (
+        <div className="mb-6">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+            Parcelles sur la carte ({partiels.filter((p) => p.geometry).length})
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {partiels.filter((p) => p.geometry).map((partiel) => (
+              <div
+                key={partiel.id}
+                className="flex flex-col justify-between bg-white border border-gray-100 rounded-xl p-4 hover:bg-gray-50 hover:border-primary/30 transition-colors min-h-[110px]"
+              >
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <span className="font-semibold text-gray-900 text-sm leading-tight">{partiel.nom}</span>
+                  {partiel.surface != null && (
+                    <span className="text-xs text-primary font-bold">{partiel.surface} ha</span>
+                  )}
+                  <TypeBadge type={partiel.type} />
+                </div>
+                <div className="flex gap-1 mt-3">
+                  <button
+                    onClick={() => setSplitTarget(partiel)}
+                    className="py-1.5 px-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-lg cursor-pointer transition-colors"
+                    title="Diviser"
+                  >
+                    ✂️
+                  </button>
+                  <button
+                    onClick={() => setEditPartiel(partiel)}
+                    className="flex-1 py-1.5 text-xs text-gray-500 hover:text-primary hover:bg-primary/5 rounded-lg cursor-pointer transition-colors text-center"
+                    title="Modifier"
+                  >
+                    ✏️ Modifier
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget(partiel)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                    title="Supprimer"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Parcelles sans géométrie */}
       {parcelsSansGeo.length > 0 && (
         <div className="mb-4">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
             Parcelles sans carte ({parcelsSansGeo.length})
           </p>
-          <div className="flex flex-col gap-1">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {parcelsSansGeo.map((partiel) => (
               <div
                 key={partiel.id}
-                className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 hover:bg-gray-50 transition-colors"
+                className="flex flex-col justify-between bg-white border border-gray-100 rounded-xl p-4 hover:bg-gray-50 hover:border-primary/30 transition-colors min-h-[110px]"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="font-semibold text-gray-900 text-sm truncate">{partiel.nom}</span>
+                <div className="flex flex-col gap-1.5 min-w-0">
+                  <span className="font-semibold text-gray-900 text-sm leading-tight">{partiel.nom}</span>
                   {partiel.surface != null && (
-                    <span className="text-xs text-primary font-semibold shrink-0">{partiel.surface} ha</span>
+                    <span className="text-xs text-primary font-bold">{partiel.surface} ha</span>
                   )}
                   <TypeBadge type={partiel.type} />
                 </div>
-                <div className="flex gap-1 shrink-0 ml-2">
+                <div className="flex gap-1 mt-3">
                   <button
                     onClick={() => setEditPartiel(partiel)}
-                    className="p-1.5 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg cursor-pointer transition-colors"
+                    className="flex-1 py-1.5 text-xs text-gray-500 hover:text-primary hover:bg-primary/5 rounded-lg cursor-pointer transition-colors text-center"
                     title="Modifier"
                   >
-                    ✏️
+                    ✏️ Modifier
                   </button>
                   <button
                     onClick={() => setDeleteTarget(partiel)}
