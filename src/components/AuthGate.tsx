@@ -4,6 +4,7 @@ import { useAppStore } from "@/store/store";
 import LoginPage from "./LoginPage";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
+import BottomNav from "./BottomNav";
 import { Wheat } from "lucide-react";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
@@ -11,7 +12,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (state.authLoading) {
     return (
-      <div className="min-h-screen bg-stone-950 flex items-center justify-center">
+      <div className="min-h-[100dvh] bg-stone-950 flex items-center justify-center"
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center">
             <Wheat className="w-6 h-6 text-white" />
@@ -35,14 +37,30 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex bg-stone-100">
+    <div className="flex bg-stone-100" style={{ minHeight: "100dvh" }}>
+      {/* Sidebar desktop fixe */}
       <Sidebar />
-      <div className="flex flex-col flex-1 lg:ml-[220px] min-h-screen">
-        <Navbar />
-        <main className="flex-1 overflow-y-auto p-5 md:p-6 lg:p-8">
-          {children}
+
+      {/* Contenu principal */}
+      <div className="flex flex-col flex-1 lg:ml-[220px] min-h-[100dvh]">
+        {/* Navbar — padding top pour safe area iOS */}
+        <div style={{ paddingTop: "env(safe-area-inset-top, 0px)" }} className="bg-white border-b border-stone-200 sticky top-0 z-[1020]">
+          <Navbar />
+        </div>
+
+        {/* Contenu — padding bottom pour la BottomNav + safe area */}
+        <main
+          className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 lg:pb-8"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 3.75rem)" }}
+        >
+          <div className="lg:pb-0" style={{ paddingBottom: 0 }}>
+            {children}
+          </div>
         </main>
       </div>
+
+      {/* Bottom nav mobile uniquement */}
+      <BottomNav />
     </div>
   );
 }

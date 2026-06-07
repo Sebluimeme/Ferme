@@ -1,11 +1,11 @@
 {
-  "name": "Gestion Ferme - Suivi d'Élevage",
-  "short_name": "Gestion Ferme",
-  "description": "Application de gestion de ferme - Cheptel, traitements, coûts et profits",
+  "name": "La Ferme Tabouche",
+  "short_name": "La Ferme",
+  "description": "Gestion de ferme — Cheptel, coûts, véhicules, fourrage",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#10b981",
+  "background_color": "#0c0a09",
+  "theme_color": "#0c0a09",
   "orientation": "portrait-primary",
   "icons": [
     {

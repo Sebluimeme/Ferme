@@ -19,19 +19,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-interface NavItem {
-  icon: React.ElementType;
-  label: string;
-  route: string;
-  badge?: string;
-}
-
-interface NavSection {
-  title: string;
-  items: NavItem[];
-}
-
-const sections: NavSection[] = [
+const sections = [
   {
     title: "Principal",
     items: [
@@ -56,15 +44,15 @@ const sections: NavSection[] = [
   {
     title: "Machines",
     items: [
-      { icon: Truck,   label: "Véhicules",  route: "/vehicules" },
-      { icon: Wrench,  label: "Entretiens", route: "/entretiens" },
+      { icon: Truck,  label: "Véhicules",  route: "/vehicules" },
+      { icon: Wrench, label: "Entretiens", route: "/entretiens" },
     ],
   },
   {
     title: "Finances",
     items: [
-      { icon: Wallet,     label: "Coûts",   route: "/couts" },
-      { icon: TrendingUp, label: "Profits", route: "/profits" },
+      { icon: Wallet,     label: "Coûts",    route: "/couts" },
+      { icon: TrendingUp, label: "Profits",  route: "/profits" },
       { icon: BarChart3,  label: "Rapports", route: "/rapports" },
     ],
   },
@@ -72,7 +60,7 @@ const sections: NavSection[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { state, closeSidebar, dispatch } = useAppStore();
+  const { state, closeSidebar } = useAppStore();
 
   const handleLogout = async () => {
     const { logout } = await import("@/lib/auth-service");
@@ -84,20 +72,25 @@ export default function Sidebar() {
       {/* Overlay mobile */}
       {state.sidebarOpen && (
         <div
-          className="fixed inset-0 top-0 bg-black/40 z-[1029] lg:hidden"
+          className="fixed inset-0 bg-black/40 z-[1029] lg:hidden"
           onClick={closeSidebar}
         />
       )}
 
       <aside
-        className={`
-          w-[220px] h-screen bg-stone-950 flex flex-col shrink-0
-          border-r border-stone-800/60
-          fixed top-0 left-0 z-[1030]
-          transition-transform duration-200
-          lg:translate-x-0
-          ${state.sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-        `}
+        className={[
+          "w-[220px] bg-stone-950 flex flex-col shrink-0",
+          "border-r border-stone-800/60",
+          "fixed top-0 left-0 z-[1030]",
+          "transition-transform duration-200",
+          state.sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+        ].join(" ")}
+        style={{
+          height: "100dvh",
+          paddingTop: "env(safe-area-inset-top, 0px)",
+          paddingLeft: "env(safe-area-inset-left, 0px)",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        }}
       >
         {/* Logo */}
         <div className="px-4 py-5 border-b border-stone-800/60 shrink-0">
@@ -128,21 +121,16 @@ export default function Sidebar() {
                       key={item.route}
                       href={item.route}
                       onClick={closeSidebar}
-                      className={`
-                        flex items-center gap-2.5 px-2 py-1.5 rounded-md
-                        text-[13px] font-medium transition-colors no-underline
-                        ${isActive
+                      className={[
+                        "flex items-center gap-2.5 px-2 py-1.5 rounded-md",
+                        "text-[13px] font-medium transition-colors no-underline",
+                        isActive
                           ? "bg-stone-800 text-white"
-                          : "text-stone-400 hover:text-stone-100 hover:bg-stone-800/50"}
-                      `}
+                          : "text-stone-400 hover:text-stone-100 hover:bg-stone-800/50",
+                      ].join(" ")}
                     >
                       <Icon className={`w-[15px] h-[15px] shrink-0 ${isActive ? "text-brand-400" : ""}`} />
                       <span>{item.label}</span>
-                      {item.badge && (
-                        <span className="ml-auto text-[10px] font-semibold bg-stone-700 text-stone-300 px-1.5 py-0.5 rounded-full">
-                          {item.badge}
-                        </span>
-                      )}
                       {isActive && (
                         <ChevronRight className="w-3 h-3 text-stone-600 ml-auto" />
                       )}

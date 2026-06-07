@@ -39,7 +39,8 @@ export default function Navbar() {
   const pageLabel = PAGE_LABELS[pathname] ?? "";
 
   return (
-    <header className="h-14 bg-white border-b border-stone-200 flex items-center justify-between px-6 sticky top-0 z-[1020]">
+    <header className="h-14 bg-white flex items-center justify-between px-4 md:px-6"
+      style={{ paddingRight: "max(env(safe-area-inset-right, 0px), 1.5rem)" }}>
       {/* Left */}
       <div className="flex items-center gap-3">
         <button
