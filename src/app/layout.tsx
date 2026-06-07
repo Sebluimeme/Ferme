@@ -1,18 +1,25 @@
 import type { Metadata, Viewport } from "next";
+import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/store/store";
 import { ToastProvider } from "@/components/Toast";
 import AuthGate from "@/components/AuthGate";
 import RegisterSW from "./register-sw";
 
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  weight: ["300", "400", "500", "600"],
+});
+
 export const metadata: Metadata = {
-  title: "🌾 Gestion Ferme",
-  description: "Application de gestion de ferme - Cheptel, traitements, coûts et profits",
+  title: "La Ferme Tabouche",
+  description: "Application de gestion de ferme — Cheptel, coûts, véhicules, fourrage",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Gestion Ferme",
+    title: "La Ferme",
   },
 };
 
@@ -20,13 +27,13 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#10b981",
+  themeColor: "#237549",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
-      <body className="font-sans text-gray-900 bg-gray-50 overflow-x-hidden">
+      <body className={`${dmSans.variable} font-sans text-stone-900 bg-stone-100 overflow-x-hidden antialiased`}>
         <RegisterSW />
         <AppProvider>
           <ToastProvider>

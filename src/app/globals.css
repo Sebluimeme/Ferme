@@ -2,52 +2,69 @@
 @import "leaflet/dist/leaflet.css";
 
 @theme {
-  --color-primary: #667eea;
-  --color-primary-dark: #5568d3;
-  --color-primary-light: #98a6f0;
-  --color-secondary: #764ba2;
-  --color-secondary-dark: #5f3c84;
-  --color-ovin: #4CAF50;
-  --color-bovin: #FF9800;
-  --color-caprin: #9C27B0;
-  --color-porcin: #F44336;
-  --color-equin: #8B6914;
+  /* Brand — vert profond, pas le vert "nature" cliché */
+  --color-brand-50:  #f0f9f4;
+  --color-brand-100: #dcf1e5;
+  --color-brand-200: #bbe3cc;
+  --color-brand-300: #8acda8;
+  --color-brand-400: #57b07e;
+  --color-brand-500: #33935e;
+  --color-brand-600: #237549;
+  --color-brand-700: #1c5e3b;
+  --color-brand-800: #194b31;
+  --color-brand-900: #163e29;
+  --color-brand-950: #0b2318;
+
+  /* Neutrals chauds */
+  --color-stone-50:  #fafaf9;
+  --color-stone-100: #f5f5f4;
+  --color-stone-200: #e7e5e4;
+  --color-stone-300: #d6d3d1;
+  --color-stone-400: #a8a29e;
+  --color-stone-500: #78716c;
+  --color-stone-600: #57534e;
+  --color-stone-700: #44403c;
+  --color-stone-800: #292524;
+  --color-stone-900: #1c1917;
+  --color-stone-950: #0c0a09;
+
+  /* Legacy — gardés pour ne pas casser les composants non encore migrés */
+  --color-primary: #237549;
+  --color-primary-dark: #1c5e3b;
+  --color-primary-light: #57b07e;
+  --color-secondary: #237549;
+  --color-secondary-dark: #1c5e3b;
+  --color-ovin:  #33935e;
+  --color-bovin: #d97706;
+  --color-caprin: #7c3aed;
+  --color-porcin: #dc2626;
+  --color-equin:  #92400e;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #f3f4f6;
-}
-::-webkit-scrollbar-thumb {
-  background: #9ca3af;
-  border-radius: 9999px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
-}
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #a8a29e; }
 
-/* Animations */
+/* ── Animations ── */
 @keyframes fadeIn {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to   { opacity: 1; }
 }
 @keyframes slideInRight {
   from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(0);    opacity: 1; }
 }
 @keyframes slideInDown {
-  from { transform: translateY(-20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from { transform: translateY(-12px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
 }
 @keyframes spin {
   from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  to   { transform: rotate(360deg); }
 }
 
-.fade-in { animation: fadeIn 0.2s ease-in-out; }
-.slide-in-right { animation: slideInRight 0.2s ease-in-out; }
-.slide-in-down { animation: slideInDown 0.2s ease-in-out; }
+.fade-in       { animation: fadeIn 0.15s ease-out; }
+.slide-in-right { animation: slideInRight 0.2s ease-out; }
+.slide-in-down  { animation: slideInDown 0.15s ease-out; }

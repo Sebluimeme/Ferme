@@ -2,58 +2,84 @@
 
 import { useEffect, useState } from "react";
 import { useAppStore } from "@/store/store";
-import { logout } from "@/lib/auth-service";
+import { Bell, Menu } from "lucide-react";
+import { usePathname } from "next/navigation";
+
+const PAGE_LABELS: Record<string, string> = {
+  "/":                  "Tableau de bord",
+  "/taches":            "Tâches",
+  "/animaux":           "Animaux",
+  "/traitements":       "Traitements",
+  "/fourrage":          "Fourrage",
+  "/fourrage/partiels": "Parcellaire",
+  "/vehicules":         "Véhicules",
+  "/entretiens":        "Entretiens",
+  "/couts":             "Coûts",
+  "/profits":           "Profits",
+  "/rapports":          "Rapports",
+};
 
 export default function Navbar() {
   const { state, toggleSidebar } = useAppStore();
   const [dateStr, setDateStr] = useState("");
+  const pathname = usePathname();
 
   useEffect(() => {
     setDateStr(
       new Date().toLocaleDateString("fr-FR", {
-        weekday: "long",
+        weekday: "short",
         day: "numeric",
-        month: "long",
+        month: "short",
         year: "numeric",
       })
     );
   }, []);
 
   const alertCount = state.alertes.length;
+  const pageLabel = PAGE_LABELS[pathname] ?? "";
 
   return (
-    <nav className="sticky top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-[1020] shadow-sm">
-      <div className="flex items-center justify-between px-6 h-full">
-        <div className="flex items-center gap-4">
-          <button
-            className="lg:hidden bg-transparent border-none text-2xl cursor-pointer"
-            onClick={toggleSidebar}
-          >
-            ☰
-          </button>
-          <h1 className="text-2xl font-bold m-0 flex items-center gap-2">
-            🌾 <span>La Ferme Tabouche</span>
-          </h1>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="hidden md:block text-gray-600 text-sm">{dateStr}</div>
-          <button className="relative text-xl" title="Notifications">
-            🔔
-            {alertCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 text-[10px] bg-red-100 text-red-800 rounded-full flex items-center justify-center font-medium">
-                {alertCount}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => logout()}
-            className="px-3 py-1.5 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 transition-all cursor-pointer"
-            title="Se déconnecter"
-          >
-            Déconnexion
-          </button>
+    <header className="h-14 bg-white border-b border-stone-200 flex items-center justify-between px-6 sticky top-0 z-[1020]">
+      {/* Left */}
+      <div className="flex items-center gap-3">
+        <button
+          className="lg:hidden w-8 h-8 rounded-lg hover:bg-stone-100 flex items-center justify-center transition-colors cursor-pointer"
+          onClick={toggleSidebar}
+        >
+          <Menu className="w-4 h-4 text-stone-500" />
+        </button>
+
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1.5 text-[13px]">
+          <span className="text-stone-400 hidden sm:block">La Ferme Tabouche</span>
+          {pageLabel && (
+            <>
+              <span className="text-stone-300 hidden sm:block">/</span>
+              <span className="text-stone-800 font-medium">{pageLabel}</span>
+            </>
+          )}
         </div>
       </div>
-    </nav>
+
+      {/* Right */}
+      <div className="flex items-center gap-2">
+        <span className="text-[12px] text-stone-400 font-mono hidden lg:block">{dateStr}</span>
+
+        <button
+          className="relative w-8 h-8 rounded-lg hover:bg-stone-100 flex items-center justify-center transition-colors cursor-pointer"
+          title="Notifications"
+        >
+          <Bell className="w-4 h-4 text-stone-500" />
+          {alertCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-brand-500" />
+          )}
+        </button>
+
+        {/* Avatar initiales */}
+        <div className="w-8 h-8 rounded-full bg-stone-100 border border-stone-200 flex items-center justify-center text-[11px] font-semibold text-stone-600 select-none">
+          SB
+        </div>
+      </div>
+    </header>
   );
 }
