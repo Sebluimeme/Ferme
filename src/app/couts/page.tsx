@@ -1,4 +1,4 @@
-import PlaceholderPage from "@/components/PlaceholderPage";
+import CoutsPageContent from "@/components/CoutsPageContent";
 export default function CoutsPage() {
-  return <PlaceholderPage icon="💰" title="Module Coûts" />;
+  return <CoutsPageContent />;
 }

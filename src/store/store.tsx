@@ -8,6 +8,7 @@ import type { User } from "firebase/auth";
 import type { Vehicle, MaintenanceAlert, MaintenanceEntry, MeterReading } from "@/types/vehicle";
 import type { Task } from "@/types/task";
 import type { Partiel, ActiviteFourrage } from "@/types/fourrage";
+import type { Transaction } from "@/types/comptabilite";
 import { calculateMaintenanceAlerts } from "@/services/vehicle-detail-service";
 
 export interface Animal {
@@ -71,7 +72,7 @@ interface AppState {
   authLoading: boolean;
   animaux: Animal[];
   traitements: FicheSoin[];
-  couts: unknown[];
+  couts: Transaction[];
   ventes: unknown[];
   alertes: Alerte[];
   vehicles: Vehicle[];
@@ -91,7 +92,7 @@ type Action =
   | { type: "SET_AUTH_LOADING"; payload: boolean }
   | { type: "SET_ANIMAUX"; payload: Animal[] }
   | { type: "SET_TRAITEMENTS"; payload: FicheSoin[] }
-  | { type: "SET_COUTS"; payload: unknown[] }
+  | { type: "SET_COUTS"; payload: Transaction[] }
   | { type: "SET_VENTES"; payload: unknown[] }
   | { type: "SET_ALERTES"; payload: Alerte[] }
   | { type: "SET_VEHICLES"; payload: Vehicle[] }
@@ -236,7 +237,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       firebaseService.listen<FicheSoin>("traitements", (data) => dispatch({ type: "SET_TRAITEMENTS", payload: data }))
     );
     listeners.push(
-      firebaseService.listen("couts", (data) => dispatch({ type: "SET_COUTS", payload: data }))
+      firebaseService.listen<Transaction>("transactions", (data) => dispatch({ type: "SET_COUTS", payload: data }))
     );
     listeners.push(
       firebaseService.listen("ventes", (data) => dispatch({ type: "SET_VENTES", payload: data }))
