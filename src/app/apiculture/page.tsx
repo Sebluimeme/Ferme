@@ -470,22 +470,22 @@ export default function ApiculturePage() {
   return (
     <div className="max-w-7xl mx-auto">
       {/* En-tête */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">🍯 Apiculture</h1>
           <p className="text-gray-500 mt-1">Suivi des ruches, récoltes et ventes de miel</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button onClick={() => setModalVente(true)}
-            className="px-4 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 cursor-pointer shadow-md">
+            className="px-3 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 cursor-pointer shadow-md">
             + Vente
           </button>
           <button onClick={() => setModalRecolte(true)}
-            className="px-4 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 cursor-pointer shadow-md">
+            className="px-3 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 cursor-pointer shadow-md">
             + Récolte
           </button>
           <button onClick={() => setModalRuche(true)}
-            className="px-4 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md">
+            className="px-3 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md">
             + Ruche
           </button>
         </div>

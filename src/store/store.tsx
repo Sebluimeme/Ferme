@@ -115,14 +115,24 @@ type Action =
   | { type: "UPDATE_STATS" }
   | { type: "UPDATE_MAINTENANCE_ALERTS" };
 
-function computeStats(animaux: Animal[]): Stats {
+function computeStats(animaux: Animal[], couts: Transaction[] = [], ventesMiel: VenteMiel[] = []): Stats {
+  const thisYear = new Date().getFullYear().toString();
+  const revenus = couts
+    .filter((t) => t.operation === "Revenus" && t.date?.startsWith(thisYear))
+    .reduce((sum, t) => sum + t.montant, 0);
+  const depenses = couts
+    .filter((t) => t.operation === "Dépenses" && t.date?.startsWith(thisYear))
+    .reduce((sum, t) => sum + t.montant, 0);
+  const caMiel = ventesMiel
+    .filter((v) => v.dateVente?.startsWith(thisYear))
+    .reduce((sum, v) => sum + v.prixTotal, 0);
   return {
     totalAnimaux: animaux.filter((a) => a.statut !== "mort").length,
     ovins: animaux.filter((a) => a.type === "ovin" && a.statut === "actif").length,
     bovins: animaux.filter((a) => a.type === "bovin" && a.statut === "actif").length,
     caprins: animaux.filter((a) => a.type === "caprin" && a.statut === "actif").length,
     porcins: animaux.filter((a) => a.type === "porcin" && a.statut === "actif").length,
-    profitGlobal: 0,
+    profitGlobal: revenus + caMiel - depenses,
   };
 }
 
@@ -157,12 +167,14 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, authLoading: action.payload };
     case "SET_ANIMAUX": {
       const animaux = action.payload;
-      return { ...state, animaux, stats: computeStats(animaux) };
+      return { ...state, animaux, stats: computeStats(animaux, state.couts, state.ventesMiel) };
     }
     case "SET_TRAITEMENTS":
       return { ...state, traitements: action.payload };
-    case "SET_COUTS":
-      return { ...state, couts: action.payload };
+    case "SET_COUTS": {
+      const couts = action.payload;
+      return { ...state, couts, stats: computeStats(state.animaux, couts, state.ventesMiel) };
+    }
     case "SET_VENTES":
       return { ...state, ventes: action.payload };
     case "SET_ALERTES":
@@ -191,8 +203,10 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, ruches: action.payload };
     case "SET_RECOLTE_MIEL":
       return { ...state, recolteMiel: action.payload };
-    case "SET_VENTES_MIEL":
-      return { ...state, ventesMiel: action.payload };
+    case "SET_VENTES_MIEL": {
+      const ventesMiel = action.payload;
+      return { ...state, ventesMiel, stats: computeStats(state.animaux, state.couts, ventesMiel) };
+    }
     case "UPDATE_MAINTENANCE_ALERTS": {
       const alerts = calculateMaintenanceAlerts(state.vehicles, state.maintenanceEntries, state.meterReadings);
       return { ...state, maintenanceAlerts: alerts };
@@ -204,7 +218,7 @@ function reducer(state: AppState, action: Action): AppState {
     case "CLOSE_SIDEBAR":
       return { ...state, sidebarOpen: false };
     case "UPDATE_STATS":
-      return { ...state, stats: computeStats(state.animaux) };
+      return { ...state, stats: computeStats(state.animaux, state.couts, state.ventesMiel) };
     default:
       return state;
   }
