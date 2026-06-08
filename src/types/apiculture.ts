@@ -19,3 +19,14 @@ export interface RecolteMiel {
   dateCreation?: string;
   derniereMAJ?: string;
 }
+
+export interface VenteMiel {
+  id: string;
+  dateVente: string;
+  nbPots500g: number;   // pots de 0,5 kg
+  nbPots1kg: number;    // pots de 1 kg
+  prixTotal: number;    // € encaissés
+  notes?: string;
+  dateCreation?: string;
+  derniereMAJ?: string;
+}

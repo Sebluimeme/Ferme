@@ -5,17 +5,18 @@ import { useAppStore } from "@/store/store";
 import KpiCard from "@/components/KpiCard";
 import Modal, { ConfirmModal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
-import type { Ruche, RecolteMiel } from "@/types/apiculture";
+import type { Ruche, RecolteMiel, VenteMiel } from "@/types/apiculture";
 import {
   createRuche, updateRuche, deleteRuche,
   createRecolte, updateRecolte, deleteRecolte,
+  createVente, updateVente, deleteVente,
 } from "@/services/apiculture-service";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Legend, LineChart, Line,
 } from "recharts";
 
-// ==================== Types ====================
+// ==================== Constantes ====================
 
 const TYPE_MIEL_LABELS: Record<NonNullable<RecolteMiel["type"]>, string> = {
   printemps: "Printemps",
@@ -53,12 +54,7 @@ interface RucheFormData {
   notes: string;
 }
 
-function RucheForm({
-  initial,
-  onSubmit,
-  onCancel,
-  loading,
-}: {
+function RucheForm({ initial, onSubmit, onCancel, loading }: {
   initial?: Partial<RucheFormData>;
   onSubmit: (data: RucheFormData) => void;
   onCancel: () => void;
@@ -77,22 +73,15 @@ function RucheForm({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Nom de la ruche *</label>
-          <input
-            type="text"
-            required
+          <input type="text" required
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            value={form.nom}
-            onChange={(e) => setForm((p) => ({ ...p, nom: e.target.value }))}
-            placeholder="Ex : Ruche 1"
-          />
+            value={form.nom} onChange={(e) => setForm((p) => ({ ...p, nom: e.target.value }))}
+            placeholder="Ex : Ruche 1" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
-          <select
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            value={form.statut}
-            onChange={(e) => setForm((p) => ({ ...p, statut: e.target.value as Ruche["statut"] }))}
-          >
+          <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={form.statut} onChange={(e) => setForm((p) => ({ ...p, statut: e.target.value as Ruche["statut"] }))}>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="perdue">Perdue</option>
@@ -102,41 +91,28 @@ function RucheForm({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Emplacement</label>
-          <input
-            type="text"
+          <input type="text"
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            value={form.emplacement}
-            onChange={(e) => setForm((p) => ({ ...p, emplacement: e.target.value }))}
-            placeholder="Ex : Verger nord"
-          />
+            value={form.emplacement} onChange={(e) => setForm((p) => ({ ...p, emplacement: e.target.value }))}
+            placeholder="Ex : Verger nord" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;installation</label>
-          <input
-            type="date"
+          <input type="date"
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            value={form.dateInstallation}
-            onChange={(e) => setForm((p) => ({ ...p, dateInstallation: e.target.value }))}
-          />
+            value={form.dateInstallation} onChange={(e) => setForm((p) => ({ ...p, dateInstallation: e.target.value }))} />
         </div>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-        <textarea
-          rows={2}
+        <textarea rows={2}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-          value={form.notes}
-          onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-          placeholder="Observations..."
-        />
+          value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+          placeholder="Observations..." />
       </div>
       <div className="flex justify-end gap-3 pt-2">
-        <button type="button" onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">
-          Annuler
-        </button>
-        <button type="submit" disabled={loading}
-          className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">Annuler</button>
+        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
       </div>
@@ -154,13 +130,7 @@ interface RecolteFormData {
   notes: string;
 }
 
-function RecolteForm({
-  ruches,
-  initial,
-  onSubmit,
-  onCancel,
-  loading,
-}: {
+function RecolteForm({ ruches, initial, onSubmit, onCancel, loading }: {
   ruches: Ruche[];
   initial?: Partial<RecolteFormData>;
   onSubmit: (data: RecolteFormData) => void;
@@ -181,36 +151,23 @@ function RecolteForm({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Date de récolte *</label>
-          <input
-            type="date"
-            required
+          <input type="date" required
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            value={form.dateRecolte}
-            onChange={(e) => setForm((p) => ({ ...p, dateRecolte: e.target.value }))}
-          />
+            value={form.dateRecolte} onChange={(e) => setForm((p) => ({ ...p, dateRecolte: e.target.value }))} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Poids (kg) *</label>
-          <input
-            type="number"
-            min="0"
-            step="0.1"
-            required
+          <input type="number" min="0" step="0.1" required
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            value={form.poidsKg}
-            onChange={(e) => setForm((p) => ({ ...p, poidsKg: e.target.value }))}
-            placeholder="Ex : 12.5"
-          />
+            value={form.poidsKg} onChange={(e) => setForm((p) => ({ ...p, poidsKg: e.target.value }))}
+            placeholder="Ex : 12.5" />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Ruche</label>
-          <select
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            value={form.rucheId}
-            onChange={(e) => setForm((p) => ({ ...p, rucheId: e.target.value }))}
-          >
+          <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={form.rucheId} onChange={(e) => setForm((p) => ({ ...p, rucheId: e.target.value }))}>
             <option value="">— Toutes ruches —</option>
             {ruches.filter((r) => r.statut === "active").map((r) => (
               <option key={r.id} value={r.id}>{r.nom}</option>
@@ -219,11 +176,8 @@ function RecolteForm({
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Type de miel</label>
-          <select
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            value={form.type}
-            onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as RecolteMiel["type"] | "" }))}
-          >
+          <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as RecolteMiel["type"] | "" }))}>
             <option value="">— Non spécifié —</option>
             {(Object.entries(TYPE_MIEL_LABELS) as [NonNullable<RecolteMiel["type"]>, string][]).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
@@ -233,21 +187,101 @@ function RecolteForm({
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-        <textarea
-          rows={2}
+        <textarea rows={2}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-          value={form.notes}
-          onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-          placeholder="Conditions, observations..."
-        />
+          value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+          placeholder="Conditions, observations..." />
       </div>
       <div className="flex justify-end gap-3 pt-2">
-        <button type="button" onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">
-          Annuler
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">Annuler</button>
+        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+          {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
-        <button type="submit" disabled={loading}
-          className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+      </div>
+    </form>
+  );
+}
+
+// ==================== Formulaire vente ====================
+
+interface VenteFormData {
+  dateVente: string;
+  nbPots500g: string;
+  nbPots1kg: string;
+  prixTotal: string;
+  notes: string;
+}
+
+function VenteForm({ initial, onSubmit, onCancel, loading }: {
+  initial?: Partial<VenteFormData>;
+  onSubmit: (data: VenteFormData) => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  const today = new Date().toISOString().split("T")[0];
+  const [form, setForm] = useState<VenteFormData>({
+    dateVente: initial?.dateVente ?? today,
+    nbPots500g: initial?.nbPots500g ?? "0",
+    nbPots1kg: initial?.nbPots1kg ?? "0",
+    prixTotal: initial?.prixTotal ?? "",
+    notes: initial?.notes ?? "",
+  });
+
+  const totalPots = (parseInt(form.nbPots500g) || 0) + (parseInt(form.nbPots1kg) || 0);
+  const poidsVendu = ((parseInt(form.nbPots500g) || 0) * 0.5) + ((parseInt(form.nbPots1kg) || 0) * 1);
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="flex flex-col gap-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Date de vente *</label>
+        <input type="date" required
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          value={form.dateVente} onChange={(e) => setForm((p) => ({ ...p, dateVente: e.target.value }))} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Pots 0,5 kg</label>
+          <input type="number" min="0" step="1"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={form.nbPots500g} onChange={(e) => setForm((p) => ({ ...p, nbPots500g: e.target.value }))}
+            placeholder="0" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Pots 1 kg</label>
+          <input type="number" min="0" step="1"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={form.nbPots1kg} onChange={(e) => setForm((p) => ({ ...p, nbPots1kg: e.target.value }))}
+            placeholder="0" />
+        </div>
+      </div>
+
+      {/* Résumé calculé */}
+      {totalPots > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-sm flex items-center justify-between">
+          <span className="text-gray-600">{totalPots} pot{totalPots > 1 ? "s" : ""} · {poidsVendu.toFixed(1)} kg</span>
+        </div>
+      )}
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Prix total (€) *</label>
+        <input type="number" min="0" step="0.01" required
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          value={form.prixTotal} onChange={(e) => setForm((p) => ({ ...p, prixTotal: e.target.value }))}
+          placeholder="Ex : 45.00" />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+        <textarea rows={2}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+          value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+          placeholder="Client, lieu de vente..." />
+      </div>
+
+      <div className="flex justify-end gap-3 pt-2">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">Annuler</button>
+        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
       </div>
@@ -260,22 +294,25 @@ function RecolteForm({
 export default function ApiculturePage() {
   const { state } = useAppStore();
   const { showToast } = useToast();
-  const { ruches, recolteMiel } = state;
+  const { ruches, recolteMiel, ventesMiel } = state;
 
-  const [tab, setTab] = useState<"dashboard" | "recoltes" | "ruches">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "recoltes" | "ventes" | "ruches">("dashboard");
   const [modalRuche, setModalRuche] = useState(false);
   const [editRuche, setEditRuche] = useState<Ruche | null>(null);
   const [deleteRucheTarget, setDeleteRucheTarget] = useState<Ruche | null>(null);
   const [modalRecolte, setModalRecolte] = useState(false);
   const [editRecolte, setEditRecolte] = useState<RecolteMiel | null>(null);
   const [deleteRecolteTarget, setDeleteRecolteTarget] = useState<RecolteMiel | null>(null);
+  const [modalVente, setModalVente] = useState(false);
+  const [editVente, setEditVente] = useState<VenteMiel | null>(null);
+  const [deleteVenteTarget, setDeleteVenteTarget] = useState<VenteMiel | null>(null);
   const [saving, setSaving] = useState(false);
 
   const now = new Date();
   const thisYear = now.getFullYear();
   const thisMonth = now.getMonth();
 
-  // KPIs
+  // ——— KPIs ———
   const ruchesActives = ruches.filter((r) => r.statut === "active").length;
   const totalMielKg = recolteMiel.reduce((s, r) => s + r.poidsKg, 0);
   const mielCeMois = recolteMiel
@@ -285,25 +322,31 @@ export default function ApiculturePage() {
     .filter((r) => new Date(r.dateRecolte).getFullYear() === thisYear)
     .reduce((s, r) => s + r.poidsKg, 0);
 
-  // Rendement moyen par ruche active (cette année)
+  // ——— KPIs ventes ———
+  const caTotal = ventesMiel.reduce((s, v) => s + v.prixTotal, 0);
+  const caCetteAnnee = ventesMiel
+    .filter((v) => new Date(v.dateVente).getFullYear() === thisYear)
+    .reduce((s, v) => s + v.prixTotal, 0);
+  const totalPots500 = ventesMiel.reduce((s, v) => s + v.nbPots500g, 0);
+  const totalPots1kg = ventesMiel.reduce((s, v) => s + v.nbPots1kg, 0);
+
   const rdtMoyenParRuche = ruchesActives > 0 && mielCetteAnnee > 0
     ? mielCetteAnnee / ruchesActives
     : null;
 
-  // Données mensuelles
+  // ——— Analytics ———
   const donneesMensuelles = useMemo(() =>
     MOIS_LABELS.map((mois, idx) => {
-      const total = recolteMiel
-        .filter((r) => {
-          const d = new Date(r.dateRecolte);
-          return d.getMonth() === idx && d.getFullYear() === thisYear;
-        })
+      const kg = recolteMiel
+        .filter((r) => { const d = new Date(r.dateRecolte); return d.getMonth() === idx && d.getFullYear() === thisYear; })
         .reduce((s, r) => s + r.poidsKg, 0);
-      return { mois, kg: total || null };
+      const ca = ventesMiel
+        .filter((v) => { const d = new Date(v.dateVente); return d.getMonth() === idx && d.getFullYear() === thisYear; })
+        .reduce((s, v) => s + v.prixTotal, 0);
+      return { mois, kg: kg || null, ca: ca || null };
     }),
-  [recolteMiel, thisYear]);
+  [recolteMiel, ventesMiel, thisYear]);
 
-  // Répartition par ruche (cette année)
   const parRuche = useMemo(() => {
     const map: Record<string, number> = {};
     recolteMiel
@@ -314,12 +357,9 @@ export default function ApiculturePage() {
           : "Non attribué";
         map[key] = (map[key] ?? 0) + r.poidsKg;
       });
-    return Object.entries(map)
-      .map(([ruche, kg]) => ({ ruche, kg }))
-      .sort((a, b) => b.kg - a.kg);
+    return Object.entries(map).map(([ruche, kg]) => ({ ruche, kg })).sort((a, b) => b.kg - a.kg);
   }, [recolteMiel, ruches, thisYear]);
 
-  // Répartition par type (total)
   const parType = useMemo(() => {
     const map: Record<string, number> = {};
     recolteMiel.forEach((r) => {
@@ -329,45 +369,32 @@ export default function ApiculturePage() {
     return Object.entries(map).map(([type, kg]) => ({ type, kg })).sort((a, b) => b.kg - a.kg);
   }, [recolteMiel]);
 
-  const recoltesTri = [...recolteMiel].sort(
-    (a, b) => new Date(b.dateRecolte).getTime() - new Date(a.dateRecolte).getTime()
-  );
+  const recoltesTri = [...recolteMiel].sort((a, b) => new Date(b.dateRecolte).getTime() - new Date(a.dateRecolte).getTime());
+  const ventesTri = [...ventesMiel].sort((a, b) => new Date(b.dateVente).getTime() - new Date(a.dateVente).getTime());
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const formatEur = (n: number) =>
+    n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
   // ——— Handlers ruches ———
   const handleCreateRuche = async (data: RucheFormData) => {
     setSaving(true);
     try {
-      const res = await createRuche({
-        nom: data.nom,
-        emplacement: data.emplacement || undefined,
-        dateInstallation: data.dateInstallation || undefined,
-        statut: data.statut,
-        notes: data.notes || undefined,
-      });
+      const res = await createRuche({ nom: data.nom, emplacement: data.emplacement || undefined, dateInstallation: data.dateInstallation || undefined, statut: data.statut, notes: data.notes || undefined });
       if (res.success) { showToast({ type: "success", title: "Ruche créée" }); setModalRuche(false); }
       else showToast({ type: "error", title: "Erreur", message: res.error });
     } finally { setSaving(false); }
   };
-
   const handleUpdateRuche = async (data: RucheFormData) => {
     if (!editRuche) return;
     setSaving(true);
     try {
-      const res = await updateRuche(editRuche.id, {
-        nom: data.nom,
-        emplacement: data.emplacement || undefined,
-        dateInstallation: data.dateInstallation || undefined,
-        statut: data.statut,
-        notes: data.notes || undefined,
-      });
+      const res = await updateRuche(editRuche.id, { nom: data.nom, emplacement: data.emplacement || undefined, dateInstallation: data.dateInstallation || undefined, statut: data.statut, notes: data.notes || undefined });
       if (res.success) { showToast({ type: "success", title: "Ruche mise à jour" }); setEditRuche(null); }
       else showToast({ type: "error", title: "Erreur", message: res.error });
     } finally { setSaving(false); }
   };
-
   const handleDeleteRuche = async () => {
     if (!deleteRucheTarget) return;
     const res = await deleteRuche(deleteRucheTarget.id);
@@ -380,34 +407,20 @@ export default function ApiculturePage() {
   const handleCreateRecolte = async (data: RecolteFormData) => {
     setSaving(true);
     try {
-      const res = await createRecolte({
-        rucheId: data.rucheId || undefined,
-        dateRecolte: data.dateRecolte,
-        poidsKg: parseFloat(data.poidsKg),
-        type: (data.type || undefined) as RecolteMiel["type"],
-        notes: data.notes || undefined,
-      });
+      const res = await createRecolte({ rucheId: data.rucheId || undefined, dateRecolte: data.dateRecolte, poidsKg: parseFloat(data.poidsKg), type: (data.type || undefined) as RecolteMiel["type"], notes: data.notes || undefined });
       if (res.success) { showToast({ type: "success", title: "Récolte enregistrée" }); setModalRecolte(false); }
       else showToast({ type: "error", title: "Erreur", message: res.error });
     } finally { setSaving(false); }
   };
-
   const handleUpdateRecolte = async (data: RecolteFormData) => {
     if (!editRecolte) return;
     setSaving(true);
     try {
-      const res = await updateRecolte(editRecolte.id, {
-        rucheId: data.rucheId || undefined,
-        dateRecolte: data.dateRecolte,
-        poidsKg: parseFloat(data.poidsKg),
-        type: (data.type || undefined) as RecolteMiel["type"],
-        notes: data.notes || undefined,
-      });
+      const res = await updateRecolte(editRecolte.id, { rucheId: data.rucheId || undefined, dateRecolte: data.dateRecolte, poidsKg: parseFloat(data.poidsKg), type: (data.type || undefined) as RecolteMiel["type"], notes: data.notes || undefined });
       if (res.success) { showToast({ type: "success", title: "Récolte mise à jour" }); setEditRecolte(null); }
       else showToast({ type: "error", title: "Erreur", message: res.error });
     } finally { setSaving(false); }
   };
-
   const handleDeleteRecolte = async () => {
     if (!deleteRecolteTarget) return;
     const res = await deleteRecolte(deleteRecolteTarget.id);
@@ -416,25 +429,63 @@ export default function ApiculturePage() {
     setDeleteRecolteTarget(null);
   };
 
+  // ——— Handlers ventes ———
+  const handleCreateVente = async (data: VenteFormData) => {
+    setSaving(true);
+    try {
+      const res = await createVente({
+        dateVente: data.dateVente,
+        nbPots500g: parseInt(data.nbPots500g) || 0,
+        nbPots1kg: parseInt(data.nbPots1kg) || 0,
+        prixTotal: parseFloat(data.prixTotal),
+        notes: data.notes || undefined,
+      });
+      if (res.success) { showToast({ type: "success", title: "Vente enregistrée" }); setModalVente(false); }
+      else showToast({ type: "error", title: "Erreur", message: res.error });
+    } finally { setSaving(false); }
+  };
+  const handleUpdateVente = async (data: VenteFormData) => {
+    if (!editVente) return;
+    setSaving(true);
+    try {
+      const res = await updateVente(editVente.id, {
+        dateVente: data.dateVente,
+        nbPots500g: parseInt(data.nbPots500g) || 0,
+        nbPots1kg: parseInt(data.nbPots1kg) || 0,
+        prixTotal: parseFloat(data.prixTotal),
+        notes: data.notes || undefined,
+      });
+      if (res.success) { showToast({ type: "success", title: "Vente mise à jour" }); setEditVente(null); }
+      else showToast({ type: "error", title: "Erreur", message: res.error });
+    } finally { setSaving(false); }
+  };
+  const handleDeleteVente = async () => {
+    if (!deleteVenteTarget) return;
+    const res = await deleteVente(deleteVenteTarget.id);
+    if (res.success) showToast({ type: "success", title: "Vente supprimée" });
+    else showToast({ type: "error", title: "Erreur", message: res.error });
+    setDeleteVenteTarget(null);
+  };
+
   return (
     <div className="max-w-7xl mx-auto">
       {/* En-tête */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">🍯 Apiculture</h1>
-          <p className="text-gray-500 mt-1">Suivi des ruches et récoltes de miel</p>
+          <p className="text-gray-500 mt-1">Suivi des ruches, récoltes et ventes de miel</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setModalRecolte(true)}
-            className="px-4 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 cursor-pointer shadow-md"
-          >
+          <button onClick={() => setModalVente(true)}
+            className="px-4 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 cursor-pointer shadow-md">
+            + Vente
+          </button>
+          <button onClick={() => setModalRecolte(true)}
+            className="px-4 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 cursor-pointer shadow-md">
             + Récolte
           </button>
-          <button
-            onClick={() => setModalRuche(true)}
-            className="px-4 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md"
-          >
+          <button onClick={() => setModalRuche(true)}
+            className="px-4 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md">
             + Ruche
           </button>
         </div>
@@ -443,22 +494,17 @@ export default function ApiculturePage() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KpiCard label="Ruches actives" value={ruchesActives} subtitle={`${ruches.length} total`} borderColorClass="border-l-amber-500" valueColorClass="text-amber-600" />
-        <KpiCard label="Miel ce mois" value={mielCeMois > 0 ? `${mielCeMois.toFixed(1)} kg` : "—"} borderColorClass="border-l-yellow-500" valueColorClass="text-yellow-600" />
-        <KpiCard label={`Miel ${thisYear}`} value={mielCetteAnnee > 0 ? `${mielCetteAnnee.toFixed(1)} kg` : "—"} borderColorClass="border-l-orange-500" valueColorClass="text-orange-600" />
-        <KpiCard label="Total récolté" value={totalMielKg > 0 ? `${totalMielKg.toFixed(1)} kg` : "—"} subtitle="toutes saisons" borderColorClass="border-l-green-500" valueColorClass="text-green-600" />
+        <KpiCard label={`Récolte ${thisYear}`} value={mielCetteAnnee > 0 ? `${mielCetteAnnee.toFixed(1)} kg` : "—"} subtitle={mielCeMois > 0 ? `${mielCeMois.toFixed(1)} kg ce mois` : undefined} borderColorClass="border-l-yellow-500" valueColorClass="text-yellow-600" />
+        <KpiCard label={`CA ${thisYear}`} value={caCetteAnnee > 0 ? formatEur(caCetteAnnee) : "—"} subtitle={caTotal !== caCetteAnnee && caTotal > 0 ? `${formatEur(caTotal)} total` : undefined} borderColorClass="border-l-green-500" valueColorClass="text-green-600" />
+        <KpiCard label="Pots vendus" value={totalPots500 + totalPots1kg > 0 ? totalPots500 + totalPots1kg : "—"} subtitle={totalPots500 + totalPots1kg > 0 ? `${totalPots500}×½kg · ${totalPots1kg}×1kg` : undefined} borderColorClass="border-l-orange-500" valueColorClass="text-orange-600" />
       </div>
 
       {/* Onglets */}
       <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl w-fit">
-        {(["dashboard", "recoltes", "ruches"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-              tab === t ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {t === "dashboard" ? "📊 Graphiques" : t === "recoltes" ? "🍯 Récoltes" : "🐝 Ruches"}
+        {(["dashboard", "ventes", "recoltes", "ruches"] as const).map((t) => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${tab === t ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>
+            {t === "dashboard" ? "📊 Graphiques" : t === "ventes" ? "💰 Ventes" : t === "recoltes" ? "🍯 Récoltes" : "🐝 Ruches"}
           </button>
         ))}
       </div>
@@ -466,50 +512,63 @@ export default function ApiculturePage() {
       {/* ——— TAB DASHBOARD ——— */}
       {tab === "dashboard" && (
         <div className="space-y-6">
-          {recolteMiel.length === 0 ? (
+          {recolteMiel.length === 0 && ventesMiel.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
               <div className="text-5xl mb-3">🍯</div>
-              <p className="text-lg font-medium">Aucune récolte enregistrée</p>
-              <p className="text-sm mt-1">Cliquez sur &quot;+ Récolte&quot; pour commencer.</p>
+              <p className="text-lg font-medium">Aucune donnée</p>
+              <p className="text-sm mt-1">Enregistrez une récolte ou une vente pour voir les graphiques.</p>
             </div>
           ) : (
             <>
-              {/* Graphique mensuel */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-                  Récoltes {thisYear} — par mois (kg)
-                </p>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={donneesMensuelles} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="mois" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} unit=" kg" />
-                    <Tooltip formatter={(v: unknown) => v != null ? `${Number(v).toFixed(1)} kg` : "—"} />
-                    <Bar dataKey="kg" name="Miel récolté" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Répartition par ruche */}
-              {parRuche.length > 0 && (
+              {/* Récoltes mensuelles */}
+              {recolteMiel.length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-                    Par ruche — {thisYear} (kg)
-                  </p>
-                  <ResponsiveContainer width="100%" height={Math.max(180, parRuche.length * 40)}>
-                    <BarChart data={parRuche} layout="vertical" margin={{ top: 4, right: 30, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 11 }} unit=" kg" />
-                      <YAxis type="category" dataKey="ruche" tick={{ fontSize: 12 }} width={90} />
-                      <Tooltip formatter={(v: unknown) => `${Number(v).toFixed(1)} kg`} />
-                      <Bar dataKey="kg" name="Miel" fill="#d97706" radius={[0, 4, 4, 0]} />
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Récoltes {thisYear} — par mois (kg)</p>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={donneesMensuelles} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="mois" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} unit=" kg" />
+                      <Tooltip formatter={(v: unknown) => v != null ? `${Number(v).toFixed(1)} kg` : "—"} />
+                      <Bar dataKey="kg" name="Miel récolté" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               )}
 
-              {/* Répartition par type + stats ruches */}
+              {/* CA mensuel */}
+              {ventesMiel.length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Chiffre d&apos;affaires {thisYear} — par mois (€)</p>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={donneesMensuelles} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis dataKey="mois" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} unit=" €" />
+                      <Tooltip formatter={(v: unknown) => v != null ? `${Number(v).toFixed(2)} €` : "—"} />
+                      <Bar dataKey="ca" name="CA ventes" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Par ruche + par type côte à côte */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {parRuche.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Par ruche — {thisYear}</p>
+                    <ResponsiveContainer width="100%" height={Math.max(160, parRuche.length * 40)}>
+                      <BarChart data={parRuche} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 11 }} unit=" kg" />
+                        <YAxis type="category" dataKey="ruche" tick={{ fontSize: 12 }} width={80} />
+                        <Tooltip formatter={(v: unknown) => `${Number(v).toFixed(1)} kg`} />
+                        <Bar dataKey="kg" name="Miel" fill="#d97706" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
                 {parType.length > 0 && (
                   <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
                     <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Par type de miel</p>
@@ -531,26 +590,55 @@ export default function ApiculturePage() {
                     </div>
                   </div>
                 )}
-
-                {/* Rendement ruches */}
-                {rdtMoyenParRuche != null && (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Rendement {thisYear}</p>
-                    <div className="flex flex-col gap-3">
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-                        <p className="text-xs text-amber-600 font-medium">Moy. par ruche active</p>
-                        <p className="text-2xl font-bold text-amber-700 mt-0.5">{rdtMoyenParRuche.toFixed(1)} kg</p>
-                      </div>
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
-                        <p className="text-xs text-yellow-600 font-medium">Total {thisYear}</p>
-                        <p className="text-2xl font-bold text-yellow-700 mt-0.5">{mielCetteAnnee.toFixed(1)} kg</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* Évolution multi-années si données suffisantes */}
+              {/* Rendement + prix moyen pot */}
+              {(rdtMoyenParRuche != null || ventesMiel.length > 0) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {rdtMoyenParRuche != null && (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Rendement {thisYear}</p>
+                      <div className="flex flex-col gap-3">
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                          <p className="text-xs text-amber-600 font-medium">Moy. par ruche active</p>
+                          <p className="text-2xl font-bold text-amber-700 mt-0.5">{rdtMoyenParRuche.toFixed(1)} kg</p>
+                        </div>
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
+                          <p className="text-xs text-yellow-600 font-medium">Total récolté {thisYear}</p>
+                          <p className="text-2xl font-bold text-yellow-700 mt-0.5">{mielCetteAnnee.toFixed(1)} kg</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {ventesMiel.length > 0 && (() => {
+                    const totalPotsAll = totalPots500 + totalPots1kg;
+                    const prixMoyPot = totalPotsAll > 0 ? caTotal / totalPotsAll : null;
+                    const poidsVenduTotal = totalPots500 * 0.5 + totalPots1kg * 1;
+                    const prixMoyKg = poidsVenduTotal > 0 ? caTotal / poidsVenduTotal : null;
+                    return (
+                      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Statistiques ventes</p>
+                        <div className="flex flex-col gap-3">
+                          {prixMoyPot != null && (
+                            <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+                              <p className="text-xs text-green-600 font-medium">Prix moyen / pot</p>
+                              <p className="text-2xl font-bold text-green-700 mt-0.5">{formatEur(prixMoyPot)}</p>
+                            </div>
+                          )}
+                          {prixMoyKg != null && (
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+                              <p className="text-xs text-emerald-600 font-medium">Prix moyen / kg</p>
+                              <p className="text-2xl font-bold text-emerald-700 mt-0.5">{formatEur(prixMoyKg)}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Comparaison multi-années */}
               {recolteMiel.length >= 5 && (() => {
                 const years = [...new Set(recolteMiel.map((r) => new Date(r.dateRecolte).getFullYear()))].sort();
                 if (years.length < 2) return null;
@@ -584,6 +672,74 @@ export default function ApiculturePage() {
               })()}
             </>
           )}
+        </div>
+      )}
+
+      {/* ——— TAB VENTES ——— */}
+      {tab === "ventes" && (
+        <div className="space-y-3">
+          {/* Récap année */}
+          {ventesMiel.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-2">
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-xs text-gray-400 font-medium">CA total</p>
+                  <p className="text-xl font-bold text-green-700">{formatEur(caTotal)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 font-medium">Pots ½ kg vendus</p>
+                  <p className="text-xl font-bold text-amber-700">{totalPots500}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 font-medium">Pots 1 kg vendus</p>
+                  <p className="text-xl font-bold text-amber-700">{totalPots1kg}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {ventesTri.length === 0 ? (
+            <div className="text-center py-16 text-gray-400">
+              <div className="text-5xl mb-3">💰</div>
+              <p className="text-lg font-medium">Aucune vente enregistrée</p>
+              <p className="text-sm mt-1">Cliquez sur &quot;+ Vente&quot; pour en ajouter une.</p>
+            </div>
+          ) : ventesTri.map((v) => (
+            <div key={v.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-base font-bold text-green-700">{formatEur(v.prixTotal)}</span>
+                  <span className="text-sm text-gray-500">{formatDate(v.dateVente)}</span>
+                </div>
+                <div className="mt-1 flex items-center gap-3 text-sm text-gray-600 flex-wrap">
+                  {v.nbPots500g > 0 && (
+                    <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5 text-xs font-medium text-amber-800">
+                      {v.nbPots500g} × ½ kg
+                    </span>
+                  )}
+                  {v.nbPots1kg > 0 && (
+                    <span className="inline-flex items-center gap-1 bg-yellow-50 border border-yellow-200 rounded-md px-2 py-0.5 text-xs font-medium text-yellow-800">
+                      {v.nbPots1kg} × 1 kg
+                    </span>
+                  )}
+                  <span className="text-gray-400 text-xs">
+                    {((v.nbPots500g * 0.5) + (v.nbPots1kg * 1)).toFixed(1)} kg vendu
+                  </span>
+                </div>
+                {v.notes && <div className="mt-0.5 text-xs text-gray-400 italic truncate">{v.notes}</div>}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button onClick={() => setEditVente(v)}
+                  className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
+                  ✏️
+                </button>
+                <button onClick={() => setDeleteVenteTarget(v)}
+                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors" title="Supprimer">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -652,7 +808,7 @@ export default function ApiculturePage() {
                     <span className="font-semibold text-gray-900">{r.nom}</span>
                     <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${statutColor}`}>{statutLabel}</span>
                   </div>
-                  <div className="mt-0.5 text-sm text-gray-500 flex gap-3">
+                  <div className="mt-0.5 text-sm text-gray-500 flex gap-3 flex-wrap">
                     {r.emplacement && <span>📍 {r.emplacement}</span>}
                     {totalKg > 0 && <span className="font-medium text-amber-700">🍯 {totalKg.toFixed(1)} kg total</span>}
                     {r.dateInstallation && <span>Installée le {formatDate(r.dateInstallation)}</span>}
@@ -675,36 +831,35 @@ export default function ApiculturePage() {
         </div>
       )}
 
-      {/* Modals ruches */}
+      {/* ——— Modals ruches ——— */}
       <Modal isOpen={modalRuche} onClose={() => setModalRuche(false)} title="Nouvelle ruche">
         <RucheForm onSubmit={handleCreateRuche} onCancel={() => setModalRuche(false)} loading={saving} />
       </Modal>
       <Modal isOpen={!!editRuche} onClose={() => setEditRuche(null)} title="Modifier la ruche">
-        {editRuche && (
-          <RucheForm
-            initial={{ nom: editRuche.nom, emplacement: editRuche.emplacement, dateInstallation: editRuche.dateInstallation, statut: editRuche.statut, notes: editRuche.notes }}
-            onSubmit={handleUpdateRuche} onCancel={() => setEditRuche(null)} loading={saving}
-          />
-        )}
+        {editRuche && <RucheForm initial={{ nom: editRuche.nom, emplacement: editRuche.emplacement, dateInstallation: editRuche.dateInstallation, statut: editRuche.statut, notes: editRuche.notes }} onSubmit={handleUpdateRuche} onCancel={() => setEditRuche(null)} loading={saving} />}
       </Modal>
       <ConfirmModal isOpen={!!deleteRucheTarget} onClose={() => setDeleteRucheTarget(null)} onConfirm={handleDeleteRuche}
         title="Supprimer la ruche" message={`Supprimer <strong>${deleteRucheTarget?.nom ?? ""}</strong> ?`} confirmText="Supprimer" danger />
 
-      {/* Modals récoltes */}
+      {/* ——— Modals récoltes ——— */}
       <Modal isOpen={modalRecolte} onClose={() => setModalRecolte(false)} title="Nouvelle récolte de miel">
         <RecolteForm ruches={ruches} onSubmit={handleCreateRecolte} onCancel={() => setModalRecolte(false)} loading={saving} />
       </Modal>
       <Modal isOpen={!!editRecolte} onClose={() => setEditRecolte(null)} title="Modifier la récolte">
-        {editRecolte && (
-          <RecolteForm
-            ruches={ruches}
-            initial={{ rucheId: editRecolte.rucheId ?? "", dateRecolte: editRecolte.dateRecolte, poidsKg: String(editRecolte.poidsKg), type: editRecolte.type ?? "", notes: editRecolte.notes ?? "" }}
-            onSubmit={handleUpdateRecolte} onCancel={() => setEditRecolte(null)} loading={saving}
-          />
-        )}
+        {editRecolte && <RecolteForm ruches={ruches} initial={{ rucheId: editRecolte.rucheId ?? "", dateRecolte: editRecolte.dateRecolte, poidsKg: String(editRecolte.poidsKg), type: editRecolte.type ?? "", notes: editRecolte.notes ?? "" }} onSubmit={handleUpdateRecolte} onCancel={() => setEditRecolte(null)} loading={saving} />}
       </Modal>
       <ConfirmModal isOpen={!!deleteRecolteTarget} onClose={() => setDeleteRecolteTarget(null)} onConfirm={handleDeleteRecolte}
         title="Supprimer la récolte" message={`Supprimer la récolte du <strong>${deleteRecolteTarget ? formatDate(deleteRecolteTarget.dateRecolte) : ""}</strong> (${deleteRecolteTarget?.poidsKg ?? 0} kg) ?`} confirmText="Supprimer" danger />
+
+      {/* ——— Modals ventes ——— */}
+      <Modal isOpen={modalVente} onClose={() => setModalVente(false)} title="Nouvelle vente de miel">
+        <VenteForm onSubmit={handleCreateVente} onCancel={() => setModalVente(false)} loading={saving} />
+      </Modal>
+      <Modal isOpen={!!editVente} onClose={() => setEditVente(null)} title="Modifier la vente">
+        {editVente && <VenteForm initial={{ dateVente: editVente.dateVente, nbPots500g: String(editVente.nbPots500g), nbPots1kg: String(editVente.nbPots1kg), prixTotal: String(editVente.prixTotal), notes: editVente.notes ?? "" }} onSubmit={handleUpdateVente} onCancel={() => setEditVente(null)} loading={saving} />}
+      </Modal>
+      <ConfirmModal isOpen={!!deleteVenteTarget} onClose={() => setDeleteVenteTarget(null)} onConfirm={handleDeleteVente}
+        title="Supprimer la vente" message={`Supprimer la vente du <strong>${deleteVenteTarget ? formatDate(deleteVenteTarget.dateVente) : ""}</strong> (${deleteVenteTarget ? formatEur(deleteVenteTarget.prixTotal) : ""}) ?`} confirmText="Supprimer" danger />
     </div>
   );
 }

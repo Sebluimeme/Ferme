@@ -8,7 +8,7 @@ import type { User } from "firebase/auth";
 import type { Vehicle, MaintenanceAlert, MaintenanceEntry, MeterReading } from "@/types/vehicle";
 import type { Task } from "@/types/task";
 import type { Partiel, ActiviteFourrage } from "@/types/fourrage";
-import type { Ruche, RecolteMiel } from "@/types/apiculture";
+import type { Ruche, RecolteMiel, VenteMiel } from "@/types/apiculture";
 import type { Transaction } from "@/types/comptabilite";
 import { calculateMaintenanceAlerts } from "@/services/vehicle-detail-service";
 
@@ -85,6 +85,7 @@ interface AppState {
   activitesFourrage: ActiviteFourrage[];
   ruches: Ruche[];
   recolteMiel: RecolteMiel[];
+  ventesMiel: VenteMiel[];
   stats: Stats;
   loading: boolean;
   sidebarOpen: boolean;
@@ -107,6 +108,7 @@ type Action =
   | { type: "SET_ACTIVITES_FOURRAGE"; payload: ActiviteFourrage[] }
   | { type: "SET_RUCHES"; payload: Ruche[] }
   | { type: "SET_RECOLTE_MIEL"; payload: RecolteMiel[] }
+  | { type: "SET_VENTES_MIEL"; payload: VenteMiel[] }
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "TOGGLE_SIDEBAR" }
   | { type: "CLOSE_SIDEBAR" }
@@ -141,6 +143,7 @@ const initialState: AppState = {
   activitesFourrage: [],
   ruches: [],
   recolteMiel: [],
+  ventesMiel: [],
   stats: { totalAnimaux: 0, ovins: 0, bovins: 0, caprins: 0, porcins: 0, profitGlobal: 0 },
   loading: true,
   sidebarOpen: false,
@@ -188,6 +191,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, ruches: action.payload };
     case "SET_RECOLTE_MIEL":
       return { ...state, recolteMiel: action.payload };
+    case "SET_VENTES_MIEL":
+      return { ...state, ventesMiel: action.payload };
     case "UPDATE_MAINTENANCE_ALERTS": {
       const alerts = calculateMaintenanceAlerts(state.vehicles, state.maintenanceEntries, state.meterReadings);
       return { ...state, maintenanceAlerts: alerts };
@@ -295,6 +300,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     listeners.push(
       firebaseService.listen<RecolteMiel>("recoltes-miel", (data) =>
         dispatch({ type: "SET_RECOLTE_MIEL", payload: data })
+      )
+    );
+    listeners.push(
+      firebaseService.listen<VenteMiel>("ventes-miel", (data) =>
+        dispatch({ type: "SET_VENTES_MIEL", payload: data })
       )
     );
 
