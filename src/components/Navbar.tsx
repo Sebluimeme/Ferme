@@ -11,6 +11,7 @@ const PAGE_LABELS: Record<string, string> = {
   "/animaux":           "Animaux",
   "/traitements":       "Traitements",
   "/fourrage":          "Fourrage",
+  "/apiculture":        "Apiculture",
   "/fourrage/partiels": "Parcellaire",
   "/vehicules":         "Véhicules",
   "/entretiens":        "Entretiens",

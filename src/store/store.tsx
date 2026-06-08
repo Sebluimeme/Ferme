@@ -8,6 +8,7 @@ import type { User } from "firebase/auth";
 import type { Vehicle, MaintenanceAlert, MaintenanceEntry, MeterReading } from "@/types/vehicle";
 import type { Task } from "@/types/task";
 import type { Partiel, ActiviteFourrage } from "@/types/fourrage";
+import type { Ruche, RecolteMiel } from "@/types/apiculture";
 import type { Transaction } from "@/types/comptabilite";
 import { calculateMaintenanceAlerts } from "@/services/vehicle-detail-service";
 
@@ -82,6 +83,8 @@ interface AppState {
   taches: Task[];
   partiels: Partiel[];
   activitesFourrage: ActiviteFourrage[];
+  ruches: Ruche[];
+  recolteMiel: RecolteMiel[];
   stats: Stats;
   loading: boolean;
   sidebarOpen: boolean;
@@ -102,6 +105,8 @@ type Action =
   | { type: "SET_TACHES"; payload: Task[] }
   | { type: "SET_PARTIELS"; payload: Partiel[] }
   | { type: "SET_ACTIVITES_FOURRAGE"; payload: ActiviteFourrage[] }
+  | { type: "SET_RUCHES"; payload: Ruche[] }
+  | { type: "SET_RECOLTE_MIEL"; payload: RecolteMiel[] }
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "TOGGLE_SIDEBAR" }
   | { type: "CLOSE_SIDEBAR" }
@@ -134,6 +139,8 @@ const initialState: AppState = {
   taches: [],
   partiels: [],
   activitesFourrage: [],
+  ruches: [],
+  recolteMiel: [],
   stats: { totalAnimaux: 0, ovins: 0, bovins: 0, caprins: 0, porcins: 0, profitGlobal: 0 },
   loading: true,
   sidebarOpen: false,
@@ -177,6 +184,10 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, partiels: action.payload };
     case "SET_ACTIVITES_FOURRAGE":
       return { ...state, activitesFourrage: action.payload };
+    case "SET_RUCHES":
+      return { ...state, ruches: action.payload };
+    case "SET_RECOLTE_MIEL":
+      return { ...state, recolteMiel: action.payload };
     case "UPDATE_MAINTENANCE_ALERTS": {
       const alerts = calculateMaintenanceAlerts(state.vehicles, state.maintenanceEntries, state.meterReadings);
       return { ...state, maintenanceAlerts: alerts };
@@ -274,6 +285,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     listeners.push(
       firebaseService.listen<ActiviteFourrage>("activites-fourrage", (data) =>
         dispatch({ type: "SET_ACTIVITES_FOURRAGE", payload: data })
+      )
+    );
+    listeners.push(
+      firebaseService.listen<Ruche>("ruches", (data) =>
+        dispatch({ type: "SET_RUCHES", payload: data })
+      )
+    );
+    listeners.push(
+      firebaseService.listen<RecolteMiel>("recoltes-miel", (data) =>
+        dispatch({ type: "SET_RECOLTE_MIEL", payload: data })
       )
     );
 

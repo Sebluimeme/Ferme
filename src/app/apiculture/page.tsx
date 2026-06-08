@@ -1,0 +1,710 @@
+"use client";
+
+import React, { useState, useMemo } from "react";
+import { useAppStore } from "@/store/store";
+import KpiCard from "@/components/KpiCard";
+import Modal, { ConfirmModal } from "@/components/Modal";
+import { useToast } from "@/components/Toast";
+import type { Ruche, RecolteMiel } from "@/types/apiculture";
+import {
+  createRuche, updateRuche, deleteRuche,
+  createRecolte, updateRecolte, deleteRecolte,
+} from "@/services/apiculture-service";
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  CartesianGrid, Legend, LineChart, Line,
+} from "recharts";
+
+// ==================== Types ====================
+
+const TYPE_MIEL_LABELS: Record<NonNullable<RecolteMiel["type"]>, string> = {
+  printemps: "Printemps",
+  ete: "Été",
+  automne: "Automne",
+  hiver: "Hiver",
+  toutes_fleurs: "Toutes fleurs",
+  acacia: "Acacia",
+  lavande: "Lavande",
+  tilleul: "Tilleul",
+  autre: "Autre",
+};
+
+const TYPE_MIEL_COLORS: Record<NonNullable<RecolteMiel["type"]>, string> = {
+  printemps: "bg-pink-100 text-pink-800",
+  ete: "bg-yellow-100 text-yellow-800",
+  automne: "bg-orange-100 text-orange-800",
+  hiver: "bg-blue-100 text-blue-800",
+  toutes_fleurs: "bg-purple-100 text-purple-800",
+  acacia: "bg-green-100 text-green-800",
+  lavande: "bg-violet-100 text-violet-800",
+  tilleul: "bg-lime-100 text-lime-800",
+  autre: "bg-gray-100 text-gray-800",
+};
+
+const MOIS_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
+
+// ==================== Formulaire ruche ====================
+
+interface RucheFormData {
+  nom: string;
+  emplacement: string;
+  dateInstallation: string;
+  statut: Ruche["statut"];
+  notes: string;
+}
+
+function RucheForm({
+  initial,
+  onSubmit,
+  onCancel,
+  loading,
+}: {
+  initial?: Partial<RucheFormData>;
+  onSubmit: (data: RucheFormData) => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  const [form, setForm] = useState<RucheFormData>({
+    nom: initial?.nom ?? "",
+    emplacement: initial?.emplacement ?? "",
+    dateInstallation: initial?.dateInstallation ?? "",
+    statut: initial?.statut ?? "active",
+    notes: initial?.notes ?? "",
+  });
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Nom de la ruche *</label>
+          <input
+            type="text"
+            required
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={form.nom}
+            onChange={(e) => setForm((p) => ({ ...p, nom: e.target.value }))}
+            placeholder="Ex : Ruche 1"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
+          <select
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={form.statut}
+            onChange={(e) => setForm((p) => ({ ...p, statut: e.target.value as Ruche["statut"] }))}
+          >
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="perdue">Perdue</option>
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Emplacement</label>
+          <input
+            type="text"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={form.emplacement}
+            onChange={(e) => setForm((p) => ({ ...p, emplacement: e.target.value }))}
+            placeholder="Ex : Verger nord"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;installation</label>
+          <input
+            type="date"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={form.dateInstallation}
+            onChange={(e) => setForm((p) => ({ ...p, dateInstallation: e.target.value }))}
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+        <textarea
+          rows={2}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+          value={form.notes}
+          onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+          placeholder="Observations..."
+        />
+      </div>
+      <div className="flex justify-end gap-3 pt-2">
+        <button type="button" onClick={onCancel}
+          className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">
+          Annuler
+        </button>
+        <button type="submit" disabled={loading}
+          className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+          {loading ? "Enregistrement..." : "Enregistrer"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ==================== Formulaire récolte ====================
+
+interface RecolteFormData {
+  rucheId: string;
+  dateRecolte: string;
+  poidsKg: string;
+  type: RecolteMiel["type"] | "";
+  notes: string;
+}
+
+function RecolteForm({
+  ruches,
+  initial,
+  onSubmit,
+  onCancel,
+  loading,
+}: {
+  ruches: Ruche[];
+  initial?: Partial<RecolteFormData>;
+  onSubmit: (data: RecolteFormData) => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  const today = new Date().toISOString().split("T")[0];
+  const [form, setForm] = useState<RecolteFormData>({
+    rucheId: initial?.rucheId ?? "",
+    dateRecolte: initial?.dateRecolte ?? today,
+    poidsKg: initial?.poidsKg ?? "",
+    type: initial?.type ?? "",
+    notes: initial?.notes ?? "",
+  });
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="flex flex-col gap-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Date de récolte *</label>
+          <input
+            type="date"
+            required
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={form.dateRecolte}
+            onChange={(e) => setForm((p) => ({ ...p, dateRecolte: e.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Poids (kg) *</label>
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            required
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={form.poidsKg}
+            onChange={(e) => setForm((p) => ({ ...p, poidsKg: e.target.value }))}
+            placeholder="Ex : 12.5"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Ruche</label>
+          <select
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={form.rucheId}
+            onChange={(e) => setForm((p) => ({ ...p, rucheId: e.target.value }))}
+          >
+            <option value="">— Toutes ruches —</option>
+            {ruches.filter((r) => r.statut === "active").map((r) => (
+              <option key={r.id} value={r.id}>{r.nom}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Type de miel</label>
+          <select
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={form.type}
+            onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as RecolteMiel["type"] | "" }))}
+          >
+            <option value="">— Non spécifié —</option>
+            {(Object.entries(TYPE_MIEL_LABELS) as [NonNullable<RecolteMiel["type"]>, string][]).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+        <textarea
+          rows={2}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+          value={form.notes}
+          onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+          placeholder="Conditions, observations..."
+        />
+      </div>
+      <div className="flex justify-end gap-3 pt-2">
+        <button type="button" onClick={onCancel}
+          className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">
+          Annuler
+        </button>
+        <button type="submit" disabled={loading}
+          className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+          {loading ? "Enregistrement..." : "Enregistrer"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ==================== Page principale ====================
+
+export default function ApiculturePage() {
+  const { state } = useAppStore();
+  const { showToast } = useToast();
+  const { ruches, recolteMiel } = state;
+
+  const [tab, setTab] = useState<"dashboard" | "recoltes" | "ruches">("dashboard");
+  const [modalRuche, setModalRuche] = useState(false);
+  const [editRuche, setEditRuche] = useState<Ruche | null>(null);
+  const [deleteRucheTarget, setDeleteRucheTarget] = useState<Ruche | null>(null);
+  const [modalRecolte, setModalRecolte] = useState(false);
+  const [editRecolte, setEditRecolte] = useState<RecolteMiel | null>(null);
+  const [deleteRecolteTarget, setDeleteRecolteTarget] = useState<RecolteMiel | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  const thisMonth = now.getMonth();
+
+  // KPIs
+  const ruchesActives = ruches.filter((r) => r.statut === "active").length;
+  const totalMielKg = recolteMiel.reduce((s, r) => s + r.poidsKg, 0);
+  const mielCeMois = recolteMiel
+    .filter((r) => { const d = new Date(r.dateRecolte); return d.getMonth() === thisMonth && d.getFullYear() === thisYear; })
+    .reduce((s, r) => s + r.poidsKg, 0);
+  const mielCetteAnnee = recolteMiel
+    .filter((r) => new Date(r.dateRecolte).getFullYear() === thisYear)
+    .reduce((s, r) => s + r.poidsKg, 0);
+
+  // Rendement moyen par ruche active (cette année)
+  const rdtMoyenParRuche = ruchesActives > 0 && mielCetteAnnee > 0
+    ? mielCetteAnnee / ruchesActives
+    : null;
+
+  // Données mensuelles
+  const donneesMensuelles = useMemo(() =>
+    MOIS_LABELS.map((mois, idx) => {
+      const total = recolteMiel
+        .filter((r) => {
+          const d = new Date(r.dateRecolte);
+          return d.getMonth() === idx && d.getFullYear() === thisYear;
+        })
+        .reduce((s, r) => s + r.poidsKg, 0);
+      return { mois, kg: total || null };
+    }),
+  [recolteMiel, thisYear]);
+
+  // Répartition par ruche (cette année)
+  const parRuche = useMemo(() => {
+    const map: Record<string, number> = {};
+    recolteMiel
+      .filter((r) => new Date(r.dateRecolte).getFullYear() === thisYear)
+      .forEach((r) => {
+        const key = r.rucheId
+          ? (ruches.find((ru) => ru.id === r.rucheId)?.nom ?? r.rucheId)
+          : "Non attribué";
+        map[key] = (map[key] ?? 0) + r.poidsKg;
+      });
+    return Object.entries(map)
+      .map(([ruche, kg]) => ({ ruche, kg }))
+      .sort((a, b) => b.kg - a.kg);
+  }, [recolteMiel, ruches, thisYear]);
+
+  // Répartition par type (total)
+  const parType = useMemo(() => {
+    const map: Record<string, number> = {};
+    recolteMiel.forEach((r) => {
+      const key = r.type ? TYPE_MIEL_LABELS[r.type] : "Non spécifié";
+      map[key] = (map[key] ?? 0) + r.poidsKg;
+    });
+    return Object.entries(map).map(([type, kg]) => ({ type, kg })).sort((a, b) => b.kg - a.kg);
+  }, [recolteMiel]);
+
+  const recoltesTri = [...recolteMiel].sort(
+    (a, b) => new Date(b.dateRecolte).getTime() - new Date(a.dateRecolte).getTime()
+  );
+
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+  // ——— Handlers ruches ———
+  const handleCreateRuche = async (data: RucheFormData) => {
+    setSaving(true);
+    try {
+      const res = await createRuche({
+        nom: data.nom,
+        emplacement: data.emplacement || undefined,
+        dateInstallation: data.dateInstallation || undefined,
+        statut: data.statut,
+        notes: data.notes || undefined,
+      });
+      if (res.success) { showToast({ type: "success", title: "Ruche créée" }); setModalRuche(false); }
+      else showToast({ type: "error", title: "Erreur", message: res.error });
+    } finally { setSaving(false); }
+  };
+
+  const handleUpdateRuche = async (data: RucheFormData) => {
+    if (!editRuche) return;
+    setSaving(true);
+    try {
+      const res = await updateRuche(editRuche.id, {
+        nom: data.nom,
+        emplacement: data.emplacement || undefined,
+        dateInstallation: data.dateInstallation || undefined,
+        statut: data.statut,
+        notes: data.notes || undefined,
+      });
+      if (res.success) { showToast({ type: "success", title: "Ruche mise à jour" }); setEditRuche(null); }
+      else showToast({ type: "error", title: "Erreur", message: res.error });
+    } finally { setSaving(false); }
+  };
+
+  const handleDeleteRuche = async () => {
+    if (!deleteRucheTarget) return;
+    const res = await deleteRuche(deleteRucheTarget.id);
+    if (res.success) showToast({ type: "success", title: "Ruche supprimée" });
+    else showToast({ type: "error", title: "Erreur", message: res.error });
+    setDeleteRucheTarget(null);
+  };
+
+  // ——— Handlers récoltes ———
+  const handleCreateRecolte = async (data: RecolteFormData) => {
+    setSaving(true);
+    try {
+      const res = await createRecolte({
+        rucheId: data.rucheId || undefined,
+        dateRecolte: data.dateRecolte,
+        poidsKg: parseFloat(data.poidsKg),
+        type: (data.type || undefined) as RecolteMiel["type"],
+        notes: data.notes || undefined,
+      });
+      if (res.success) { showToast({ type: "success", title: "Récolte enregistrée" }); setModalRecolte(false); }
+      else showToast({ type: "error", title: "Erreur", message: res.error });
+    } finally { setSaving(false); }
+  };
+
+  const handleUpdateRecolte = async (data: RecolteFormData) => {
+    if (!editRecolte) return;
+    setSaving(true);
+    try {
+      const res = await updateRecolte(editRecolte.id, {
+        rucheId: data.rucheId || undefined,
+        dateRecolte: data.dateRecolte,
+        poidsKg: parseFloat(data.poidsKg),
+        type: (data.type || undefined) as RecolteMiel["type"],
+        notes: data.notes || undefined,
+      });
+      if (res.success) { showToast({ type: "success", title: "Récolte mise à jour" }); setEditRecolte(null); }
+      else showToast({ type: "error", title: "Erreur", message: res.error });
+    } finally { setSaving(false); }
+  };
+
+  const handleDeleteRecolte = async () => {
+    if (!deleteRecolteTarget) return;
+    const res = await deleteRecolte(deleteRecolteTarget.id);
+    if (res.success) showToast({ type: "success", title: "Récolte supprimée" });
+    else showToast({ type: "error", title: "Erreur", message: res.error });
+    setDeleteRecolteTarget(null);
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto">
+      {/* En-tête */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">🍯 Apiculture</h1>
+          <p className="text-gray-500 mt-1">Suivi des ruches et récoltes de miel</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setModalRecolte(true)}
+            className="px-4 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 cursor-pointer shadow-md"
+          >
+            + Récolte
+          </button>
+          <button
+            onClick={() => setModalRuche(true)}
+            className="px-4 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md"
+          >
+            + Ruche
+          </button>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <KpiCard label="Ruches actives" value={ruchesActives} subtitle={`${ruches.length} total`} borderColorClass="border-l-amber-500" valueColorClass="text-amber-600" />
+        <KpiCard label="Miel ce mois" value={mielCeMois > 0 ? `${mielCeMois.toFixed(1)} kg` : "—"} borderColorClass="border-l-yellow-500" valueColorClass="text-yellow-600" />
+        <KpiCard label={`Miel ${thisYear}`} value={mielCetteAnnee > 0 ? `${mielCetteAnnee.toFixed(1)} kg` : "—"} borderColorClass="border-l-orange-500" valueColorClass="text-orange-600" />
+        <KpiCard label="Total récolté" value={totalMielKg > 0 ? `${totalMielKg.toFixed(1)} kg` : "—"} subtitle="toutes saisons" borderColorClass="border-l-green-500" valueColorClass="text-green-600" />
+      </div>
+
+      {/* Onglets */}
+      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl w-fit">
+        {(["dashboard", "recoltes", "ruches"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+              tab === t ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {t === "dashboard" ? "📊 Graphiques" : t === "recoltes" ? "🍯 Récoltes" : "🐝 Ruches"}
+          </button>
+        ))}
+      </div>
+
+      {/* ——— TAB DASHBOARD ——— */}
+      {tab === "dashboard" && (
+        <div className="space-y-6">
+          {recolteMiel.length === 0 ? (
+            <div className="text-center py-16 text-gray-400">
+              <div className="text-5xl mb-3">🍯</div>
+              <p className="text-lg font-medium">Aucune récolte enregistrée</p>
+              <p className="text-sm mt-1">Cliquez sur &quot;+ Récolte&quot; pour commencer.</p>
+            </div>
+          ) : (
+            <>
+              {/* Graphique mensuel */}
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                  Récoltes {thisYear} — par mois (kg)
+                </p>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={donneesMensuelles} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="mois" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} unit=" kg" />
+                    <Tooltip formatter={(v: unknown) => v != null ? `${Number(v).toFixed(1)} kg` : "—"} />
+                    <Bar dataKey="kg" name="Miel récolté" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Répartition par ruche */}
+              {parRuche.length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                    Par ruche — {thisYear} (kg)
+                  </p>
+                  <ResponsiveContainer width="100%" height={Math.max(180, parRuche.length * 40)}>
+                    <BarChart data={parRuche} layout="vertical" margin={{ top: 4, right: 30, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 11 }} unit=" kg" />
+                      <YAxis type="category" dataKey="ruche" tick={{ fontSize: 12 }} width={90} />
+                      <Tooltip formatter={(v: unknown) => `${Number(v).toFixed(1)} kg`} />
+                      <Bar dataKey="kg" name="Miel" fill="#d97706" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Répartition par type + stats ruches */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {parType.length > 0 && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Par type de miel</p>
+                    <div className="space-y-2">
+                      {parType.map(({ type, kg }) => {
+                        const pct = totalMielKg > 0 ? (kg / totalMielKg) * 100 : 0;
+                        return (
+                          <div key={type}>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="text-gray-700 font-medium">{type}</span>
+                              <span className="text-gray-500">{kg.toFixed(1)} kg · {pct.toFixed(0)}%</span>
+                            </div>
+                            <div className="w-full bg-gray-100 rounded-full h-2">
+                              <div className="h-2 rounded-full bg-amber-400 transition-all" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Rendement ruches */}
+                {rdtMoyenParRuche != null && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Rendement {thisYear}</p>
+                    <div className="flex flex-col gap-3">
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                        <p className="text-xs text-amber-600 font-medium">Moy. par ruche active</p>
+                        <p className="text-2xl font-bold text-amber-700 mt-0.5">{rdtMoyenParRuche.toFixed(1)} kg</p>
+                      </div>
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
+                        <p className="text-xs text-yellow-600 font-medium">Total {thisYear}</p>
+                        <p className="text-2xl font-bold text-yellow-700 mt-0.5">{mielCetteAnnee.toFixed(1)} kg</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Évolution multi-années si données suffisantes */}
+              {recolteMiel.length >= 5 && (() => {
+                const years = [...new Set(recolteMiel.map((r) => new Date(r.dateRecolte).getFullYear()))].sort();
+                if (years.length < 2) return null;
+                const data = MOIS_LABELS.map((mois, idx) => {
+                  const obj: Record<string, number | string> = { mois };
+                  years.forEach((y) => {
+                    obj[String(y)] = recolteMiel
+                      .filter((r) => { const d = new Date(r.dateRecolte); return d.getMonth() === idx && d.getFullYear() === y; })
+                      .reduce((s, r) => s + r.poidsKg, 0) || 0;
+                  });
+                  return obj;
+                });
+                const COLORS = ["#f59e0b", "#10b981", "#6366f1", "#ef4444", "#3b82f6"];
+                return (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Comparaison annuelle (kg/mois)</p>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={data} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                        <XAxis dataKey="mois" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} unit=" kg" />
+                        <Tooltip formatter={(v: unknown) => `${Number(v).toFixed(1)} kg`} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        {years.map((y, i) => (
+                          <Line key={y} type="monotone" dataKey={String(y)} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })()}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ——— TAB RÉCOLTES ——— */}
+      {tab === "recoltes" && (
+        <div className="space-y-3">
+          {recoltesTri.length === 0 ? (
+            <div className="text-center py-16 text-gray-400">
+              <div className="text-5xl mb-3">🍯</div>
+              <p className="text-lg font-medium">Aucune récolte</p>
+              <p className="text-sm mt-1">Cliquez sur &quot;+ Récolte&quot; pour ajouter.</p>
+            </div>
+          ) : recoltesTri.map((r) => {
+            const ruche = ruches.find((ru) => ru.id === r.rucheId);
+            return (
+              <div key={r.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-base font-bold text-amber-700">{r.poidsKg.toFixed(1)} kg</span>
+                    {r.type && (
+                      <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${TYPE_MIEL_COLORS[r.type]}`}>
+                        {TYPE_MIEL_LABELS[r.type]}
+                      </span>
+                    )}
+                    <span className="text-sm text-gray-500">{formatDate(r.dateRecolte)}</span>
+                  </div>
+                  <div className="mt-0.5 text-sm text-gray-600">
+                    {ruche ? <span className="font-medium">🐝 {ruche.nom}</span> : <span className="text-gray-400">Ruche non attribuée</span>}
+                  </div>
+                  {r.notes && <div className="mt-0.5 text-xs text-gray-400 italic truncate">{r.notes}</div>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => setEditRecolte(r)}
+                    className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
+                    ✏️
+                  </button>
+                  <button onClick={() => setDeleteRecolteTarget(r)}
+                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors" title="Supprimer">
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ——— TAB RUCHES ——— */}
+      {tab === "ruches" && (
+        <div className="space-y-3">
+          {ruches.length === 0 ? (
+            <div className="text-center py-16 text-gray-400">
+              <div className="text-5xl mb-3">🐝</div>
+              <p className="text-lg font-medium">Aucune ruche</p>
+              <p className="text-sm mt-1">Cliquez sur &quot;+ Ruche&quot; pour en ajouter.</p>
+            </div>
+          ) : ruches.map((r) => {
+            const totalKg = recolteMiel.filter((rec) => rec.rucheId === r.id).reduce((s, rec) => s + rec.poidsKg, 0);
+            const statutColor = r.statut === "active" ? "bg-green-100 text-green-800" : r.statut === "inactive" ? "bg-gray-100 text-gray-600" : "bg-red-100 text-red-700";
+            const statutLabel = r.statut === "active" ? "Active" : r.statut === "inactive" ? "Inactive" : "Perdue";
+            return (
+              <div key={r.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-xl shrink-0">🐝</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-gray-900">{r.nom}</span>
+                    <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${statutColor}`}>{statutLabel}</span>
+                  </div>
+                  <div className="mt-0.5 text-sm text-gray-500 flex gap-3">
+                    {r.emplacement && <span>📍 {r.emplacement}</span>}
+                    {totalKg > 0 && <span className="font-medium text-amber-700">🍯 {totalKg.toFixed(1)} kg total</span>}
+                    {r.dateInstallation && <span>Installée le {formatDate(r.dateInstallation)}</span>}
+                  </div>
+                  {r.notes && <div className="mt-0.5 text-xs text-gray-400 italic truncate">{r.notes}</div>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => setEditRuche(r)}
+                    className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
+                    ✏️
+                  </button>
+                  <button onClick={() => setDeleteRucheTarget(r)}
+                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors" title="Supprimer">
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Modals ruches */}
+      <Modal isOpen={modalRuche} onClose={() => setModalRuche(false)} title="Nouvelle ruche">
+        <RucheForm onSubmit={handleCreateRuche} onCancel={() => setModalRuche(false)} loading={saving} />
+      </Modal>
+      <Modal isOpen={!!editRuche} onClose={() => setEditRuche(null)} title="Modifier la ruche">
+        {editRuche && (
+          <RucheForm
+            initial={{ nom: editRuche.nom, emplacement: editRuche.emplacement, dateInstallation: editRuche.dateInstallation, statut: editRuche.statut, notes: editRuche.notes }}
+            onSubmit={handleUpdateRuche} onCancel={() => setEditRuche(null)} loading={saving}
+          />
+        )}
+      </Modal>
+      <ConfirmModal isOpen={!!deleteRucheTarget} onClose={() => setDeleteRucheTarget(null)} onConfirm={handleDeleteRuche}
+        title="Supprimer la ruche" message={`Supprimer <strong>${deleteRucheTarget?.nom ?? ""}</strong> ?`} confirmText="Supprimer" danger />
+
+      {/* Modals récoltes */}
+      <Modal isOpen={modalRecolte} onClose={() => setModalRecolte(false)} title="Nouvelle récolte de miel">
+        <RecolteForm ruches={ruches} onSubmit={handleCreateRecolte} onCancel={() => setModalRecolte(false)} loading={saving} />
+      </Modal>
+      <Modal isOpen={!!editRecolte} onClose={() => setEditRecolte(null)} title="Modifier la récolte">
+        {editRecolte && (
+          <RecolteForm
+            ruches={ruches}
+            initial={{ rucheId: editRecolte.rucheId ?? "", dateRecolte: editRecolte.dateRecolte, poidsKg: String(editRecolte.poidsKg), type: editRecolte.type ?? "", notes: editRecolte.notes ?? "" }}
+            onSubmit={handleUpdateRecolte} onCancel={() => setEditRecolte(null)} loading={saving}
+          />
+        )}
+      </Modal>
+      <ConfirmModal isOpen={!!deleteRecolteTarget} onClose={() => setDeleteRecolteTarget(null)} onConfirm={handleDeleteRecolte}
+        title="Supprimer la récolte" message={`Supprimer la récolte du <strong>${deleteRecolteTarget ? formatDate(deleteRecolteTarget.dateRecolte) : ""}</strong> (${deleteRecolteTarget?.poidsKg ?? 0} kg) ?`} confirmText="Supprimer" danger />
+    </div>
+  );
+}

@@ -8,6 +8,7 @@ import {
   ClipboardList,
   PawPrint,
   Syringe,
+  Flower,
   Wheat,
   Map,
   Truck,
@@ -38,6 +39,7 @@ const sections = [
     title: "Culture",
     items: [
       { icon: Wheat, label: "Fourrage",    route: "/fourrage" },
+      { icon: Flower, label: "Apiculture",  route: "/apiculture" },
       { icon: Map,   label: "Parcellaire", route: "/fourrage/partiels" },
     ],
   },
