@@ -18,12 +18,13 @@ import {
   ChevronRight,
   AlertCircle,
   Clock,
+  FlowerIcon,
 } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { state } = useAppStore();
-  const { stats, alertes, vehicles, maintenanceAlerts, taches, animaux, activitesFourrage } = state;
+  const { stats, alertes, vehicles, maintenanceAlerts, taches, animaux, activitesFourrage, ventesMiel, couts } = state;
 
   const vehicleStats = useMemo(() => getVehicleStats(vehicles), [vehicles]);
   const urgentTasks  = useMemo(() => getUrgentTasks(taches, 5), [taches]);
@@ -54,6 +55,19 @@ export default function DashboardPage() {
   const foinPct = objectifFoinTonnes > 0
     ? Math.min(100, Math.round((foinsRecoltesTonnes / objectifFoinTonnes) * 100))
     : 0;
+
+  // ——— Apiculture stats ———
+  const thisYear = new Date().getFullYear().toString();
+  const caMielAnnee = useMemo(() =>
+    ventesMiel.filter((v) => v.dateVente?.startsWith(thisYear)).reduce((s, v) => s + v.prixTotal, 0),
+  [ventesMiel, thisYear]);
+  const depensesApiAnnee = useMemo(() =>
+    couts
+      .filter((t) => t.operation === "Dépenses" && t.date?.startsWith(thisYear) &&
+        (t.production?.toLowerCase().includes("apicult") || t.production?.toLowerCase().includes("miel") || t.production?.toLowerCase().includes("abeill")))
+      .reduce((s, t) => s + t.montant, 0),
+  [couts, thisYear]);
+  const balanceMiel = caMielAnnee - depensesApiAnnee;
 
   return (
     <div className="space-y-6 fade-in">
@@ -205,6 +219,38 @@ export default function DashboardPage() {
                   Il manque <span className="text-stone-600 font-medium">{(objectifFoinTonnes - foinsRecoltesTonnes).toFixed(1)} t</span> pour atteindre l'objectif
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Widget Apiculture */}
+          {(caMielAnnee > 0 || depensesApiAnnee > 0) && (
+            <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
+              <button
+                onClick={() => router.push("/apiculture")}
+                className="w-full flex items-center justify-between px-5 py-3.5 border-b border-stone-100 hover:bg-stone-50 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <FlowerIcon className="w-4 h-4 text-stone-400" />
+                  <span className="text-[13px] font-semibold text-stone-800">Apiculture {new Date().getFullYear()}</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-stone-400" />
+              </button>
+              <div className="px-5 py-4 grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <p className="text-[10px] text-stone-400 font-medium uppercase tracking-wide">CA miel</p>
+                  <p className="text-[15px] font-bold text-green-700 mt-0.5">{formatCurrency(caMielAnnee)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-stone-400 font-medium uppercase tracking-wide">Coûts</p>
+                  <p className="text-[15px] font-bold text-red-500 mt-0.5">{formatCurrency(depensesApiAnnee)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-stone-400 font-medium uppercase tracking-wide">Balance</p>
+                  <p className={`text-[15px] font-bold mt-0.5 ${balanceMiel >= 0 ? "text-brand-600" : "text-red-500"}`}>
+                    {balanceMiel >= 0 ? "+" : ""}{formatCurrency(balanceMiel)}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 

@@ -294,9 +294,9 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
 export default function ApiculturePage() {
   const { state } = useAppStore();
   const { showToast } = useToast();
-  const { ruches, recolteMiel, ventesMiel } = state;
+  const { ruches, recolteMiel, ventesMiel, couts } = state;
 
-  const [tab, setTab] = useState<"dashboard" | "recoltes" | "ventes" | "ruches">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "recoltes" | "ventes" | "balance" | "ruches">("dashboard");
   const [modalRuche, setModalRuche] = useState(false);
   const [editRuche, setEditRuche] = useState<Ruche | null>(null);
   const [deleteRucheTarget, setDeleteRucheTarget] = useState<Ruche | null>(null);
@@ -333,6 +333,35 @@ export default function ApiculturePage() {
   const rdtMoyenParRuche = ruchesActives > 0 && mielCetteAnnee > 0
     ? mielCetteAnnee / ruchesActives
     : null;
+
+  // ——— Balance apiculture (transactions taguées "Apiculture") ———
+  const coutsApiculture = useMemo(() =>
+    couts.filter((t) => t.production?.toLowerCase().includes("apicult") || t.production?.toLowerCase().includes("miel") || t.production?.toLowerCase().includes("abeill")),
+  [couts]);
+
+  const depensesApiculture = useMemo(() =>
+    coutsApiculture.filter((t) => t.operation === "Dépenses").reduce((s, t) => s + t.montant, 0),
+  [coutsApiculture]);
+
+  const revenusTransacApiculture = useMemo(() =>
+    coutsApiculture.filter((t) => t.operation === "Revenus").reduce((s, t) => s + t.montant, 0),
+  [coutsApiculture]);
+
+  // Revenus totaux apiculture = ventes miel + revenus transactions taguées
+  const revenusApicultureTotal = caTotal + revenusTransacApiculture;
+  const balanceApiculture = revenusApicultureTotal - depensesApiculture;
+
+  // Par catégorie de dépense
+  const depensesParCategorie = useMemo(() => {
+    const map: Record<string, number> = {};
+    coutsApiculture
+      .filter((t) => t.operation === "Dépenses")
+      .forEach((t) => {
+        const key = t.categorie || "Non catégorisé";
+        map[key] = (map[key] ?? 0) + t.montant;
+      });
+    return Object.entries(map).map(([cat, montant]) => ({ cat, montant })).sort((a, b) => b.montant - a.montant);
+  }, [coutsApiculture]);
 
   // ——— Analytics ———
   const donneesMensuelles = useMemo(() =>
@@ -500,11 +529,11 @@ export default function ApiculturePage() {
       </div>
 
       {/* Onglets */}
-      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl w-fit">
-        {(["dashboard", "ventes", "recoltes", "ruches"] as const).map((t) => (
+      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl flex-wrap">
+        {(["dashboard", "ventes", "balance", "recoltes", "ruches"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${tab === t ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>
-            {t === "dashboard" ? "📊 Graphiques" : t === "ventes" ? "💰 Ventes" : t === "recoltes" ? "🍯 Récoltes" : "🐝 Ruches"}
+            {t === "dashboard" ? "📊 Graphiques" : t === "ventes" ? "💰 Ventes" : t === "balance" ? "⚖️ Balance" : t === "recoltes" ? "🍯 Récoltes" : "🐝 Ruches"}
           </button>
         ))}
       </div>
@@ -740,6 +769,119 @@ export default function ApiculturePage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ——— TAB BALANCE ——— */}
+      {tab === "balance" && (
+        <div className="space-y-5">
+
+          {/* Résumé balance */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Revenus apiculture</p>
+              <p className="text-2xl font-bold text-green-700">{formatEur(revenusApicultureTotal)}</p>
+              <div className="mt-2 space-y-1 text-xs text-gray-500">
+                <div className="flex justify-between"><span>Ventes miel</span><span className="font-medium text-green-600">+{formatEur(caTotal)}</span></div>
+                {revenusTransacApiculture > 0 && <div className="flex justify-between"><span>Autres revenus</span><span className="font-medium text-green-600">+{formatEur(revenusTransacApiculture)}</span></div>}
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Coûts apiculture</p>
+              <p className="text-2xl font-bold text-red-600">{formatEur(depensesApiculture)}</p>
+              {depensesParCategorie.length > 0 && (
+                <div className="mt-2 space-y-1 text-xs text-gray-500">
+                  {depensesParCategorie.slice(0, 3).map(({ cat, montant }) => (
+                    <div key={cat} className="flex justify-between">
+                      <span className="truncate max-w-[120px]">{cat}</span>
+                      <span className="font-medium text-red-500">−{formatEur(montant)}</span>
+                    </div>
+                  ))}
+                  {depensesParCategorie.length > 3 && <p className="text-gray-400 italic">+{depensesParCategorie.length - 3} autres catégories</p>}
+                </div>
+              )}
+            </div>
+            <div className={`rounded-xl shadow-sm border p-5 ${balanceApiculture >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Balance nette</p>
+              <p className={`text-2xl font-bold ${balanceApiculture >= 0 ? "text-green-700" : "text-red-700"}`}>
+                {balanceApiculture >= 0 ? "+" : ""}{formatEur(balanceApiculture)}
+              </p>
+              <p className="text-xs text-gray-500 mt-2">
+                {balanceApiculture >= 0 ? "✓ Activité bénéficiaire" : "⚠ Investissement en cours"}
+              </p>
+              {depensesApiculture > 0 && revenusApicultureTotal > 0 && (
+                <div className="mt-3">
+                  <div className="text-xs text-gray-400 mb-1">Taux de retour</div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full ${balanceApiculture >= 0 ? "bg-green-500" : "bg-red-400"}`}
+                      style={{ width: `${Math.min(100, (revenusApicultureTotal / depensesApiculture) * 100).toFixed(0)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1 text-right">
+                    {((revenusApicultureTotal / depensesApiculture) * 100).toFixed(0)}% des coûts couverts
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Répartition dépenses par catégorie */}
+          {depensesParCategorie.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Dépenses par catégorie</p>
+              <div className="space-y-3">
+                {depensesParCategorie.map(({ cat, montant }) => {
+                  const pct = depensesApiculture > 0 ? (montant / depensesApiculture) * 100 : 0;
+                  return (
+                    <div key={cat}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="font-medium text-gray-700">{cat}</span>
+                        <span className="text-gray-500">{formatEur(montant)} · {pct.toFixed(0)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2">
+                        <div className="h-2 rounded-full bg-red-400 transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Liste détaillée des transactions */}
+          {coutsApiculture.length > 0 ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-gray-100">
+                <p className="text-[13px] font-semibold text-gray-800">Transactions liées à l&apos;apiculture</p>
+                <p className="text-xs text-gray-400 mt-0.5">Transactions avec production "Apiculture", "Miel" ou "Abeille"</p>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {[...coutsApiculture]
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .map((t) => (
+                    <div key={t.id} className="flex items-center gap-3 px-5 py-3">
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.operation === "Revenus" ? "bg-green-400" : "bg-red-400"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{t.produit || t.categorie}</p>
+                        <p className="text-xs text-gray-400">{formatDate(t.date)} · {t.categorie}{t.sousCategorie ? ` › ${t.sousCategorie}` : ""}</p>
+                      </div>
+                      <span className={`text-sm font-semibold shrink-0 ${t.operation === "Revenus" ? "text-green-600" : "text-red-500"}`}>
+                        {t.operation === "Revenus" ? "+" : "−"}{formatEur(t.montant)}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+              <p className="text-4xl mb-3">💸</p>
+              <p className="text-base font-medium text-gray-700">Aucune transaction liée à l&apos;apiculture</p>
+              <p className="text-sm text-gray-400 mt-1">
+                Dans <strong>Coûts</strong>, taguez vos dépenses avec la production <strong>&quot;Apiculture&quot;</strong> pour les voir apparaître ici.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
