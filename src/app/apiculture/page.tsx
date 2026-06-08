@@ -483,14 +483,14 @@ export default function ApiculturePage() {
         nbPots1kg: parseInt(data.nbPots1kg) || 0,
         prixTotal: parseFloat(data.prixTotal),
         notes: data.notes || undefined,
-      });
+      }, editVente);
       if (res.success) { showToast({ type: "success", title: "Vente mise à jour" }); setEditVente(null); }
       else showToast({ type: "error", title: "Erreur", message: res.error });
     } finally { setSaving(false); }
   };
   const handleDeleteVente = async () => {
     if (!deleteVenteTarget) return;
-    const res = await deleteVente(deleteVenteTarget.id);
+    const res = await deleteVente(deleteVenteTarget.id, deleteVenteTarget.transactionId);
     if (res.success) showToast({ type: "success", title: "Vente supprimée" });
     else showToast({ type: "error", title: "Erreur", message: res.error });
     setDeleteVenteTarget(null);

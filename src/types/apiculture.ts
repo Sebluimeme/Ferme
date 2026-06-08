@@ -23,10 +23,11 @@ export interface RecolteMiel {
 export interface VenteMiel {
   id: string;
   dateVente: string;
-  nbPots500g: number;   // pots de 0,5 kg
-  nbPots1kg: number;    // pots de 1 kg
-  prixTotal: number;    // € encaissés
+  nbPots500g: number;
+  nbPots1kg: number;
+  prixTotal: number;
   notes?: string;
+  transactionId?: string;  // ID de la Transaction miroir dans "transactions"
   dateCreation?: string;
   derniereMAJ?: string;
 }
