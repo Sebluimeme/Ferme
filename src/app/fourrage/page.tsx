@@ -318,14 +318,14 @@ function BottesForm({
 
 // ==================== Page principale ====================
 
-const DUREE_STABULATION = 180;
+const DUREE_STABULATION = 120; // mi-novembre à mi-mars (~120 jours, variable selon neige)
 const MOIS_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
 const CONSO_KG_JOUR: Record<string, number> = {
-  bovin: 9,
-  ovin: 2,
-  caprin: 1.8,
-  porcin: 0,
-  equin: 10,
+  bovin: 8,   // ~8 kg/j (vache/taureau/veau en moyenne) — calibré sur conso réelle
+  ovin: 2,    // ~2 kg/j
+  caprin: 1.8, // ~1.8 kg/j
+  porcin: 0,  // pas de foin
+  equin: 8,   // ~8 kg/j (pur-sang arabe ~450kg / Haflinger ~550kg)
 };
 
 export default function FourragePage() {
