@@ -279,6 +279,7 @@ export function getVehicleStats(vehicles: Vehicle[]): VehicleStats {
 // ==================== Helpers ====================
 
 export function getVehicleDisplayName(vehicle: Vehicle): string {
+  if (vehicle.nom) return vehicle.nom;
   if (vehicle.plaqueImmatriculation) return vehicle.plaqueImmatriculation;
   if (vehicle.marque && vehicle.modele) return `${vehicle.marque} ${vehicle.modele}`;
   if (vehicle.marque) return vehicle.marque;

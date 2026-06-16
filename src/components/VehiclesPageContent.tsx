@@ -31,7 +31,7 @@ export default function VehiclesPageContent() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<VehicleType | "">("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("actif");
 
   const formRef = useRef<HTMLFormElement | null>(null);
 

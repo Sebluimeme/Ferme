@@ -14,6 +14,7 @@ export interface Vehicle {
   id: string;                          // ID Firebase auto-généré
 
   // Identification
+  nom?: string;                        // Nom d'affichage libre (ex: "Tractopelle JCB")
   type: VehicleType;                   // Type de véhicule
   marque?: string;                     // Marque (Renault, John Deere, etc.)
   modele?: string;                     // Modèle
