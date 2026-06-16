@@ -320,13 +320,52 @@ function BottesForm({
 
 const DUREE_STABULATION = 120; // mi-novembre à mi-mars (~120 jours, variable selon neige)
 const MOIS_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
-const CONSO_KG_JOUR: Record<string, number> = {
-  bovin: 8,   // ~8 kg/j (vache/taureau/veau en moyenne) — calibré sur conso réelle
-  ovin: 2,    // ~2 kg/j
-  caprin: 1.8, // ~1.8 kg/j
-  porcin: 0,  // pas de foin
-  equin: 8,   // ~8 kg/j (pur-sang arabe ~450kg / Haflinger ~550kg)
-};
+
+/**
+ * Consommation de foin en kg/jour selon l'espèce et l'âge en mois à la stabulation.
+ * Tranches calibrées sur conso réelle (10t pour 6 bovins + 2 équins + 10 ovins sur 120j).
+ */
+function getConsoKgJour(type: string, ageMois: number | null): number {
+  switch (type) {
+    case "bovin":
+      if (ageMois === null) return 8;
+      if (ageMois < 3)  return 1;   // veau sous la mère, mange peu
+      if (ageMois < 9)  return 3;   // veau sevré
+      if (ageMois < 18) return 5;   // jeune bovin
+      return 8;                     // adulte — calibré sur données réelles
+    case "ovin":
+      if (ageMois === null) return 2;
+      if (ageMois < 3)  return 0.4; // agneau sous la mère
+      if (ageMois < 9)  return 1;   // agneau sevré
+      return 2;                     // adulte
+    case "caprin":
+      if (ageMois === null) return 1.8;
+      if (ageMois < 3)  return 0.4;
+      if (ageMois < 9)  return 0.9;
+      return 1.8;
+    case "equin":
+      if (ageMois === null) return 8;
+      if (ageMois < 6)  return 2;
+      if (ageMois < 18) return 5;
+      return 8;                     // adulte (pur-sang arabe + Haflinger)
+    case "porcin":
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+/** Âge en mois à la date de début de stabulation (15 novembre de l'année courante) */
+function ageMoisAStabulation(dateNaissance: string | undefined): number | null {
+  if (!dateNaissance) return null;
+  const naissance = new Date(dateNaissance);
+  if (isNaN(naissance.getTime())) return null;
+  const now = new Date();
+  const debutStab = new Date(now.getMonth() >= 10 ? now.getFullYear() : now.getFullYear() - 1, 10, 15);
+  const diffMs = debutStab.getTime() - naissance.getTime();
+  if (diffMs < 0) return 0;
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
+}
 
 export default function FourragePage() {
   const { state } = useAppStore();
@@ -354,7 +393,10 @@ export default function FourragePage() {
 
   // Objectif foin basé sur les animaux actifs
   const animauxActifs = state.animaux.filter((a) => a.statut === "actif");
-  const objectifFoinKg = animauxActifs.reduce((sum, a) => sum + (CONSO_KG_JOUR[a.type] ?? 0) * DUREE_STABULATION, 0);
+  const objectifFoinKg = animauxActifs.reduce((sum, a) => {
+    const age = ageMoisAStabulation(a.dateNaissance);
+    return sum + getConsoKgJour(a.type, age) * DUREE_STABULATION;
+  }, 0);
   const objectifFoinT = objectifFoinKg / 1000;
 
   const foinsRecoltesT = activitesFourrage
@@ -365,11 +407,13 @@ export default function FourragePage() {
   const manquantT = Math.max(0, objectifFoinT - foinsRecoltesT);
 
   type AnimalType = "bovin" | "ovin" | "caprin" | "equin" | "porcin";
-  const detailParType = (["bovin", "ovin", "caprin", "equin"] as AnimalType[]).map((type) => ({
-    type,
-    count: animauxActifs.filter((a) => a.type === type).length,
-    conso: CONSO_KG_JOUR[type],
-  })).filter((d) => d.count > 0);
+  const detailParType = (["bovin", "ovin", "caprin", "equin"] as AnimalType[]).map((type) => {
+    const animauxDuType = animauxActifs.filter((a) => a.type === type);
+    const consoMoyenne = animauxDuType.length > 0
+      ? animauxDuType.reduce((s, a) => s + getConsoKgJour(a.type, ageMoisAStabulation(a.dateNaissance)), 0) / animauxDuType.length
+      : getConsoKgJour(type, null);
+    return { type, count: animauxDuType.length, conso: consoMoyenne };
+  }).filter((d) => d.count > 0);
 
   const activitesTri = [...activitesFourrage].sort(
     (a, b) => new Date(b.dateActivite).getTime() - new Date(a.dateActivite).getTime()
