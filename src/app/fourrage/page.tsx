@@ -80,8 +80,6 @@ function ActiviteForm({
   const poidsTotalT = form.nombreBottes && form.poidsBotteKg
     ? (parseInt(form.nombreBottes) * parseFloat(form.poidsBotteKg)) / 1000
     : null;
-  const [viewMode, setViewMode] = useState<"list" | "map">("list");
-
   const togglePartiel = (id: string) => {
     setForm((prev) => ({
       ...prev,
@@ -127,55 +125,17 @@ function ActiviteForm({
       </div>
 
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700">Parcelles concernées</label>
-          {partiels.length > 0 && (
-            <div className="flex rounded-lg overflow-hidden border border-gray-300 text-xs">
-              <button
-                type="button"
-                onClick={() => setViewMode("list")}
-                className={`px-3 py-1 font-medium cursor-pointer transition-colors ${
-                  viewMode === "list" ? "bg-primary text-white" : "bg-white text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                Liste
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode("map")}
-                className={`px-3 py-1 font-medium cursor-pointer border-l border-gray-300 transition-colors ${
-                  viewMode === "map" ? "bg-primary text-white" : "bg-white text-gray-600 hover:bg-gray-50"
-                }`}
-              >
-                🗺️ Carte
-              </button>
-            </div>
-          )}
-        </div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Parcelles concernées</label>
         {partiels.length === 0 ? (
           <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             Aucune parcelle créée — allez dans <strong>Parcellaire</strong> pour en ajouter.
           </p>
-        ) : viewMode === "map" ? (
+        ) : (
           <ParcelSelectorMap
             partiels={partiels}
             selectedIds={form.parcelIds}
             onToggle={togglePartiel}
           />
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            {partiels.map((p) => (
-              <label key={p.id} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.parcelIds.includes(p.id)}
-                  onChange={() => togglePartiel(p.id)}
-                  className="accent-primary"
-                />
-                <span className="text-sm text-gray-700">{p.nom}</span>
-              </label>
-            ))}
-          </div>
         )}
       </div>
 
