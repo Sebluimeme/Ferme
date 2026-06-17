@@ -355,15 +355,19 @@ function getConsoKgJour(type: string, ageMois: number | null): number {
   }
 }
 
-/** Âge en mois à la date de début de stabulation (15 novembre de l'année courante) */
+/** Âge en mois à la date de début de la PROCHAINE stabulation (15 novembre).
+ *  Si on est déjà en novembre ou après → on planifie pour l'année suivante.
+ *  Ainsi les veaux nés cette année sont évalués avec leur âge réel à la mise en stabulation.
+ */
 function ageMoisAStabulation(dateNaissance: string | undefined): number | null {
   if (!dateNaissance) return null;
   const naissance = new Date(dateNaissance);
   if (isNaN(naissance.getTime())) return null;
   const now = new Date();
-  const debutStab = new Date(now.getMonth() >= 10 ? now.getFullYear() : now.getFullYear() - 1, 10, 15);
+  // Prochaine stabulation : 15 novembre de cette année si on est avant nov, sinon l'an prochain
+  const debutStab = new Date(now.getMonth() < 10 ? now.getFullYear() : now.getFullYear() + 1, 10, 15);
   const diffMs = debutStab.getTime() - naissance.getTime();
-  if (diffMs < 0) return 0;
+  if (diffMs < 0) return 0; // animal pas encore né à la stabulation → veau sous la mère
   return Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
 }
 

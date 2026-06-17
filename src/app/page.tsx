@@ -35,8 +35,8 @@ export default function DashboardPage() {
     [maintenanceAlerts]
   );
 
-  const CONSO_KG_JOUR: Record<string, number> = { ovin: 2, bovin: 9, caprin: 1.8, porcin: 0, equin: 10 };
-  const DUREE_STABULATION = 180;
+  const CONSO_KG_JOUR: Record<string, number> = { ovin: 2, bovin: 8, caprin: 1.8, porcin: 0, equin: 8 };
+  const DUREE_STABULATION = 120;
 
   const objectifFoinTonnes = useMemo(() => {
     const actifs = animaux.filter((a) => a.statut === "actif");
