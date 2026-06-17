@@ -35,12 +35,53 @@ export default function DashboardPage() {
     [maintenanceAlerts]
   );
 
-  const CONSO_KG_JOUR: Record<string, number> = { ovin: 2, bovin: 9, caprin: 1.8, porcin: 0, equin: 10 };
   const DUREE_STABULATION = 120;
+
+  // Même logique que fourrage/page.tsx : conso selon espèce + âge à la prochaine stabulation
+  function getConsoKgJour(type: string, ageMois: number | null): number {
+    switch (type) {
+      case "bovin":
+        if (ageMois === null) return 9;
+        if (ageMois < 3)  return 1;
+        if (ageMois < 9)  return 3;
+        if (ageMois < 18) return 5;
+        return 9;
+      case "ovin":
+        if (ageMois === null) return 2;
+        if (ageMois < 3)  return 0.4;
+        if (ageMois < 9)  return 1;
+        return 2;
+      case "caprin":
+        if (ageMois === null) return 1.8;
+        if (ageMois < 3)  return 0.4;
+        if (ageMois < 9)  return 0.9;
+        return 1.8;
+      case "equin":
+        if (ageMois === null) return 10;
+        if (ageMois < 6)  return 2;
+        if (ageMois < 18) return 5;
+        return 10;
+      default: return 0;
+    }
+  }
+
+  function ageMoisAStabulation(dateNaissance: string | undefined): number | null {
+    if (!dateNaissance) return null;
+    const naissance = new Date(dateNaissance);
+    if (isNaN(naissance.getTime())) return null;
+    const now = new Date();
+    const debutStab = new Date(now.getMonth() < 10 ? now.getFullYear() : now.getFullYear() + 1, 10, 15);
+    const diffMs = debutStab.getTime() - naissance.getTime();
+    if (diffMs < 0) return 0;
+    return Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
+  }
 
   const objectifFoinTonnes = useMemo(() => {
     const actifs = animaux.filter((a) => a.statut === "actif");
-    const kg = actifs.reduce((sum, a) => sum + (CONSO_KG_JOUR[a.type] ?? 0) * DUREE_STABULATION, 0);
+    const kg = actifs.reduce((sum, a) => {
+      const age = ageMoisAStabulation(a.dateNaissance);
+      return sum + getConsoKgJour(a.type, age) * DUREE_STABULATION;
+    }, 0);
     return Math.round(kg / 100) / 10;
   }, [animaux]);
 
