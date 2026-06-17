@@ -328,11 +328,11 @@ const MOIS_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "
 function getConsoKgJour(type: string, ageMois: number | null): number {
   switch (type) {
     case "bovin":
-      if (ageMois === null) return 8;
+      if (ageMois === null) return 9;
       if (ageMois < 3)  return 1;   // veau sous la mère, mange peu
       if (ageMois < 9)  return 3;   // veau sevré
       if (ageMois < 18) return 5;   // jeune bovin
-      return 8;                     // adulte — calibré sur données réelles
+      return 9;                     // adulte — calibré sur données réelles (10t pour l'ancienne composition)
     case "ovin":
       if (ageMois === null) return 2;
       if (ageMois < 3)  return 0.4; // agneau sous la mère
@@ -344,10 +344,10 @@ function getConsoKgJour(type: string, ageMois: number | null): number {
       if (ageMois < 9)  return 0.9;
       return 1.8;
     case "equin":
-      if (ageMois === null) return 8;
+      if (ageMois === null) return 10;
       if (ageMois < 6)  return 2;
       if (ageMois < 18) return 5;
-      return 8;                     // adulte (pur-sang arabe + Haflinger)
+      return 10;                    // adulte (calibré sur données réelles)
     case "porcin":
       return 0;
     default:
