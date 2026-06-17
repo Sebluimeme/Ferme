@@ -19,6 +19,7 @@ export interface ActiviteFourrage {
   dateActivite: string; // ISO date string
   parcelIds?: string[]; // IDs des partiels concernés (peut être absent si tableau vide en DB)
   nombreBottes?: number;
+  poidsBotteKg?: number;   // poids unitaire en kg (stocké pour traçabilité)
   poidsTonne?: number;
   notes?: string;
   statut: "en_cours" | "terminee";

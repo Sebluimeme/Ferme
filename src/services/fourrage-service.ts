@@ -43,11 +43,14 @@ export async function deleteActivite(id: string) {
   return firebaseService.delete(PATH_ACTIVITES, id);
 }
 
-export async function addBottesActivite(id: string, nombreBottes: number, poidsTonne?: number) {
+export async function addBottesActivite(id: string, nombreBottes: number, poidsBotteKg?: number) {
   const updates: Record<string, unknown> = {
     nombreBottes,
     statut: "terminee",
   };
-  if (poidsTonne !== undefined) updates.poidsTonne = poidsTonne;
+  if (poidsBotteKg !== undefined) {
+    updates.poidsBotteKg = poidsBotteKg;
+    updates.poidsTonne = (nombreBottes * poidsBotteKg) / 1000;
+  }
   return firebaseService.update(PATH_ACTIVITES, id, updates);
 }

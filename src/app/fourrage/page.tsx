@@ -27,13 +27,13 @@ interface ActiviteFormData {
   dateActivite: string;
   parcelIds: string[];
   nombreBottes: string;
-  poidsParBotte: string;
+  poidsBotteKg: string;
   notes: string;
 }
 
 interface BottesFormData {
   nombreBottes: string;
-  poidsParBotte: string;
+  poidsBotteKg: string;
 }
 
 const TYPE_LABELS: Record<TypeActivite, string> = {
@@ -73,12 +73,12 @@ function ActiviteForm({
     dateActivite: initial?.dateActivite ?? today,
     parcelIds: initial?.parcelIds ?? [],
     nombreBottes: initial?.nombreBottes ?? "",
-    poidsParBotte: initial?.poidsParBotte ?? "",
+    poidsBotteKg: initial?.poidsBotteKg ?? "16.5",
     notes: initial?.notes ?? "",
   });
 
-  const poidsTotalT = form.nombreBottes && form.poidsParBotte
-    ? (parseInt(form.nombreBottes) * parseFloat(form.poidsParBotte)) / 1000
+  const poidsTotalT = form.nombreBottes && form.poidsBotteKg
+    ? (parseInt(form.nombreBottes) * parseFloat(form.poidsBotteKg)) / 1000
     : null;
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
 
@@ -196,11 +196,11 @@ function ActiviteForm({
           <input
             type="number"
             min="0"
-            step="1"
+            step="0.01"
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            value={form.poidsParBotte}
-            onChange={(e) => setForm((p) => ({ ...p, poidsParBotte: e.target.value }))}
-            placeholder="Ex : 300"
+            value={form.poidsBotteKg}
+            onChange={(e) => setForm((p) => ({ ...p, poidsBotteKg: e.target.value }))}
+            placeholder="Ex : 16.05"
           />
         </div>
       </div>
@@ -253,10 +253,10 @@ function BottesForm({
   onCancel: () => void;
   loading: boolean;
 }) {
-  const [form, setForm] = useState<BottesFormData>({ nombreBottes: "", poidsParBotte: "" });
+  const [form, setForm] = useState<BottesFormData>({ nombreBottes: "", poidsBotteKg: "16.5" });
 
-  const poidsTotalT = form.nombreBottes && form.poidsParBotte
-    ? (parseInt(form.nombreBottes) * parseFloat(form.poidsParBotte)) / 1000
+  const poidsTotalT = form.nombreBottes && form.poidsBotteKg
+    ? (parseInt(form.nombreBottes) * parseFloat(form.poidsBotteKg)) / 1000
     : null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -283,11 +283,11 @@ function BottesForm({
         <input
           type="number"
           min="0"
-          step="1"
+          step="0.01"
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          value={form.poidsParBotte}
-          onChange={(e) => setForm((p) => ({ ...p, poidsParBotte: e.target.value }))}
-          placeholder="Ex : 300"
+          value={form.poidsBotteKg}
+          onChange={(e) => setForm((p) => ({ ...p, poidsBotteKg: e.target.value }))}
+          placeholder="Ex : 16.05"
         />
       </div>
       {poidsTotalT !== null && (
@@ -478,14 +478,14 @@ export default function FourragePage() {
     setSaving(true);
     try {
       const nbBottes = data.nombreBottes ? parseInt(data.nombreBottes) : undefined;
-      const poidsTonne = nbBottes && data.poidsParBotte
-        ? (nbBottes * parseFloat(data.poidsParBotte)) / 1000
-        : undefined;
+      const poidsBotteKg = data.poidsBotteKg ? parseFloat(data.poidsBotteKg) : undefined;
+      const poidsTonne = nbBottes && poidsBotteKg ? (nbBottes * poidsBotteKg) / 1000 : undefined;
       const result = await createActivite({
         typeActivite: data.typeActivite,
         dateActivite: data.dateActivite,
         parcelIds: data.parcelIds,
         nombreBottes: nbBottes,
+        poidsBotteKg,
         poidsTonne,
         notes: data.notes || undefined,
         statut: nbBottes ? "terminee" : "en_cours",
@@ -506,14 +506,14 @@ export default function FourragePage() {
     setSaving(true);
     try {
       const nbBottes = data.nombreBottes ? parseInt(data.nombreBottes) : undefined;
-      const poidsTonne = nbBottes && data.poidsParBotte
-        ? (nbBottes * parseFloat(data.poidsParBotte)) / 1000
-        : undefined;
+      const poidsBotteKg = data.poidsBotteKg ? parseFloat(data.poidsBotteKg) : undefined;
+      const poidsTonne = nbBottes && poidsBotteKg ? (nbBottes * poidsBotteKg) / 1000 : undefined;
       const result = await updateActivite(editActivite.id, {
         typeActivite: data.typeActivite,
         dateActivite: data.dateActivite,
         parcelIds: data.parcelIds,
         nombreBottes: nbBottes,
+        poidsBotteKg,
         poidsTonne,
         notes: data.notes || undefined,
         statut: nbBottes ? "terminee" : "en_cours",
@@ -545,10 +545,8 @@ export default function FourragePage() {
     setSaving(true);
     try {
       const nbBottes = parseInt(data.nombreBottes);
-      const poidsTonne = data.poidsParBotte
-        ? (nbBottes * parseFloat(data.poidsParBotte)) / 1000
-        : undefined;
-      const result = await addBottesActivite(bottesModal.id, nbBottes, poidsTonne);
+      const poidsBotteKg = data.poidsBotteKg ? parseFloat(data.poidsBotteKg) : undefined;
+      const result = await addBottesActivite(bottesModal.id, nbBottes, poidsBotteKg);
       if (result.success) {
         showToast({ type: "success", title: "Bottes enregistrées" });
         setBottesModal(null);
@@ -852,9 +850,7 @@ export default function FourragePage() {
               dateActivite: editActivite.dateActivite,
               parcelIds: editActivite.parcelIds ?? [],
               nombreBottes: editActivite.nombreBottes?.toString() ?? "",
-              poidsParBotte: editActivite.nombreBottes && editActivite.poidsTonne
-                ? Math.round((editActivite.poidsTonne * 1000) / editActivite.nombreBottes).toString()
-                : "",
+              poidsBotteKg: editActivite.poidsBotteKg?.toString() ?? "16.5",
               notes: editActivite.notes ?? "",
             }}
             onSubmit={handleUpdate}
