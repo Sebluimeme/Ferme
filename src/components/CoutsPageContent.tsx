@@ -33,6 +33,7 @@ import {
   TrendingUp,
   Scale,
   Receipt,
+  Paperclip,
 } from "lucide-react";
 
 // ─── Styles helpers ─────────────────────────────────────────────────────────
@@ -209,7 +210,7 @@ export default function CoutsPageContent() {
   const [editTarget, setEditTarget] = useState<Transaction | null>(null);
   const [form, setForm] = useState<TransactionFormData>(EMPTY_TRANSACTION_FORM);
   const [formLoading, setFormLoading] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string; storagePath?: string } | null>(null);
   const [addModal, setAddModal] = useState<null | "production" | "categorie" | "sousCategorie">(null);
 
   const [search, setSearch]       = useState("");
@@ -288,12 +289,17 @@ export default function CoutsPageContent() {
     setShowModal(true);
   };
 
+  const [pieceJointeFile, setPieceJointeFile] = useState<File | null>(null);
+
   const handleSave = async () => {
     setFormLoading(true);
-    const res = editTarget ? await updateTransaction(editTarget.id, form) : await createTransaction(form);
+    const res = editTarget
+      ? await updateTransaction(editTarget.id, form, pieceJointeFile ?? undefined, editTarget.pieceJointe?.storagePath)
+      : await createTransaction(form, pieceJointeFile ?? undefined);
     setFormLoading(false);
     if (res.success) {
       showToast(editTarget ? { type: "success", title: "Transaction modifiée" } : { type: "success", title: "Transaction ajoutée" });
+      setPieceJointeFile(null);
       setShowModal(false);
     } else {
       showToast({ type: "error", title: res.error || "Erreur" });
@@ -302,7 +308,7 @@ export default function CoutsPageContent() {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    const res = await deleteTransaction(deleteTarget.id);
+    const res = await deleteTransaction(deleteTarget.id, deleteTarget.storagePath);
     if (res.success) showToast({ type: "success", title: "Transaction supprimée" });
     else showToast({ type: "error", title: res.error || "Erreur" });
     setDeleteTarget(null);
@@ -462,9 +468,16 @@ export default function CoutsPageContent() {
                           <span className={`text-[15px] font-bold ${t.operation === "Revenus" ? "text-brand-600" : "text-stone-900"}`}>
                             {t.operation === "Revenus" ? "+" : "−"}{fmt(t.montant)} €
                           </span>
+                          {t.pieceJointe && (
+                            <a href={t.pieceJointe.url} target="_blank" rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="block ml-auto mt-0.5 text-stone-400 hover:text-brand-600"
+                              title={t.pieceJointe.nom}>
+                              <Paperclip className="w-3.5 h-3.5" />
+                            </a>
+                          )}
                           <button
-                            onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: t.id, label: t.produit }); }}
-                            className="block ml-auto mt-1 text-[11px] text-stone-400 hover:text-red-500"
+                            onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: t.id, label: t.produit, storagePath: t.pieceJointe?.storagePath }); }}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -515,7 +528,7 @@ export default function CoutsPageContent() {
                                 className="w-7 h-7 rounded-md hover:bg-stone-200 flex items-center justify-center cursor-pointer transition-colors">
                                 <Pencil className="w-3.5 h-3.5 text-stone-400" />
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: t.id, label: t.produit }); }}
+                              <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: t.id, label: t.produit, storagePath: t.pieceJointe?.storagePath }); }}
                                 className="w-7 h-7 rounded-md hover:bg-red-50 flex items-center justify-center cursor-pointer transition-colors">
                                 <Trash2 className="w-3.5 h-3.5 text-stone-400 hover:text-red-500" />
                               </button>
@@ -638,6 +651,30 @@ export default function CoutsPageContent() {
           onAddCategorie={() => setAddModal("categorie")}
           onAddSousCategorie={() => setAddModal("sousCategorie")}
         />
+
+        {/* Pièce jointe */}
+        <div className="mt-4 pt-4 border-t border-stone-100">
+          <label className={`${labelClass}`}>Pièce jointe (photo, PDF, facture)</label>
+          {editTarget?.pieceJointe && !pieceJointeFile && (
+            <div className="flex items-center gap-2 mb-2 p-2 bg-stone-50 border border-stone-200 rounded-lg">
+              <Paperclip className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+              <a href={editTarget.pieceJointe.url} target="_blank" rel="noopener noreferrer"
+                className="text-[12px] text-brand-600 hover:underline truncate flex-1">
+                {editTarget.pieceJointe.nom}
+              </a>
+              <span className="text-[11px] text-stone-400">Remplacer ↓</span>
+            </div>
+          )}
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            onChange={(e) => setPieceJointeFile(e.target.files?.[0] ?? null)}
+            className="block w-full text-[13px] text-stone-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-medium file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200 cursor-pointer"
+          />
+          {pieceJointeFile && (
+            <p className="text-[11px] text-brand-600 mt-1">✓ {pieceJointeFile.name}</p>
+          )}
+        </div>
       </Modal>
 
       {/* Modal suppression */}

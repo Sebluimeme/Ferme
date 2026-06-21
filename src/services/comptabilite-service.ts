@@ -123,19 +123,43 @@ export function validateTransactionData(data: TransactionFormData): { valid: boo
   return { valid: errors.length === 0, errors };
 }
 
-export async function createTransaction(data: TransactionFormData) {
+export async function createTransaction(data: TransactionFormData, pieceJointe?: File) {
   const validation = validateTransactionData(data);
   if (!validation.valid) return { success: false, error: validation.errors.join(", ") };
-  return firebaseService.create(PATH, parseFormData(data));
+  const parsed = parseFormData(data);
+  if (pieceJointe) {
+    const { uploadFile } = await import("@/lib/firebase-storage");
+    const path = `transactions/${Date.now()}_${pieceJointe.name}`;
+    const res = await uploadFile(path, pieceJointe);
+    if (res.success && res.url) {
+      parsed.pieceJointe = { url: res.url, storagePath: path, nom: pieceJointe.name };
+    }
+  }
+  return firebaseService.create(PATH, parsed);
 }
 
-export async function updateTransaction(id: string, data: TransactionFormData) {
+export async function updateTransaction(id: string, data: TransactionFormData, pieceJointe?: File, ancienStoragePath?: string) {
   const validation = validateTransactionData(data);
   if (!validation.valid) return { success: false, error: validation.errors.join(", ") };
-  return firebaseService.update(PATH, id, parseFormData(data));
+  const parsed = parseFormData(data);
+  if (pieceJointe) {
+    const { uploadFile, deleteFile } = await import("@/lib/firebase-storage");
+    // Supprimer l'ancienne pièce jointe si elle existe
+    if (ancienStoragePath) await deleteFile(ancienStoragePath);
+    const path = `transactions/${Date.now()}_${pieceJointe.name}`;
+    const res = await uploadFile(path, pieceJointe);
+    if (res.success && res.url) {
+      parsed.pieceJointe = { url: res.url, storagePath: path, nom: pieceJointe.name };
+    }
+  }
+  return firebaseService.update(PATH, id, parsed);
 }
 
-export async function deleteTransaction(id: string) {
+export async function deleteTransaction(id: string, storagePath?: string) {
+  if (storagePath) {
+    const { deleteFile } = await import("@/lib/firebase-storage");
+    await deleteFile(storagePath);
+  }
   return firebaseService.delete(PATH, id);
 }
 

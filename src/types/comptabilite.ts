@@ -21,6 +21,11 @@ export interface Transaction {
   quantite?: number;
   payeur: string; // Ex: "SY", "BY", "revolut"
   montant: number; // Toujours positif — operation détermine le sens
+  pieceJointe?: {
+    url: string;
+    storagePath: string;
+    nom: string;
+  };
   dateCreation?: string;
   derniereMAJ?: string;
 }
