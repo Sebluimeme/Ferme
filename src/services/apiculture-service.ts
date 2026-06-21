@@ -45,6 +45,7 @@ function buildTransactionPayload(data: {
   typeMiel?: string;
   prixTotal: number;
   notes?: string;
+  beneficiaire?: string;
 }): Record<string, unknown> {
   const detail: string[] = [];
   if (data.nbPots500g > 0) detail.push(`${data.nbPots500g}×½kg`);
@@ -61,7 +62,7 @@ function buildTransactionPayload(data: {
     remarque: data.notes ?? "",
     fournisseur: "",
     quantite: data.nbPots500g + data.nbPots1kg,
-    payeur: "Ferme",
+    payeur: data.beneficiaire ?? "Revolut",
     montant: data.prixTotal,
   };
 }
@@ -94,8 +95,10 @@ export async function updateVente(
         dateVente: merged.dateVente,
         nbPots500g: merged.nbPots500g ?? 0,
         nbPots1kg: merged.nbPots1kg ?? 0,
+        typeMiel: merged.typeMiel,
         prixTotal: merged.prixTotal,
         notes: merged.notes,
+        beneficiaire: merged.beneficiaire,
       }));
     }
   }

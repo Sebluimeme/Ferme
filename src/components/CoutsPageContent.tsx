@@ -145,7 +145,7 @@ function TransactionForm({
           <input type="number" min="0" step="0.01" value={form.quantite} onChange={set("quantite")} placeholder="Ex: 5" className={inputClass} />
         </div>
         <div>
-          <label className={labelClass}>Payeur</label>
+          <label className={labelClass}>{form.operation === "Revenus" ? "Bénéficiaire" : "Payeur"}</label>
           <select value={form.payeur} onChange={set("payeur")} className={selectClass}>
             {config.payeurs.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>

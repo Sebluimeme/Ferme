@@ -26,9 +26,10 @@ export interface VenteMiel {
   nbPots500g: number;
   nbPots1kg: number;
   typeMiel?: string;
+  beneficiaire?: string;
   prixTotal: number;
   notes?: string;
-  transactionId?: string;  // ID de la Transaction miroir dans "transactions"
+  transactionId?: string;
   dateCreation?: string;
   derniereMAJ?: string;
 }

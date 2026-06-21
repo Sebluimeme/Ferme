@@ -209,6 +209,7 @@ interface VenteFormData {
   nbPots500g: string;
   nbPots1kg: string;
   typeMiel: string;
+  beneficiaire: string;
   prixTotal: string;
   notes: string;
 }
@@ -238,13 +239,14 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
   const initialPoids = initial ? venteFormToPoidsKg({
     nbPots500g: initial.nbPots500g ?? "0",
     nbPots1kg: initial.nbPots1kg ?? "0",
-    dateVente: "", prixTotal: "", notes: "", typeMiel: "",
+    dateVente: "", prixTotal: "", notes: "", typeMiel: "", beneficiaire: "",
   }) : 0.5;
 
   const [form, setForm] = useState<VenteFormData>({
     dateVente: initial?.dateVente ?? today,
     ...poidsKgToVenteForm(initialPoids || 0.5),
     typeMiel: initial?.typeMiel ?? "Toutes fleurs",
+    beneficiaire: initial?.beneficiaire ?? "Revolut",
     prixTotal: initial?.prixTotal ?? "",
     notes: initial?.notes ?? "",
   });
@@ -314,6 +316,19 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
           {TYPES_MIEL.map((t) => (
             <option key={t} value={t}>{t}</option>
           ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Encaissé par</label>
+        <select
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          value={form.beneficiaire}
+          onChange={(e) => setForm((p) => ({ ...p, beneficiaire: e.target.value }))}
+        >
+          <option value="Revolut">Revolut (ferme)</option>
+          <option value="SY">Sébastien (SY)</option>
+          <option value="BY">Benjamin (BY)</option>
         </select>
       </div>
 
@@ -517,9 +532,11 @@ export default function ApiculturePage() {
     setSaving(true);
     try {
       const res = await createVente({
+        beneficiaire: data.beneficiaire || undefined,
         dateVente: data.dateVente,
         nbPots500g: parseInt(data.nbPots500g) || 0,
         nbPots1kg: parseInt(data.nbPots1kg) || 0,
+        typeMiel: data.typeMiel || undefined,
         prixTotal: parseFloat(data.prixTotal),
         notes: data.notes || undefined,
       });
@@ -532,9 +549,11 @@ export default function ApiculturePage() {
     setSaving(true);
     try {
       const res = await updateVente(editVente.id, {
+        beneficiaire: data.beneficiaire || undefined,
         dateVente: data.dateVente,
         nbPots500g: parseInt(data.nbPots500g) || 0,
         nbPots1kg: parseInt(data.nbPots1kg) || 0,
+        typeMiel: data.typeMiel || undefined,
         prixTotal: parseFloat(data.prixTotal),
         notes: data.notes || undefined,
       }, editVente);
