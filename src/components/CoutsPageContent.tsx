@@ -225,11 +225,14 @@ export default function CoutsPageContent() {
 
   const stats = useMemo(() => computeStats(transactions), [transactions]);
 
-  // Dette ferme envers SY : avances SY (dépenses payeur=SY) - remboursements SY (revenus payeur=SY)
-  const detteSY = useMemo(() => {
-    const avances = transactions.filter((t) => t.payeur === "SY" && t.operation === "Dépenses").reduce((s, t) => s + t.montant, 0);
-    const remboursements = transactions.filter((t) => t.payeur === "SY" && t.operation === "Revenus").reduce((s, t) => s + t.montant, 0);
-    return avances - remboursements;
+  // Dettes ferme envers les avanceurs (SY, BY, etc.) : dépenses payées par eux - remboursements reçus
+  const dettes = useMemo(() => {
+    const avanceurs = ["SY", "BY"];
+    return avanceurs.map((payeur) => {
+      const avances = transactions.filter((t) => t.payeur === payeur && t.operation === "Dépenses").reduce((s, t) => s + t.montant, 0);
+      const remboursements = transactions.filter((t) => t.payeur === payeur && t.operation === "Revenus").reduce((s, t) => s + t.montant, 0);
+      return { payeur, dette: avances - remboursements };
+    }).filter((d) => d.dette > 0);
   }, [transactions]);
 
   const filtered = useMemo(() => {
@@ -337,35 +340,41 @@ export default function CoutsPageContent() {
         <KpiCard label="Transactions" value={stats.nbTransactions} icon={<Receipt className="w-3.5 h-3.5" />} />
       </div>
 
-      {/* Dette SY */}
-      {detteSY > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
-          <div>
-            <p className="text-[12px] font-semibold uppercase tracking-wide text-amber-700">Dette ferme envers SY</p>
-            <p className="text-[22px] font-bold font-mono text-amber-900 mt-0.5">
-              {detteSY.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
-            </p>
-          </div>
-          <button
-            onClick={() => {
-              setForm({
-                ...EMPTY_TRANSACTION_FORM,
-                date: new Date().toISOString().split("T")[0],
-                operation: "Revenus",
-                production: "Ferme",
-                categorie: "Remboursement",
-                sousCategorie: "SY",
-                produit: "Remboursement SY",
-                payeur: "SY",
-              });
-              setEditTarget(null);
-              setShowModal(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white text-[13px] font-medium rounded-lg hover:bg-amber-700 transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Enregistrer remboursement
-          </button>
+      {/* Dettes SY / BY */}
+      {dettes.length > 0 && (
+        <div className="flex flex-col sm:flex-row gap-3">
+          {dettes.map(({ payeur, dette }) => (
+            <div key={payeur} className="flex-1 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
+              <div>
+                <p className="text-[12px] font-semibold uppercase tracking-wide text-amber-700">
+                  Dette ferme → {payeur === "SY" ? "Sébastien" : payeur === "BY" ? "Benjamin" : payeur}
+                </p>
+                <p className="text-[22px] font-bold font-mono text-amber-900 mt-0.5">
+                  {dette.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setForm({
+                    ...EMPTY_TRANSACTION_FORM,
+                    date: new Date().toISOString().split("T")[0],
+                    operation: "Revenus",
+                    production: "Ferme",
+                    categorie: "Remboursement",
+                    sousCategorie: payeur,
+                    produit: `Remboursement ${payeur === "SY" ? "Sébastien" : payeur === "BY" ? "Benjamin" : payeur}`,
+                    payeur,
+                  });
+                  setEditTarget(null);
+                  setShowModal(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white text-[13px] font-medium rounded-lg hover:bg-amber-700 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Rembourser
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
