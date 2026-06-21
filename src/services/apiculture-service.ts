@@ -88,10 +88,10 @@ export async function updateVente(
   currentVente?: VenteMiel
 ) {
   // Mettre à jour la transaction miroir si elle existe et qu'on a les données complètes
-  if (currentVente?.transactionId && data.dateVente !== undefined || data.prixTotal !== undefined) {
+  if (currentVente?.transactionId && (data.dateVente !== undefined || data.prixTotal !== undefined)) {
     const merged = { ...currentVente, ...data } as VenteMiel;
     if (merged.dateVente && merged.prixTotal != null) {
-      await firebaseService.update(PATH_TRANSACTIONS, currentVente!.transactionId!, buildTransactionPayload({
+      await firebaseService.update(PATH_TRANSACTIONS, currentVente.transactionId, buildTransactionPayload({
         dateVente: merged.dateVente,
         nbPots500g: merged.nbPots500g ?? 0,
         nbPots1kg: merged.nbPots1kg ?? 0,
