@@ -42,6 +42,12 @@ const labelClass = "text-[11px] font-semibold uppercase tracking-wide text-stone
 const selectClass =
   "w-full px-3 py-2 text-[13px] bg-stone-50 border border-stone-200 rounded-lg text-stone-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 focus:bg-white transition-all";
 
+// Formate un montant sans espace insécable (\u202F) qui casse le rendu mobile
+function fmt(n: number, decimals = 2): string {
+  return n.toLocaleString("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    .replace(/\u202F/g, "\u00A0"); // remplace narrow no-break space par espace normal
+}
+
 // ─── Formulaire transaction ──────────────────────────────────────────────────
 function TransactionForm({
   form, setForm, config, onAddProduction, onAddCategorie, onAddSousCategorie,
@@ -330,11 +336,11 @@ export default function CoutsPageContent() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard label="Dépenses" value={`${stats.totalDepenses.toLocaleString("fr-FR", { minimumFractionDigits: 0 })} €`} icon={<TrendingDown className="w-3.5 h-3.5 text-red-500" />} />
-        <KpiCard label="Revenus" value={`${stats.totalRevenus.toLocaleString("fr-FR", { minimumFractionDigits: 0 })} €`} icon={<TrendingUp className="w-3.5 h-3.5 text-brand-500" />} />
+        <KpiCard label="Dépenses" value={`${fmt(stats.totalDepenses, 0)} €`} icon={<TrendingDown className="w-3.5 h-3.5 text-red-500" />} />
+        <KpiCard label="Revenus" value={`${fmt(stats.totalRevenus, 0)} €`} icon={<TrendingUp className="w-3.5 h-3.5 text-brand-500" />} />
         <KpiCard
           label="Balance"
-          value={`${stats.balance >= 0 ? "+" : ""}${stats.balance.toLocaleString("fr-FR", { minimumFractionDigits: 0 })} €`}
+          value={`${stats.balance >= 0 ? "+" : ""}${fmt(stats.balance, 0)} €`}
           icon={<Scale className="w-3.5 h-3.5" />}
         />
         <KpiCard label="Transactions" value={stats.nbTransactions} icon={<Receipt className="w-3.5 h-3.5" />} />
@@ -350,7 +356,7 @@ export default function CoutsPageContent() {
                   Dette ferme → {payeur === "SY" ? "Sébastien" : payeur === "BY" ? "Benjamin" : payeur}
                 </p>
                 <p className="text-[22px] font-bold font-mono text-amber-900 mt-0.5">
-                  {dette.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
+                  {fmt(dette)} €
                 </p>
               </div>
               <button
@@ -454,7 +460,7 @@ export default function CoutsPageContent() {
                         </div>
                         <div className="text-right shrink-0">
                           <span className={`text-[15px] font-bold ${t.operation === "Revenus" ? "text-brand-600" : "text-stone-900"}`}>
-                            {t.operation === "Revenus" ? "+" : "−"}{t.montant.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
+                            {t.operation === "Revenus" ? "+" : "−"}{fmt(t.montant)} €
                           </span>
                           <button
                             onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: t.id, label: t.produit }); }}
@@ -500,7 +506,7 @@ export default function CoutsPageContent() {
                           </td>
                           <td className="px-4 py-3 text-right whitespace-nowrap">
                             <span className={`text-[13.5px] font-semibold ${t.operation === "Revenus" ? "text-brand-600" : "text-stone-900"}`}>
-                              {t.operation === "Revenus" ? "+" : "−"}{t.montant.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
+                              {t.operation === "Revenus" ? "+" : "−"}{fmt(t.montant)} €
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -534,57 +540,87 @@ export default function CoutsPageContent() {
               <p className="text-[14px] text-stone-400">Aucune donnée</p>
             </div>
           ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-stone-200">
-                  {["Production", "Dépenses", "Revenus", "Balance", "Couverture"].map((h) => (
-                    <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold text-stone-400 uppercase tracking-[0.06em]">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
+            <>
+              {/* Vue carte — mobile */}
+              <div className="md:hidden divide-y divide-stone-100">
                 {parProduction.map((row) => {
                   const pct = row.depenses > 0 ? Math.min(100, (row.revenus / row.depenses) * 100) : 100;
                   return (
-                    <tr key={row.production} className="hover:bg-stone-50">
-                      <td className="px-4 py-3 text-[13px] font-medium text-stone-800">{row.production}</td>
-                      <td className="px-4 py-3 text-[13px] font-mono text-stone-900">
-                        −{row.depenses.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
-                      </td>
-                      <td className="px-4 py-3 text-[13px] font-mono text-brand-600">
-                        +{row.revenus.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
-                      </td>
-                      <td className={`px-4 py-3 text-[13px] font-semibold font-mono ${row.balance >= 0 ? "text-brand-600" : "text-stone-900"}`}>
-                        {row.balance >= 0 ? "+" : ""}{row.balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-20 bg-stone-100 rounded-full h-1.5">
-                            <div className="bg-brand-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                          </div>
-                          <span className="text-[11px] text-stone-400 font-mono">{Math.round(pct)}%</span>
+                    <div key={row.production} className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[13px] font-semibold text-stone-800">{row.production}</span>
+                        <span className={`text-[14px] font-bold ${row.balance >= 0 ? "text-brand-600" : "text-stone-900"}`}>
+                          {row.balance >= 0 ? "+" : ""}{fmt(row.balance)} €
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-[11px] text-stone-500 mb-2">
+                        <span>−{fmt(row.depenses)} €</span>
+                        <span className="text-brand-600">+{fmt(row.revenus)} €</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-stone-100 rounded-full h-1.5">
+                          <div className="bg-brand-500 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
                         </div>
-                      </td>
-                    </tr>
+                        <span className="text-[10px] text-stone-400">{Math.round(pct)}%</span>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-              <tfoot className="border-t-2 border-stone-200 bg-stone-50">
-                <tr>
-                  <td className="px-4 py-3 text-[12px] font-semibold uppercase tracking-wide text-stone-500">TOTAL</td>
-                  <td className="px-4 py-3 text-[13px] font-semibold font-mono text-stone-900">
-                    −{stats.totalDepenses.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
-                  </td>
-                  <td className="px-4 py-3 text-[13px] font-semibold font-mono text-brand-600">
-                    +{stats.totalRevenus.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
-                  </td>
-                  <td className={`px-4 py-3 text-[14px] font-bold font-mono ${stats.balance >= 0 ? "text-brand-700" : "text-stone-900"}`}>
-                    {stats.balance >= 0 ? "+" : ""}{stats.balance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
-                  </td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
+                <div className="px-4 py-3 bg-stone-50 border-t-2 border-stone-200 flex items-center justify-between">
+                  <span className="text-[12px] font-semibold text-stone-500 uppercase tracking-wide">Total</span>
+                  <span className={`text-[14px] font-bold ${stats.balance >= 0 ? "text-brand-700" : "text-stone-900"}`}>
+                    {stats.balance >= 0 ? "+" : ""}{fmt(stats.balance)} €
+                  </span>
+                </div>
+              </div>
+
+              {/* Vue tableau — desktop */}
+              <div className="hidden md:block">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-stone-200">
+                      {["Production", "Dépenses", "Revenus", "Balance", "Couverture"].map((h) => (
+                        <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold text-stone-400 uppercase tracking-[0.06em]">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {parProduction.map((row) => {
+                      const pct = row.depenses > 0 ? Math.min(100, (row.revenus / row.depenses) * 100) : 100;
+                      return (
+                        <tr key={row.production} className="hover:bg-stone-50">
+                          <td className="px-4 py-3 text-[13px] font-medium text-stone-800">{row.production}</td>
+                          <td className="px-4 py-3 text-[13px] text-stone-900">−{fmt(row.depenses)} €</td>
+                          <td className="px-4 py-3 text-[13px] text-brand-600">+{fmt(row.revenus)} €</td>
+                          <td className={`px-4 py-3 text-[13px] font-semibold ${row.balance >= 0 ? "text-brand-600" : "text-stone-900"}`}>
+                            {row.balance >= 0 ? "+" : ""}{fmt(row.balance)} €
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-20 bg-stone-100 rounded-full h-1.5">
+                                <div className="bg-brand-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-[11px] text-stone-400">{Math.round(pct)}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="border-t-2 border-stone-200 bg-stone-50">
+                    <tr>
+                      <td className="px-4 py-3 text-[12px] font-semibold uppercase tracking-wide text-stone-500">TOTAL</td>
+                      <td className="px-4 py-3 text-[13px] font-semibold text-stone-900">−{fmt(stats.totalDepenses)} €</td>
+                      <td className="px-4 py-3 text-[13px] font-semibold text-brand-600">+{fmt(stats.totalRevenus)} €</td>
+                      <td className={`px-4 py-3 text-[14px] font-bold ${stats.balance >= 0 ? "text-brand-700" : "text-stone-900"}`}>
+                        {stats.balance >= 0 ? "+" : ""}{fmt(stats.balance)} €
+                      </td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}

@@ -26,7 +26,7 @@ export default function KpiCard({ label, value, subtitle, icon, trend, onClick }
         )}
       </div>
 
-      <p className="text-[26px] font-semibold text-stone-900 tracking-[-0.5px] leading-none">
+      <p className="text-[20px] sm:text-[26px] font-semibold text-stone-900 tracking-[-0.5px] leading-tight break-words">
         {value}
       </p>
 
