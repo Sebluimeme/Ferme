@@ -249,11 +249,25 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
     notes: initial?.notes ?? "",
   });
 
-  const poidsVendu = venteFormToPoidsKg(form);
+  const [taillePot, setTaillePot] = useState<0.5 | 1>(
+    (initialPoids || 0.5) % 1 !== 0 ? 0.5 : 1
+  );
+  const [nbPots, setNbPots] = useState<number>(
+    Math.max(1, Math.round((initialPoids || 0.5) / ((initialPoids || 0.5) % 1 !== 0 ? 0.5 : 1)))
+  );
 
-  const handlePoidsChange = (kg: number) => {
-    setForm((p) => ({ ...p, ...poidsKgToVenteForm(kg) }));
+  // Sync nbPots500g / nbPots1kg dans form à chaque changement
+  const handlePotsChange = (taille: 0.5 | 1, nb: number) => {
+    setTaillePot(taille);
+    setNbPots(nb);
+    if (taille === 0.5) {
+      setForm((p) => ({ ...p, nbPots500g: String(nb), nbPots1kg: "0" }));
+    } else {
+      setForm((p) => ({ ...p, nbPots500g: "0", nbPots1kg: String(nb) }));
+    }
   };
+
+  const poidsTotal = taillePot * nbPots;
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="flex flex-col gap-4">
@@ -264,17 +278,30 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
           value={form.dateVente} onChange={(e) => setForm((p) => ({ ...p, dateVente: e.target.value }))} />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Quantité vendue</label>
-        <select
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          value={poidsVendu}
-          onChange={(e) => handlePoidsChange(parseFloat(e.target.value))}
-        >
-          {[0.5, 1].map((kg) => (
-            <option key={kg} value={kg}>{kg % 1 === 0 ? kg : kg.toFixed(1)} kg</option>
-          ))}
-        </select>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Taille du pot</label>
+          <select
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={taillePot}
+            onChange={(e) => handlePotsChange(parseFloat(e.target.value) as 0.5 | 1, nbPots)}
+          >
+            <option value={0.5}>0,5 kg</option>
+            <option value={1}>1 kg</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de pots</label>
+          <input type="number" min="1" step="1" required
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            value={nbPots}
+            onChange={(e) => handlePotsChange(taillePot, Math.max(1, parseInt(e.target.value) || 1))}
+          />
+        </div>
+      </div>
+
+      <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-sm text-amber-800 font-medium">
+        Total : {nbPots} pot{nbPots > 1 ? "s" : ""} × {taillePot % 1 === 0 ? taillePot : taillePot.toFixed(1)} kg = <strong>{poidsTotal.toFixed(1)} kg</strong>
       </div>
 
       <div>
