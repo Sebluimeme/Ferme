@@ -87,7 +87,7 @@ function TransactionForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className={labelClass}>Catégorie *</label>
           <div className="flex gap-2">

@@ -24,36 +24,56 @@ export default function Modal({ isOpen, onClose, title, children, buttons = [], 
     };
     if (isOpen) {
       document.addEventListener("keydown", handleEsc);
+      // iOS-safe scroll lock
+      const scrollY = window.scrollY;
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.left = "0";
+      document.body.style.right = "0";
       document.body.style.overflow = "hidden";
     }
     return () => {
       document.removeEventListener("keydown", handleEsc);
+      const scrollY = document.body.style.top;
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.left = "";
+      document.body.style.right = "";
       document.body.style.overflow = "";
+      if (scrollY) window.scrollTo(0, -parseInt(scrollY));
     };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const maxW = size === "large" ? "max-w-[900px]" : size === "small" ? "max-w-[400px]" : "max-w-[600px]";
+  const maxW = size === "large" ? "max-w-[900px]" : size === "small" ? "max-w-sm" : "max-w-lg";
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 z-[1050] flex items-center justify-center p-4 fade-in"
+      className="fixed inset-0 bg-black/50 z-[1050] flex items-end sm:items-center justify-center overflow-hidden fade-in"
+      style={{
+        paddingLeft: "env(safe-area-inset-left, 0px)",
+        paddingRight: "env(safe-area-inset-right, 0px)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className={`bg-white rounded-2xl shadow-xl ${maxW} w-full max-h-[90vh] flex flex-col slide-in-down`}>
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-2xl font-bold m-0">{title}</h2>
+      <div className={`bg-white shadow-xl w-full ${maxW} flex flex-col slide-in-down
+        rounded-t-2xl sm:rounded-2xl
+        max-h-[92dvh] sm:max-h-[90dvh]`}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200 shrink-0">
+          <h2 className="text-xl font-bold m-0 text-stone-900">{title}</h2>
           <button
             onClick={onClose}
-            className="text-3xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center cursor-pointer"
+            className="text-stone-400 hover:text-stone-700 hover:bg-stone-100 rounded-full w-8 h-8 flex items-center justify-center cursor-pointer text-xl"
           >
             &times;
           </button>
         </div>
-        <div className="flex-1 px-6 py-5 overflow-y-auto">{children}</div>
+        <div className="flex-1 px-5 py-5 overflow-y-auto overflow-x-hidden">{children}</div>
         {buttons.length > 0 && (
-          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-stone-200 shrink-0">
             {buttons.map((btn, i) => (
               <button key={i} onClick={btn.onClick} className={btn.className || "btn-secondary"}>
                 {btn.label}
