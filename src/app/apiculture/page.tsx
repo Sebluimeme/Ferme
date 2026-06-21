@@ -212,6 +212,20 @@ interface VenteFormData {
   notes: string;
 }
 
+const QUANTITES_MIEL = [0.5, 1];
+
+function venteFormToPoidsKg(form: VenteFormData): number {
+  return (parseInt(form.nbPots500g) || 0) * 0.5 + (parseInt(form.nbPots1kg) || 0) * 1;
+}
+
+function poidsKgToVenteForm(kg: number): { nbPots500g: string; nbPots1kg: string } {
+  // Représente tout en pots 1 kg si entier, sinon en pots 0,5 kg
+  if (kg % 1 === 0 && kg >= 1) {
+    return { nbPots500g: "0", nbPots1kg: String(kg) };
+  }
+  return { nbPots500g: String(Math.round(kg / 0.5)), nbPots1kg: "0" };
+}
+
 function VenteForm({ initial, onSubmit, onCancel, loading }: {
   initial?: Partial<VenteFormData>;
   onSubmit: (data: VenteFormData) => void;
@@ -219,16 +233,25 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
   loading: boolean;
 }) {
   const today = new Date().toISOString().split("T")[0];
+
+  const initialPoids = initial ? venteFormToPoidsKg({
+    nbPots500g: initial.nbPots500g ?? "0",
+    nbPots1kg: initial.nbPots1kg ?? "0",
+    dateVente: "", prixTotal: "", notes: "",
+  }) : 0.5;
+
   const [form, setForm] = useState<VenteFormData>({
     dateVente: initial?.dateVente ?? today,
-    nbPots500g: initial?.nbPots500g ?? "0",
-    nbPots1kg: initial?.nbPots1kg ?? "0",
+    ...poidsKgToVenteForm(initialPoids || 0.5),
     prixTotal: initial?.prixTotal ?? "",
     notes: initial?.notes ?? "",
   });
 
-  const totalPots = (parseInt(form.nbPots500g) || 0) + (parseInt(form.nbPots1kg) || 0);
-  const poidsVendu = ((parseInt(form.nbPots500g) || 0) * 0.5) + ((parseInt(form.nbPots1kg) || 0) * 1);
+  const poidsVendu = venteFormToPoidsKg(form);
+
+  const handlePoidsChange = (kg: number) => {
+    setForm((p) => ({ ...p, ...poidsKgToVenteForm(kg) }));
+  };
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="flex flex-col gap-4">
@@ -239,29 +262,18 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
           value={form.dateVente} onChange={(e) => setForm((p) => ({ ...p, dateVente: e.target.value }))} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Pots 0,5 kg</label>
-          <input type="number" min="0" step="1"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            value={form.nbPots500g} onChange={(e) => setForm((p) => ({ ...p, nbPots500g: e.target.value }))}
-            placeholder="0" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Pots 1 kg</label>
-          <input type="number" min="0" step="1"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            value={form.nbPots1kg} onChange={(e) => setForm((p) => ({ ...p, nbPots1kg: e.target.value }))}
-            placeholder="0" />
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Quantité vendue</label>
+        <select
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          value={poidsVendu}
+          onChange={(e) => handlePoidsChange(parseFloat(e.target.value))}
+        >
+          {QUANTITES_MIEL.map((kg) => (
+            <option key={kg} value={kg}>{kg % 1 === 0 ? kg : kg.toFixed(1)} kg</option>
+          ))}
+        </select>
       </div>
-
-      {/* Résumé calculé */}
-      {totalPots > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-sm flex items-center justify-between">
-          <span className="text-gray-600">{totalPots} pot{totalPots > 1 ? "s" : ""} · {poidsVendu.toFixed(1)} kg</span>
-        </div>
-      )}
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Prix total (€) *</label>
