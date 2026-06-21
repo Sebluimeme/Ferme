@@ -208,11 +208,12 @@ interface VenteFormData {
   dateVente: string;
   nbPots500g: string;
   nbPots1kg: string;
+  typeMiel: string;
   prixTotal: string;
   notes: string;
 }
 
-const QUANTITES_MIEL = [0.5, 1];
+const TYPES_MIEL = ["Toutes fleurs", "Acacia", "Tilleul", "Lavande", "Printemps", "Été", "Automne", "Hiver", "Autre"];
 
 function venteFormToPoidsKg(form: VenteFormData): number {
   return (parseInt(form.nbPots500g) || 0) * 0.5 + (parseInt(form.nbPots1kg) || 0) * 1;
@@ -237,12 +238,13 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
   const initialPoids = initial ? venteFormToPoidsKg({
     nbPots500g: initial.nbPots500g ?? "0",
     nbPots1kg: initial.nbPots1kg ?? "0",
-    dateVente: "", prixTotal: "", notes: "",
+    dateVente: "", prixTotal: "", notes: "", typeMiel: "",
   }) : 0.5;
 
   const [form, setForm] = useState<VenteFormData>({
     dateVente: initial?.dateVente ?? today,
     ...poidsKgToVenteForm(initialPoids || 0.5),
+    typeMiel: initial?.typeMiel ?? "Toutes fleurs",
     prixTotal: initial?.prixTotal ?? "",
     notes: initial?.notes ?? "",
   });
@@ -269,8 +271,21 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
           value={poidsVendu}
           onChange={(e) => handlePoidsChange(parseFloat(e.target.value))}
         >
-          {QUANTITES_MIEL.map((kg) => (
+          {[0.5, 1].map((kg) => (
             <option key={kg} value={kg}>{kg % 1 === 0 ? kg : kg.toFixed(1)} kg</option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Type de miel</label>
+        <select
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          value={form.typeMiel}
+          onChange={(e) => setForm((p) => ({ ...p, typeMiel: e.target.value }))}
+        >
+          {TYPES_MIEL.map((t) => (
+            <option key={t} value={t}>{t}</option>
           ))}
         </select>
       </div>

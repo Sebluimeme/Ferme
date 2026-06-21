@@ -25,6 +25,7 @@ export interface VenteMiel {
   dateVente: string;
   nbPots500g: number;
   nbPots1kg: number;
+  typeMiel?: string;
   prixTotal: number;
   notes?: string;
   transactionId?: string;  // ID de la Transaction miroir dans "transactions"

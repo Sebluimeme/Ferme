@@ -225,6 +225,13 @@ export default function CoutsPageContent() {
 
   const stats = useMemo(() => computeStats(transactions), [transactions]);
 
+  // Dette ferme envers SY : avances SY (dépenses payeur=SY) - remboursements SY (revenus payeur=SY)
+  const detteSY = useMemo(() => {
+    const avances = transactions.filter((t) => t.payeur === "SY" && t.operation === "Dépenses").reduce((s, t) => s + t.montant, 0);
+    const remboursements = transactions.filter((t) => t.payeur === "SY" && t.operation === "Revenus").reduce((s, t) => s + t.montant, 0);
+    return avances - remboursements;
+  }, [transactions]);
+
   const filtered = useMemo(() => {
     let list = filterTransactions(transactions, {
       operation: filterOp || undefined,
@@ -330,6 +337,38 @@ export default function CoutsPageContent() {
         <KpiCard label="Transactions" value={stats.nbTransactions} icon={<Receipt className="w-3.5 h-3.5" />} />
       </div>
 
+      {/* Dette SY */}
+      {detteSY > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-[12px] font-semibold uppercase tracking-wide text-amber-700">Dette ferme envers SY</p>
+            <p className="text-[22px] font-bold font-mono text-amber-900 mt-0.5">
+              {detteSY.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setForm({
+                ...EMPTY_TRANSACTION_FORM,
+                date: new Date().toISOString().split("T")[0],
+                operation: "Revenus",
+                production: "Ferme",
+                categorie: "Remboursement",
+                sousCategorie: "SY",
+                produit: "Remboursement SY",
+                payeur: "SY",
+              });
+              setEditTarget(null);
+              setShowModal(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white text-[13px] font-medium rounded-lg hover:bg-amber-700 transition-colors cursor-pointer whitespace-nowrap"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Enregistrer remboursement
+          </button>
+        </div>
+      )}
+
       {/* Onglets */}
       <div className="flex items-center gap-1 p-1 bg-stone-200/60 rounded-lg w-fit">
         {(["liste", "par-production"] as const).map((t) => (
@@ -399,7 +438,7 @@ export default function CoutsPageContent() {
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {filtered.map((t) => (
-                      <tr key={t.id} className="hover:bg-stone-50/80 transition-colors group">
+                      <tr key={t.id} onClick={() => openEdit(t)} className="hover:bg-stone-50/80 transition-colors group cursor-pointer">
                         <td className="px-4 py-3 text-[12.5px] font-mono text-stone-500 whitespace-nowrap">{formatDate(t.date)}</td>
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-brand-50 text-brand-700">

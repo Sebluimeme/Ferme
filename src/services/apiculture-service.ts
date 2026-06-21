@@ -42,12 +42,14 @@ function buildTransactionPayload(data: {
   dateVente: string;
   nbPots500g: number;
   nbPots1kg: number;
+  typeMiel?: string;
   prixTotal: number;
   notes?: string;
 }): Record<string, unknown> {
   const detail: string[] = [];
   if (data.nbPots500g > 0) detail.push(`${data.nbPots500g}×½kg`);
   if (data.nbPots1kg > 0) detail.push(`${data.nbPots1kg}×1kg`);
+  if (data.typeMiel) detail.push(data.typeMiel);
   const produit = `Vente miel${detail.length ? ` (${detail.join(", ")})` : ""}`;
   return {
     date: data.dateVente,
