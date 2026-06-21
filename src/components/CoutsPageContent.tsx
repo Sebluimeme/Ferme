@@ -132,7 +132,7 @@ function TransactionForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className={labelClass}>Quantité</label>
           <input type="number" min="0" step="0.01" value={form.quantite} onChange={set("quantite")} placeholder="Ex: 5" className={inputClass} />
@@ -392,7 +392,7 @@ export default function CoutsPageContent() {
         <>
           {/* Filtres */}
           <div className="bg-white border border-stone-200 rounded-xl p-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
               <div className="relative col-span-2 md:col-span-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400" />
                 <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
@@ -434,58 +434,93 @@ export default function CoutsPageContent() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-stone-200">
-                      {["Date", "Production", "Catégorie", "Produit", "Fournisseur", "Qté", "Payeur", "Montant", ""].map((h) => (
-                        <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold text-stone-400 uppercase tracking-[0.06em] whitespace-nowrap">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100">
-                    {filtered.map((t) => (
-                      <tr key={t.id} onClick={() => openEdit(t)} className="hover:bg-stone-50/80 transition-colors group cursor-pointer">
-                        <td className="px-4 py-3 text-[12.5px] font-mono text-stone-500 whitespace-nowrap">{formatDate(t.date)}</td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-brand-50 text-brand-700">
-                            {t.production}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-[12px] text-stone-500 whitespace-nowrap">
-                          {t.categorie} <span className="text-stone-300">›</span> {t.sousCategorie}
-                        </td>
-                        <td className="px-4 py-3 text-[13px] text-stone-800 max-w-[180px] truncate" title={t.produit}>{t.produit}</td>
-                        <td className="px-4 py-3 text-[12px] text-stone-400 whitespace-nowrap">{t.fournisseur || "—"}</td>
-                        <td className="px-4 py-3 text-[12px] text-stone-500 text-center">{t.quantite ?? "—"}</td>
-                        <td className="px-4 py-3 text-center">
-                          <span className="text-[11px] font-mono bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded">{t.payeur}</span>
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <span className={`text-[13.5px] font-semibold font-mono ${t.operation === "Revenus" ? "text-brand-600" : "text-stone-900"}`}>
-                            {t.operation === "Revenus" ? "+" : "−"}{t.montant.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
-                          </span>
-                          <span className="text-[11px] text-stone-400 ml-0.5">€</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => openEdit(t)}
-                              className="w-7 h-7 rounded-md hover:bg-stone-200 flex items-center justify-center cursor-pointer transition-colors">
-                              <Pencil className="w-3.5 h-3.5 text-stone-400" />
-                            </button>
-                            <button onClick={() => setDeleteTarget({ id: t.id, label: t.produit })}
-                              className="w-7 h-7 rounded-md hover:bg-red-50 flex items-center justify-center cursor-pointer transition-colors">
-                              <Trash2 className="w-3.5 h-3.5 text-stone-400 hover:text-red-500" />
-                            </button>
+              <>
+                {/* Vue carte — mobile uniquement */}
+                <div className="md:hidden divide-y divide-stone-100">
+                  {filtered.map((t) => (
+                    <div key={t.id} onClick={() => openEdit(t)} className="px-4 py-3 hover:bg-stone-50 cursor-pointer">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium text-stone-800 truncate">{t.produit}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-50 text-brand-700">{t.production}</span>
+                            <span className="text-[11px] text-stone-400">{t.categorie} › {t.sousCategorie}</span>
                           </div>
-                        </td>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[11px] text-stone-400">{formatDate(t.date)}</span>
+                            <span className="text-[11px] font-mono bg-stone-100 text-stone-600 px-1 py-0.5 rounded">{t.payeur}</span>
+                            {t.fournisseur && <span className="text-[11px] text-stone-400 truncate">{t.fournisseur}</span>}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className={`text-[15px] font-bold ${t.operation === "Revenus" ? "text-brand-600" : "text-stone-900"}`}>
+                            {t.operation === "Revenus" ? "+" : "−"}{t.montant.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
+                          </span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: t.id, label: t.produit }); }}
+                            className="block ml-auto mt-1 text-[11px] text-stone-400 hover:text-red-500"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Vue tableau — desktop uniquement */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-stone-200">
+                        {["Date", "Production", "Catégorie", "Produit", "Fournisseur", "Qté", "Payeur", "Montant", ""].map((h) => (
+                          <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold text-stone-400 uppercase tracking-[0.06em] whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {filtered.map((t) => (
+                        <tr key={t.id} onClick={() => openEdit(t)} className="hover:bg-stone-50/80 transition-colors group cursor-pointer">
+                          <td className="px-4 py-3 text-[12.5px] font-mono text-stone-500 whitespace-nowrap">{formatDate(t.date)}</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-brand-50 text-brand-700">
+                              {t.production}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-[12px] text-stone-500 whitespace-nowrap">
+                            {t.categorie} <span className="text-stone-300">›</span> {t.sousCategorie}
+                          </td>
+                          <td className="px-4 py-3 text-[13px] text-stone-800 max-w-[180px] truncate" title={t.produit}>{t.produit}</td>
+                          <td className="px-4 py-3 text-[12px] text-stone-400 whitespace-nowrap">{t.fournisseur || "—"}</td>
+                          <td className="px-4 py-3 text-[12px] text-stone-500 text-center">{t.quantite ?? "—"}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="text-[11px] font-mono bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded">{t.payeur}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <span className={`text-[13.5px] font-semibold ${t.operation === "Revenus" ? "text-brand-600" : "text-stone-900"}`}>
+                              {t.operation === "Revenus" ? "+" : "−"}{t.montant.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={(e) => { e.stopPropagation(); openEdit(t); }}
+                                className="w-7 h-7 rounded-md hover:bg-stone-200 flex items-center justify-center cursor-pointer transition-colors">
+                                <Pencil className="w-3.5 h-3.5 text-stone-400" />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: t.id, label: t.produit }); }}
+                                className="w-7 h-7 rounded-md hover:bg-red-50 flex items-center justify-center cursor-pointer transition-colors">
+                                <Trash2 className="w-3.5 h-3.5 text-stone-400 hover:text-red-500" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </>

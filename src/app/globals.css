@@ -49,7 +49,19 @@
   --sal: env(safe-area-inset-left, 0px);
 }
 
-/* Scrollbar */
+/* ── Reset mobile PWA ── */
+html {
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+
+body {
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
+}
+
+
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 9999px; }

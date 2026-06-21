@@ -50,7 +50,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
         {/* Contenu — padding bottom pour la BottomNav + safe area */}
         <main
-          className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 lg:pb-8"
+          className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8 lg:pb-8"
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 3.75rem)" }}
         >
           <div className="lg:pb-0" style={{ paddingBottom: 0 }}>
