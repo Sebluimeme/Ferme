@@ -16,6 +16,7 @@ import {
   Wallet,
   TrendingUp,
   BarChart3,
+  Droplets,
   LogOut,
   ChevronRight,
 } from "lucide-react";
@@ -41,6 +42,7 @@ const sections = [
       { icon: Wheat, label: "Fourrage",    route: "/fourrage" },
       { icon: Flower, label: "Apiculture",  route: "/apiculture" },
       { icon: Map,   label: "Parcellaire", route: "/fourrage/partiels" },
+      { icon: Droplets, label: "Source", route: "/source" },
     ],
   },
   {
