@@ -15,6 +15,7 @@ export function getVehicleIcon(type: VehicleType): string {
     tracteur: "🚜",
     utilitaire: "🚐",
     remorque: "🚚",
+    engin_tp: "🦾",
   };
   return icons[type] || "🚗";
 }
@@ -27,6 +28,7 @@ export function getVehicleTypeLabel(type: VehicleType): string {
     tracteur: "Tracteur",
     utilitaire: "Utilitaire",
     remorque: "Remorque",
+    engin_tp: "Engin TP",
   };
   return labels[type] || type;
 }
@@ -112,6 +114,7 @@ export function getVehicleColor(type: VehicleType): string {
     tracteur: "var(--color-vehicle-tracteur)",
     utilitaire: "var(--color-vehicle-utilitaire)",
     remorque: "var(--color-vehicle-remorque)",
+    engin_tp: "#b45309",
   };
   return colors[type] || "#6b7280";
 }
@@ -124,6 +127,7 @@ export function getVehicleTailwindColor(type: VehicleType): string {
     tracteur: "text-green-600",
     utilitaire: "text-purple-600",
     remorque: "text-gray-600",
+    engin_tp: "text-amber-700",
   };
   return colors[type] || "text-gray-500";
 }
@@ -136,6 +140,7 @@ export function getVehicleBorderColor(type: VehicleType): string {
     tracteur: "border-l-green-600",
     utilitaire: "border-l-purple-600",
     remorque: "border-l-gray-600",
+    engin_tp: "border-l-amber-700",
   };
   return colors[type] || "border-l-gray-500";
 }
@@ -148,6 +153,7 @@ export function getVehicleBgColor(type: VehicleType): string {
     tracteur: "bg-green-50 text-green-700",
     utilitaire: "bg-purple-50 text-purple-700",
     remorque: "bg-gray-50 text-gray-700",
+    engin_tp: "bg-amber-50 text-amber-700",
   };
   return colors[type] || "bg-gray-100 text-gray-700";
 }

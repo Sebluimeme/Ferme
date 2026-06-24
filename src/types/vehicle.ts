@@ -4,7 +4,7 @@
 
 // ==================== Types de Véhicules ====================
 
-export type VehicleType = "voiture" | "moto" | "quad" | "tracteur" | "utilitaire" | "remorque";
+export type VehicleType = "voiture" | "moto" | "quad" | "tracteur" | "utilitaire" | "remorque" | "engin_tp";
 
 export type VehicleStatus = "actif" | "en_reparation" | "stocke" | "vendu" | "reforme";
 

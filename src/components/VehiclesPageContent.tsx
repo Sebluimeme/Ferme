@@ -155,6 +155,7 @@ export default function VehiclesPageContent() {
               <option value="tracteur">🚜 {getVehicleTypeLabel("tracteur")}</option>
               <option value="utilitaire">🚐 {getVehicleTypeLabel("utilitaire")}</option>
               <option value="remorque">🚚 {getVehicleTypeLabel("remorque")}</option>
+              <option value="engin_tp">🦾 {getVehicleTypeLabel("engin_tp")}</option>
             </select>
             <select
               value={statusFilter}
@@ -168,10 +169,10 @@ export default function VehiclesPageContent() {
               <option value="vendu">Vendu</option>
               <option value="reforme">Réformé</option>
             </select>
-            {/* Bouton ajouter visible uniquement sur desktop */}
+            {/* Bouton ajouter */}
             <button
               onClick={() => setShowAddModal(true)}
-              className="hidden md:block px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors whitespace-nowrap"
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors whitespace-nowrap cursor-pointer"
             >
               + Ajouter un véhicule
             </button>

@@ -95,6 +95,7 @@ export default function VehicleForm({ vehicle, formRef }: VehicleFormProps) {
             <option value="tracteur">🚜 Tracteur</option>
             <option value="utilitaire">🚐 Utilitaire</option>
             <option value="remorque">🚚 Remorque</option>
+            <option value="engin_tp">🦾 Engin TP</option>
           </select>
         </div>
         <div>

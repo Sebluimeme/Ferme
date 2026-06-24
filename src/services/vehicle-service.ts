@@ -243,6 +243,7 @@ export function getVehicleStats(vehicles: Vehicle[]): VehicleStats {
     tracteur: 0,
     utilitaire: 0,
     remorque: 0,
+    engin_tp: 0,
   };
 
   const parStatut: Record<string, number> = {
