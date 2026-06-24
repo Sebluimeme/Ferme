@@ -12,6 +12,7 @@ import type { CadastreSelectData } from "@/components/CadastreMap";
 const CadastreMap = dynamic(() => import("@/components/CadastreMap"), { ssr: false });
 const ParcelSplitEditor = dynamic(() => import("@/components/ParcelSplitEditor"), { ssr: false });
 const ParcelOverviewMap = dynamic(() => import("@/components/ParcelOverviewMap"), { ssr: false });
+const ParcelGeometryEditor = dynamic(() => import("@/components/ParcelGeometryEditor"), { ssr: false });
 
 // ==================== Types internes ====================
 
@@ -168,6 +169,10 @@ export default function ParcellairePage() {
   const [showOverviewMap, setShowOverviewMap] = useState(true);
   const [splitTarget, setSplitTarget] = useState<Partiel | null>(null);
   const [splitSaving, setSplitSaving] = useState(false);
+  const [editGeoTarget, setEditGeoTarget] = useState<Partiel | null>(null);
+  const [drawMode, setDrawMode] = useState(false);
+  const [pendingGeometry, setPendingGeometry] = useState<{ geometry: object; surfaceHa: number } | null>(null);
+  const [geoSaving, setGeoSaving] = useState(false);
 
   const [cadastrePrefill, setCadastrePrefill] = useState<{
     nom: string;
@@ -284,6 +289,40 @@ export default function ParcellairePage() {
     }
   };
 
+  // Sauvegarde d'une géométrie éditée ou dessinée
+  const handleSaveGeometry = async () => {
+    if (!pendingGeometry) return;
+    setGeoSaving(true);
+    try {
+      if (editGeoTarget) {
+        // Edition de parcelle existante
+        const result = await updatePartiel(editGeoTarget.id, {
+          geometry: pendingGeometry.geometry,
+          surface: pendingGeometry.surfaceHa > 0 ? pendingGeometry.surfaceHa : editGeoTarget.surface,
+        });
+        if (result.success) {
+          showToast({ type: "success", title: "Géométrie mise à jour" });
+          setEditGeoTarget(null);
+          setPendingGeometry(null);
+        } else {
+          showToast({ type: "error", title: "Erreur", message: result.error });
+        }
+      } else if (drawMode) {
+        // Dessin à main levée → pré-remplir le formulaire de création
+        setDrawMode(false);
+        setCadastrePrefill({
+          nom: "",
+          surface: pendingGeometry.surfaceHa.toString(),
+          geometry: pendingGeometry.geometry,
+        });
+        setModalOpen(true);
+        setPendingGeometry(null);
+      }
+    } finally {
+      setGeoSaving(false);
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* En-tête */}
@@ -293,6 +332,12 @@ export default function ParcellairePage() {
           <p className="text-gray-500 mt-1">Gérez vos parcelles fourragères</p>
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={() => { setDrawMode(true); setPendingGeometry(null); }}
+            className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 cursor-pointer shadow-md"
+          >
+            ✍️ Tracer à main levée
+          </button>
           <button
             onClick={() => setShowMap(true)}
             className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md"
@@ -355,6 +400,13 @@ export default function ParcellairePage() {
                     title="Diviser"
                   >
                     ✂️
+                  </button>
+                  <button
+                    onClick={() => { setEditGeoTarget(partiel); setPendingGeometry(null); }}
+                    className="py-1.5 px-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-lg cursor-pointer transition-colors"
+                    title="Éditer le tracé"
+                  >
+                    📐
                   </button>
                   <button
                     onClick={() => setEditPartiel(partiel)}
@@ -509,6 +561,73 @@ export default function ParcellairePage() {
             saving={splitSaving}
           />
         )}
+      </Modal>
+
+      {/* Modal édition géométrie (vertices) */}
+      <Modal
+        isOpen={!!editGeoTarget}
+        onClose={() => { setEditGeoTarget(null); setPendingGeometry(null); }}
+        title={`📐 Éditer le tracé — "${editGeoTarget?.nom ?? ""}"`}
+        size="large"
+      >
+        {editGeoTarget && (
+          <div className="flex flex-col gap-3" style={{ minHeight: "480px" }}>
+            <ParcelGeometryEditor
+              initialGeometry={editGeoTarget.geometry}
+              mode="edit"
+              onChange={(geometry, surfaceHa) => setPendingGeometry({ geometry, surfaceHa })}
+            />
+            <div className="flex justify-end gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => { setEditGeoTarget(null); setPendingGeometry(null); }}
+                className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={!pendingGeometry || geoSaving}
+                onClick={handleSaveGeometry}
+                className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50"
+              >
+                {geoSaving ? "Enregistrement..." : "Enregistrer le tracé"}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal dessin à main levée */}
+      <Modal
+        isOpen={drawMode}
+        onClose={() => { setDrawMode(false); setPendingGeometry(null); }}
+        title="✍️ Tracer une parcelle à main levée"
+        size="large"
+      >
+        <div className="flex flex-col gap-3" style={{ minHeight: "480px" }}>
+          <ParcelGeometryEditor
+            mode="draw"
+            onChange={(geometry, surfaceHa) => setPendingGeometry({ geometry, surfaceHa })}
+          />
+          <div className="flex justify-end gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => { setDrawMode(false); setPendingGeometry(null); }}
+              className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+            >
+              Annuler
+            </button>
+            <button
+              type="button"
+              disabled={!pendingGeometry}
+              onClick={handleSaveGeometry}
+              className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 cursor-pointer disabled:opacity-50"
+            >
+              Valider ce tracé →
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
