@@ -89,6 +89,8 @@ function formDataToVehicle(formData: VehicleFormData): Partial<Omit<Vehicle, "id
 
     valeurAchat: formData.valeurAchat ? Number(formData.valeurAchat) : undefined,
     dateAchat: formData.dateAchat || undefined,
+    dateVente: formData.dateVente || undefined,
+    prixVente: formData.prixVente ? Number(formData.prixVente) : undefined,
 
     dateProchainCT: formData.dateProchainCT || undefined,
 

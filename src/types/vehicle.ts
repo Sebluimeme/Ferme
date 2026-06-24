@@ -34,6 +34,8 @@ export interface Vehicle {
   // Financier
   valeurAchat?: number;                // Prix d'achat
   dateAchat?: string;                  // Date d'achat (ISO format)
+  dateVente?: string;                  // Date de vente (ISO format)
+  prixVente?: number;                  // Prix de vente
 
   // Documents
   dateProchainCT?: string;             // Date prochain contrôle technique
@@ -251,6 +253,8 @@ export interface VehicleFormData {
 
   valeurAchat?: string;
   dateAchat?: string;
+  dateVente?: string;
+  prixVente?: string;
 
   dateProchainCT?: string;
 

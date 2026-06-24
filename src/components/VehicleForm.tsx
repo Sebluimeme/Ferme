@@ -11,12 +11,14 @@ interface VehicleFormProps {
 export default function VehicleForm({ vehicle, formRef }: VehicleFormProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(vehicle?.photoUrl || null);
   const [clearPhoto, setClearPhoto] = useState(false);
+  const [statut, setStatut] = useState<string>(vehicle?.statut || "actif");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Reset photo state when the edited vehicle changes
   useEffect(() => {
     setPreviewUrl(vehicle?.photoUrl || null);
     setClearPhoto(false);
+    setStatut(vehicle?.statut || "actif");
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, [vehicle?.id]);
 
@@ -106,6 +108,7 @@ export default function VehicleForm({ vehicle, formRef }: VehicleFormProps) {
             name="statut"
             defaultValue={vehicle?.statut || "actif"}
             required
+            onChange={(e) => setStatut(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
           >
             <option value="actif">✅ Actif</option>
@@ -239,6 +242,33 @@ export default function VehicleForm({ vehicle, formRef }: VehicleFormProps) {
           />
         </div>
       </div>
+
+      {/* Vente — affiché uniquement si statut = vendu */}
+      {statut === "vendu" && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div>
+            <label className="block mb-1 text-sm font-medium text-amber-800">💰 Date de vente</label>
+            <input
+              type="date"
+              name="dateVente"
+              defaultValue={vehicle?.dateVente || ""}
+              className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10 bg-white"
+            />
+          </div>
+          <div>
+            <label className="block mb-1 text-sm font-medium text-amber-800">💰 Prix de vente (€)</label>
+            <input
+              type="number"
+              name="prixVente"
+              defaultValue={vehicle?.prixVente || ""}
+              placeholder="Ex : 8500"
+              min="0"
+              step="0.01"
+              className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/10 bg-white"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Commentaire */}
       <div>
