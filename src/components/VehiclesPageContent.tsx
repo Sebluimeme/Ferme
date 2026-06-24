@@ -189,7 +189,7 @@ export default function VehiclesPageContent() {
         +
       </button>
 
-      {/* Grille de cartes */}
+      {/* Grille de cartes — groupées par catégorie */}
       {filteredVehicles.length === 0 ? (
         <div className="text-center py-16">
           <div className="text-6xl mb-4">🚗</div>
@@ -205,29 +205,69 @@ export default function VehiclesPageContent() {
             + Ajouter votre premier véhicule
           </button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {filteredVehicles.map((vehicle) => (
-            <VehicleCard
-              key={vehicle.id}
-              vehicle={vehicle}
-              onEdit={(id) => {
-                const v = state.vehicles.find((v) => v.id === id);
-                if (v) setEditVehicle(v);
-              }}
-              onDelete={(id) => {
-                const v = state.vehicles.find((v) => v.id === id);
-                if (v)
-                  setDeleteTarget({
-                    id: v.id,
-                    nom: v.plaqueImmatriculation || (v.marque && v.modele ? `${v.marque} ${v.modele}` : `Véhicule ${v.id}`),
-                  });
-              }}
-              onClick={handleVehicleClick}
-            />
-          ))}
-        </div>
-      )}
+      ) : (() => {
+        // Ordre d'affichage des catégories
+        const categoryOrder: VehicleType[] = ["tracteur", "engin_tp", "utilitaire", "quad", "voiture", "moto", "remorque"];
+        const categoryLabels: Record<VehicleType, string> = {
+          tracteur: "🚜 Tracteurs",
+          engin_tp: "🦾 Engins TP",
+          utilitaire: "🚐 Utilitaires",
+          quad: "🛺 Quads & SSV",
+          voiture: "🚗 Voitures",
+          moto: "🏍️ Motos",
+          remorque: "🚚 Remorques",
+        };
+
+        // Grouper les véhicules par type, en respectant l'ordre
+        const grouped = categoryOrder
+          .map((type) => ({
+            type,
+            label: categoryLabels[type],
+            vehicles: filteredVehicles.filter((v) => v.type === type),
+          }))
+          .filter((g) => g.vehicles.length > 0);
+
+        // Véhicules avec type inconnu (sécurité)
+        const knownTypes = new Set(categoryOrder);
+        const others = filteredVehicles.filter((v) => !knownTypes.has(v.type as VehicleType));
+        if (others.length > 0) grouped.push({ type: "utilitaire", label: "Autres", vehicles: others });
+
+        return (
+          <div className="flex flex-col gap-8">
+            {grouped.map((group) => (
+              <div key={group.type}>
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                  {group.label}
+                  <span className="text-xs font-normal text-gray-400 normal-case tracking-normal">
+                    ({group.vehicles.length})
+                  </span>
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {group.vehicles.map((vehicle) => (
+                    <VehicleCard
+                      key={vehicle.id}
+                      vehicle={vehicle}
+                      onEdit={(id) => {
+                        const v = state.vehicles.find((v) => v.id === id);
+                        if (v) setEditVehicle(v);
+                      }}
+                      onDelete={(id) => {
+                        const v = state.vehicles.find((v) => v.id === id);
+                        if (v)
+                          setDeleteTarget({
+                            id: v.id,
+                            nom: v.plaqueImmatriculation || (v.marque && v.modele ? `${v.marque} ${v.modele}` : `Véhicule ${v.id}`),
+                          });
+                      }}
+                      onClick={handleVehicleClick}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Modal d'ajout */}
       <Modal
