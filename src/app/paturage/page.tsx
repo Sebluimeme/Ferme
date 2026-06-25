@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import dynamic from "next/dynamic";
 import { useAppStore } from "@/store/store";
 import { useToast } from "@/components/Toast";
 import Modal, { ConfirmModal } from "@/components/Modal";
@@ -9,6 +10,9 @@ import type { SejourPaturage } from "@/types/paturage";
 import { getAnimalIcon } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { MapPin, Calendar, Download, Plus, Pencil, Trash2, LogOut } from "lucide-react";
+
+// Carte chargée dynamiquement (pas de SSR)
+const ParcelSelectorMap = dynamic(() => import("@/components/ParcelSelectorMap"), { ssr: false });
 
 const TYPE_LABELS: Record<SejourPaturage["typeAnimal"], string> = {
   ovin: "Ovins",
@@ -23,7 +27,7 @@ const TYPE_COLORS: Record<SejourPaturage["typeAnimal"], string> = {
   bovin:  "bg-amber-50 text-amber-700 border-amber-200",
   caprin: "bg-purple-50 text-purple-700 border-purple-200",
   porcin: "bg-red-50 text-red-700 border-red-200",
-  equin:  "bg-stone-50 text-stone-700 border-stone-200",
+  equin:  "bg-stone-100 text-stone-700 border-stone-300",
 };
 
 function formatDate(iso: string) {
@@ -32,8 +36,7 @@ function formatDate(iso: string) {
 
 function dureeJours(entree: string, sortie?: string): number {
   const fin = sortie ? new Date(sortie) : new Date();
-  const debut = new Date(entree);
-  return Math.max(0, Math.round((fin.getTime() - debut.getTime()) / 86400000));
+  return Math.max(0, Math.round((fin.getTime() - new Date(entree).getTime()) / 86400000));
 }
 
 // ─── Formulaire ──────────────────────────────────────────────────────────────
@@ -56,7 +59,7 @@ function SejourForm({
   loading,
 }: {
   initial?: Partial<FormData>;
-  partiels: { id: string; nom: string; surface?: number }[];
+  partiels: { id: string; nom: string; surface?: number; geometry?: object }[];
   animaux: { id: string; nom?: string; numeroBoucle?: string; type: string; statut: string }[];
   onSubmit: (data: FormData) => void;
   onCancel: () => void;
@@ -77,108 +80,147 @@ function SejourForm({
     [animaux, form.typeAnimal]
   );
 
+  // Pour la carte : sélection d'une seule parcelle
+  const selectedIds = form.parcelId ? [form.parcelId] : [];
+  const handleToggle = (id: string) => {
+    setForm((p) => ({ ...p, parcelId: p.parcelId === id ? "" : id }));
+  };
+
+  const parcellesAvecGeo = partiels.filter((p) => p.geometry);
+  const parcellesSansGeo = partiels.filter((p) => !p.geometry);
+
   return (
-    <form
-      onSubmit={(e) => { e.preventDefault(); onSubmit(form); }}
-      className="flex flex-col gap-4"
-    >
-      {/* Parcelle */}
-      <div>
-        <label className="block text-[13px] font-medium text-stone-700 mb-1">Parcelle *</label>
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="flex flex-col gap-4">
+
+      {/* Sélection parcelle — carte si géométries dispo */}
+      <div className="form-field">
+        <label className="form-label">Parcelle *</label>
+        {parcellesAvecGeo.length > 0 ? (
+          <>
+            <p className="form-hint mb-1">Cliquez sur la parcelle sur la carte pour la sélectionner.</p>
+            <ParcelSelectorMap
+              partiels={partiels}
+              selectedIds={selectedIds}
+              onToggle={handleToggle}
+            />
+          </>
+        ) : (
+          <select
+            required
+            value={form.parcelId}
+            onChange={(e) => setForm((p) => ({ ...p, parcelId: e.target.value }))}
+            className="form-input"
+          >
+            <option value="">Sélectionner une parcelle</option>
+            {partiels.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nom}{p.surface ? ` (${p.surface.toFixed(2)} ha)` : ""}
+              </option>
+            ))}
+          </select>
+        )}
+        {/* Fallback dropdown si parcelles sans géo */}
+        {parcellesAvecGeo.length > 0 && parcellesSansGeo.length > 0 && (
+          <div className="mt-2">
+            <p className="form-hint mb-1">Ou choisir une parcelle sans géométrie :</p>
+            <select
+              value={parcellesSansGeo.some(p => p.id === form.parcelId) ? form.parcelId : ""}
+              onChange={(e) => setForm((p) => ({ ...p, parcelId: e.target.value || p.parcelId }))}
+              className="form-input"
+            >
+              <option value="">—</option>
+              {parcellesSansGeo.map((p) => (
+                <option key={p.id} value={p.id}>{p.nom}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {/* Validation visuelle */}
+        {!form.parcelId && (
+          <p className="form-hint text-amber-600">Aucune parcelle sélectionnée</p>
+        )}
+      </div>
+
+      {/* Type animal */}
+      <div className="form-field">
+        <label className="form-label">Type d&apos;animal *</label>
         <select
-          required
-          value={form.parcelId}
-          onChange={(e) => setForm((p) => ({ ...p, parcelId: e.target.value }))}
-          className="w-full px-3 py-2 text-[13px] bg-stone-50 border border-stone-200 rounded-lg text-stone-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+          value={form.typeAnimal}
+          onChange={(e) => setForm((p) => ({ ...p, typeAnimal: e.target.value as SejourPaturage["typeAnimal"] }))}
+          className="form-input"
         >
-          <option value="">Sélectionner une parcelle</option>
-          {partiels.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nom}{p.surface ? ` (${p.surface.toFixed(2)} ha)` : ""}
-            </option>
+          {(Object.keys(TYPE_LABELS) as SejourPaturage["typeAnimal"][]).map((t) => (
+            <option key={t} value={t}>{getAnimalIcon(t)} {TYPE_LABELS[t]}</option>
           ))}
         </select>
       </div>
 
-      {/* Type animal + nombre */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-[13px] font-medium text-stone-700 mb-1">Type d'animal *</label>
-          <select
-            value={form.typeAnimal}
-            onChange={(e) => setForm((p) => ({ ...p, typeAnimal: e.target.value as SejourPaturage["typeAnimal"] }))}
-            className="w-full px-3 py-2 text-[13px] bg-stone-50 border border-stone-200 rounded-lg text-stone-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-          >
-            {(Object.keys(TYPE_LABELS) as SejourPaturage["typeAnimal"][]).map((t) => (
-              <option key={t} value={t}>
-                {getAnimalIcon(t)} {TYPE_LABELS[t]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-[13px] font-medium text-stone-700 mb-1">
-            Nombre de têtes *
-            {animauxDuType.length > 0 && (
-              <span className="ml-1 text-stone-400 font-normal">({animauxDuType.length} actifs)</span>
-            )}
-          </label>
-          <input
-            type="number"
-            required
-            min="1"
-            value={form.nombreAnimaux}
-            onChange={(e) => setForm((p) => ({ ...p, nombreAnimaux: e.target.value }))}
-            placeholder={animauxDuType.length > 0 ? String(animauxDuType.length) : "Ex: 12"}
-            className="w-full px-3 py-2 text-[13px] bg-stone-50 border border-stone-200 rounded-lg text-stone-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-          />
-        </div>
+      {/* Nombre de têtes */}
+      <div className="form-field">
+        <label className="form-label">
+          Nombre de têtes *
+          {animauxDuType.length > 0 && (
+            <span className="ml-1 text-stone-400 font-normal">({animauxDuType.length} actifs en base)</span>
+          )}
+        </label>
+        <input
+          type="number"
+          required
+          min="1"
+          value={form.nombreAnimaux}
+          onChange={(e) => setForm((p) => ({ ...p, nombreAnimaux: e.target.value }))}
+          placeholder={animauxDuType.length > 0 ? String(animauxDuType.length) : "Ex: 12"}
+          className="form-input"
+        />
       </div>
 
-      {/* Dates */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-[13px] font-medium text-stone-700 mb-1">Date d'entrée *</label>
+      {/* Dates — 2 colonnes à partir de 480px */}
+      <div className="form-row">
+        <div className="form-field">
+          <label className="form-label">Date d&apos;entrée *</label>
           <input
             type="date"
             required
             value={form.dateEntree}
             onChange={(e) => setForm((p) => ({ ...p, dateEntree: e.target.value }))}
-            className="w-full px-3 py-2 text-[13px] bg-stone-50 border border-stone-200 rounded-lg text-stone-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            className="form-input"
           />
         </div>
-        <div>
-          <label className="block text-[13px] font-medium text-stone-700 mb-1">Date de sortie</label>
+        <div className="form-field">
+          <label className="form-label">Date de sortie</label>
           <input
             type="date"
             value={form.dateSortie}
             min={form.dateEntree}
             onChange={(e) => setForm((p) => ({ ...p, dateSortie: e.target.value }))}
-            className="w-full px-3 py-2 text-[13px] bg-stone-50 border border-stone-200 rounded-lg text-stone-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+            className="form-input"
           />
-          <p className="text-[11px] text-stone-400 mt-0.5">Laisser vide si encore en cours</p>
+          <p className="form-hint">Laisser vide si encore en cours</p>
         </div>
       </div>
 
       {/* Notes */}
-      <div>
-        <label className="block text-[13px] font-medium text-stone-700 mb-1">Notes</label>
+      <div className="form-field">
+        <label className="form-label">Notes</label>
         <textarea
           rows={2}
           value={form.notes}
           onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
           placeholder="Observations, état de la prairie..."
-          className="w-full px-3 py-2 text-[13px] bg-stone-50 border border-stone-200 rounded-lg text-stone-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 resize-none"
+          className="form-input resize-none"
         />
       </div>
 
-      <div className="flex justify-end gap-2 pt-1">
+      <div className="form-actions">
         <button type="button" onClick={onCancel}
           className="px-4 py-2 text-[13px] font-medium bg-stone-100 text-stone-700 border border-stone-200 rounded-lg hover:bg-stone-200 transition-colors cursor-pointer">
           Annuler
         </button>
-        <button type="submit" disabled={loading}
-          className="px-4 py-2 text-[13px] font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors cursor-pointer disabled:opacity-50">
+        <button
+          type="submit"
+          disabled={loading || !form.parcelId}
+          className="px-4 py-2 text-[13px] font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+        >
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
       </div>
@@ -201,13 +243,11 @@ export default function PaturagePage() {
   const [cloreTarget, setCloreTarget] = useState<SejourPaturage | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // KPIs
   const enCours = useMemo(() => sejoursPaturage.filter((s) => !s.dateSortie), [sejoursPaturage]);
   const termines = useMemo(() => sejoursPaturage.filter((s) => !!s.dateSortie), [sejoursPaturage]);
   const parcellesActives = useMemo(() => new Set(enCours.map((s) => s.parcelId)).size, [enCours]);
   const animauxEnPature = useMemo(() => enCours.reduce((sum, s) => sum + s.nombreAnimaux, 0), [enCours]);
 
-  // Liste filtrée + triée
   const filtered = useMemo(() => {
     let list = [...sejoursPaturage];
     if (filterType) list = list.filter((s) => s.typeAnimal === filterType);
@@ -216,11 +256,9 @@ export default function PaturagePage() {
     return list.sort((a, b) => new Date(b.dateEntree).getTime() - new Date(a.dateEntree).getTime());
   }, [sejoursPaturage, filterType, filterStatut]);
 
-  // Helpers
-  const getParcelNom = (id: string) => partiels.find((p) => p.id === id)?.nom ?? id;
+  const getParcelNom = (id: string) => partiels.find((p) => p.id === id)?.nom ?? "Parcelle inconnue";
   const getParcel = (id: string) => partiels.find((p) => p.id === id);
 
-  // Handlers CRUD
   const handleCreate = async (data: FormData) => {
     setSaving(true);
     try {
@@ -236,12 +274,8 @@ export default function PaturagePage() {
       if (result.success) {
         showToast({ type: "success", title: "Séjour enregistré" });
         setModalOpen(false);
-      } else {
-        showToast({ type: "error", title: "Erreur", message: result.error });
-      }
-    } finally {
-      setSaving(false);
-    }
+      } else showToast({ type: "error", title: "Erreur", message: result.error });
+    } finally { setSaving(false); }
   };
 
   const handleUpdate = async (data: FormData) => {
@@ -259,12 +293,8 @@ export default function PaturagePage() {
       if (result.success) {
         showToast({ type: "success", title: "Séjour mis à jour" });
         setEditTarget(null);
-      } else {
-        showToast({ type: "error", title: "Erreur", message: result.error });
-      }
-    } finally {
-      setSaving(false);
-    }
+      } else showToast({ type: "error", title: "Erreur", message: result.error });
+    } finally { setSaving(false); }
   };
 
   const handleDelete = async () => {
@@ -284,7 +314,6 @@ export default function PaturagePage() {
     setCloreTarget(null);
   };
 
-  // Export Excel
   const handleExport = () => {
     const rows = sejoursPaturage.map((s) => {
       const p = getParcel(s.parcelId);
@@ -343,46 +372,43 @@ export default function PaturagePage() {
         ))}
       </div>
 
-      {/* Vue "En cours" par parcelle */}
+      {/* Séjours en cours */}
       {enCours.length > 0 && (
         <div className="bg-white border border-stone-200 rounded-xl overflow-hidden mb-6">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-stone-100">
             <MapPin className="w-4 h-4 text-stone-400" />
-            <span className="text-[13px] font-semibold text-stone-800">Séjours en cours</span>
-            <span className="ml-auto text-[11px] font-semibold bg-brand-50 text-brand-700 border border-brand-100 px-2 py-0.5 rounded-full">
-              {enCours.length}
-            </span>
+            <span className="text-[13px] font-semibold text-stone-800">En cours</span>
+            <span className="ml-auto text-[11px] font-semibold bg-brand-50 text-brand-700 border border-brand-100 px-2 py-0.5 rounded-full">{enCours.length}</span>
           </div>
           <div className="divide-y divide-stone-100">
             {enCours.map((s) => {
               const p = getParcel(s.parcelId);
-              const jours = dureeJours(s.dateEntree);
               return (
                 <div key={s.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0 mt-0.5" />
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-medium text-stone-800">{getParcelNom(s.parcelId)}</span>
-                      {p?.surface && <span className="text-[11px] text-stone-400">{p.surface.toFixed(2)} ha</span>}
-                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${TYPE_COLORS[s.typeAnimal]}`}>
+                      <span className="text-[13px] font-medium text-stone-800 truncate">{getParcelNom(s.parcelId)}</span>
+                      {p?.surface && <span className="text-[11px] text-stone-400 shrink-0">{p.surface.toFixed(2)} ha</span>}
+                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border shrink-0 ${TYPE_COLORS[s.typeAnimal]}`}>
                         {getAnimalIcon(s.typeAnimal)} {s.nombreAnimaux} {TYPE_LABELS[s.typeAnimal]}
                       </span>
                     </div>
                     <p className="text-[12px] text-stone-400 mt-0.5">
-                      Entrée le {formatDate(s.dateEntree)} · {jours}j en pâture
-                      {s.notes && <span className="ml-1 italic">· {s.notes}</span>}
+                      Entrée le {formatDate(s.dateEntree)} · {dureeJours(s.dateEntree)}j
+                      {s.notes && <> · <span className="italic">{s.notes}</span></>}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => setCloreTarget(s)} title="Clore le séjour"
+                    <button onClick={() => setCloreTarget(s)} title="Clore"
                       className="p-1.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer">
                       <LogOut className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => setEditTarget(s)} title="Modifier"
+                    <button onClick={() => setEditTarget(s)}
                       className="p-1.5 text-stone-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition-colors cursor-pointer">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
-                    <button onClick={() => setDeleteTarget(s)} title="Supprimer"
+                    <button onClick={() => setDeleteTarget(s)}
                       className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -405,7 +431,7 @@ export default function PaturagePage() {
         </select>
         <select value={filterStatut} onChange={(e) => setFilterStatut(e.target.value as "en_cours" | "termine" | "")}
           className="px-3 py-1.5 text-[13px] bg-white border border-stone-200 rounded-lg text-stone-700 focus:outline-none focus:border-brand-500 cursor-pointer">
-          <option value="">Tous les statuts</option>
+          <option value="">Tous</option>
           <option value="en_cours">En cours</option>
           <option value="termine">Terminés</option>
         </select>
@@ -417,9 +443,7 @@ export default function PaturagePage() {
           <MapPin className="w-10 h-10 text-stone-200 mx-auto mb-3" />
           <p className="text-[14px] font-medium text-stone-500">Aucun séjour enregistré</p>
           <p className="text-[13px] text-stone-400 mt-1 mb-5">
-            {sejoursPaturage.length === 0
-              ? "Enregistrez le premier passage d'animaux sur une parcelle"
-              : "Aucun séjour ne correspond aux filtres"}
+            {sejoursPaturage.length === 0 ? "Enregistrez le premier passage d'animaux sur une parcelle" : "Aucun résultat pour ces filtres"}
           </p>
           {sejoursPaturage.length === 0 && (
             <button onClick={() => setModalOpen(true)}
@@ -439,28 +463,22 @@ export default function PaturagePage() {
             {filtered.map((s) => {
               const p = getParcel(s.parcelId);
               const isEnCours = !s.dateSortie;
-              const jours = dureeJours(s.dateEntree, s.dateSortie);
               return (
                 <div key={s.id} className="flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition-colors">
-                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-0.5 ${isEnCours ? "bg-brand-400" : "bg-stone-300"}`} />
+                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnCours ? "bg-brand-400" : "bg-stone-300"}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-medium text-stone-800">{getParcelNom(s.parcelId)}</span>
-                      {p?.surface && <span className="text-[11px] text-stone-400">{p.surface.toFixed(2)} ha</span>}
-                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${TYPE_COLORS[s.typeAnimal]}`}>
+                      <span className="text-[13px] font-medium text-stone-800 truncate">{getParcelNom(s.parcelId)}</span>
+                      {p?.surface && <span className="text-[11px] text-stone-400 shrink-0">{p.surface.toFixed(2)} ha</span>}
+                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border shrink-0 ${TYPE_COLORS[s.typeAnimal]}`}>
                         {getAnimalIcon(s.typeAnimal)} {s.nombreAnimaux} {TYPE_LABELS[s.typeAnimal]}
                       </span>
-                      {isEnCours && (
-                        <span className="text-[11px] font-semibold text-brand-600 bg-brand-50 border border-brand-100 px-1.5 py-0.5 rounded-full">
-                          En cours
-                        </span>
-                      )}
+                      {isEnCours && <span className="text-[11px] font-semibold text-brand-600 bg-brand-50 border border-brand-100 px-1.5 py-0.5 rounded-full shrink-0">En cours</span>}
                     </div>
                     <p className="text-[12px] text-stone-400 mt-0.5">
-                      {formatDate(s.dateEntree)}
-                      {s.dateSortie ? ` → ${formatDate(s.dateSortie)}` : " → aujourd'hui"}
-                      {" · "}{jours}j
-                      {s.notes && <span className="ml-1 italic">· {s.notes}</span>}
+                      {formatDate(s.dateEntree)}{s.dateSortie ? ` → ${formatDate(s.dateSortie)}` : " → aujourd'hui"}
+                      {" · "}{dureeJours(s.dateEntree, s.dateSortie)}j
+                      {s.notes && <> · <span className="italic">{s.notes}</span></>}
                     </p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -486,17 +504,15 @@ export default function PaturagePage() {
         </div>
       )}
 
-      {/* Modal création */}
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Nouveau séjour de pâturage">
+      {/* Modals */}
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Nouveau séjour de pâturage" size="large">
         <SejourForm partiels={partiels} animaux={animaux} onSubmit={handleCreate} onCancel={() => setModalOpen(false)} loading={saving} />
       </Modal>
 
-      {/* Modal édition */}
-      <Modal isOpen={!!editTarget} onClose={() => setEditTarget(null)} title="Modifier le séjour">
+      <Modal isOpen={!!editTarget} onClose={() => setEditTarget(null)} title="Modifier le séjour" size="large">
         {editTarget && (
           <SejourForm
-            partiels={partiels}
-            animaux={animaux}
+            partiels={partiels} animaux={animaux}
             initial={{
               parcelId: editTarget.parcelId,
               typeAnimal: editTarget.typeAnimal,
@@ -505,32 +521,23 @@ export default function PaturagePage() {
               dateSortie: editTarget.dateSortie ?? "",
               notes: editTarget.notes ?? "",
             }}
-            onSubmit={handleUpdate}
-            onCancel={() => setEditTarget(null)}
-            loading={saving}
+            onSubmit={handleUpdate} onCancel={() => setEditTarget(null)} loading={saving}
           />
         )}
       </Modal>
 
-      {/* Confirm clore */}
       <ConfirmModal
-        isOpen={!!cloreTarget}
-        onClose={() => setCloreTarget(null)}
-        onConfirm={handleClore}
+        isOpen={!!cloreTarget} onClose={() => setCloreTarget(null)} onConfirm={handleClore}
         title="Clore le séjour"
-        message={`Clore le séjour de <strong>${cloreTarget ? TYPE_LABELS[cloreTarget.typeAnimal] : ""}</strong> sur <strong>${cloreTarget ? getParcelNom(cloreTarget.parcelId) : ""}</strong> ? La date de sortie sera fixée à aujourd'hui.`}
+        message={`Clore le séjour de <strong>${cloreTarget ? TYPE_LABELS[cloreTarget.typeAnimal] : ""}</strong> sur <strong>${cloreTarget ? getParcelNom(cloreTarget.parcelId) : ""}</strong> ?<br>La date de sortie sera fixée à aujourd'hui.`}
         confirmText="Clore"
       />
 
-      {/* Confirm delete */}
       <ConfirmModal
-        isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
         title="Supprimer le séjour"
         message="Voulez-vous vraiment supprimer ce séjour ? Cette action est irréversible."
-        confirmText="Supprimer"
-        danger
+        confirmText="Supprimer" danger
       />
     </div>
   );

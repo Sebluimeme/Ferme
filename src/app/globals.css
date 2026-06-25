@@ -88,3 +88,58 @@ body {
 .fade-in       { animation: fadeIn 0.15s ease-out; }
 .slide-in-right { animation: slideInRight 0.2s ease-out; }
 .slide-in-down  { animation: slideInDown 0.15s ease-out; }
+
+/* ── Système de formulaire standard ── */
+/* RÈGLE : toujours utiliser ces classes dans les formulaires de modales.
+   Ne JAMAIS utiliser grid-cols-2 brut dans une modal — ça casse sur mobile.
+   Pour 2 colonnes côte à côte : .form-row (devient colonne unique < 480px) */
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.form-label {
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 500;
+  color: #44403c; /* stone-700 */
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  background: #fafaf9; /* stone-50 */
+  border: 1px solid #e7e5e4; /* stone-200 */
+  border-radius: 0.5rem;
+  color: #292524; /* stone-800 */
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.form-input:focus {
+  border-color: #33935e; /* brand-500 */
+  box-shadow: 0 0 0 3px rgba(51, 147, 94, 0.12);
+}
+
+.form-hint {
+  font-size: 0.6875rem; /* 11px */
+  color: #a8a29e; /* stone-400 */
+}
+
+/* 2 colonnes sur écran ≥ 480px, 1 colonne en dessous */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+}
+@media (min-width: 480px) {
+  .form-row { grid-template-columns: 1fr 1fr; }
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
+}
