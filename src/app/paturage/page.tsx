@@ -42,7 +42,7 @@ function dureeJours(entree: string, sortie?: string): number {
 // ─── Formulaire ──────────────────────────────────────────────────────────────
 
 interface FormData {
-  parcelId: string;
+  parcelIds: string[];
   typeAnimal: SejourPaturage["typeAnimal"];
   nombreAnimaux: string;
   dateEntree: string;
@@ -67,7 +67,7 @@ function SejourForm({
 }) {
   const today = new Date().toISOString().split("T")[0];
   const [form, setForm] = useState<FormData>({
-    parcelId: initial?.parcelId ?? "",
+    parcelIds: initial?.parcelIds ?? [],
     typeAnimal: initial?.typeAnimal ?? "ovin",
     nombreAnimaux: initial?.nombreAnimaux ?? "",
     dateEntree: initial?.dateEntree ?? today,
@@ -80,10 +80,14 @@ function SejourForm({
     [animaux, form.typeAnimal]
   );
 
-  // Pour la carte : sélection d'une seule parcelle
-  const selectedIds = form.parcelId ? [form.parcelId] : [];
+  // Multi-sélection
   const handleToggle = (id: string) => {
-    setForm((p) => ({ ...p, parcelId: p.parcelId === id ? "" : id }));
+    setForm((p) => ({
+      ...p,
+      parcelIds: p.parcelIds.includes(id)
+        ? p.parcelIds.filter((x) => x !== id)
+        : [...p.parcelIds, id],
+    }));
   };
 
   const parcellesAvecGeo = partiels.filter((p) => p.geometry);
@@ -100,15 +104,15 @@ function SejourForm({
             <p className="form-hint mb-1">Cliquez sur la parcelle sur la carte pour la sélectionner.</p>
             <ParcelSelectorMap
               partiels={partiels}
-              selectedIds={selectedIds}
+              selectedIds={form.parcelIds}
               onToggle={handleToggle}
             />
           </>
         ) : (
           <select
             required
-            value={form.parcelId}
-            onChange={(e) => setForm((p) => ({ ...p, parcelId: e.target.value }))}
+            value=""
+            onChange={() => {}}
             className="form-input"
           >
             <option value="">Sélectionner une parcelle</option>
@@ -124,8 +128,8 @@ function SejourForm({
           <div className="mt-2">
             <p className="form-hint mb-1">Ou choisir une parcelle sans géométrie :</p>
             <select
-              value={parcellesSansGeo.some(p => p.id === form.parcelId) ? form.parcelId : ""}
-              onChange={(e) => setForm((p) => ({ ...p, parcelId: e.target.value || p.parcelId }))}
+              value=""
+              onChange={(e) => { if (e.target.value) setForm((p) => ({ ...p, parcelIds: p.parcelIds.includes(e.target.value) ? p.parcelIds : [...p.parcelIds, e.target.value] })); }}
               className="form-input"
             >
               <option value="">—</option>
@@ -136,7 +140,7 @@ function SejourForm({
           </div>
         )}
         {/* Validation visuelle */}
-        {!form.parcelId && (
+        {form.parcelIds.length === 0 && (
           <p className="form-hint text-amber-600">Aucune parcelle sélectionnée</p>
         )}
       </div>
@@ -218,7 +222,7 @@ function SejourForm({
         </button>
         <button
           type="submit"
-          disabled={loading || !form.parcelId}
+          disabled={loading || form.parcelIds.length === 0}
           className="px-4 py-2 text-[13px] font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
         >
           {loading ? "Enregistrement..." : "Enregistrer"}
@@ -245,7 +249,7 @@ export default function PaturagePage() {
 
   const enCours = useMemo(() => sejoursPaturage.filter((s) => !s.dateSortie), [sejoursPaturage]);
   const termines = useMemo(() => sejoursPaturage.filter((s) => !!s.dateSortie), [sejoursPaturage]);
-  const parcellesActives = useMemo(() => new Set(enCours.map((s) => s.parcelId)).size, [enCours]);
+  const parcellesActives = useMemo(() => new Set(enCours.flatMap((s) => s.parcelIds)).size, [enCours]);
   const animauxEnPature = useMemo(() => enCours.reduce((sum, s) => sum + s.nombreAnimaux, 0), [enCours]);
 
   const filtered = useMemo(() => {
@@ -257,13 +261,14 @@ export default function PaturagePage() {
   }, [sejoursPaturage, filterType, filterStatut]);
 
   const getParcelNom = (id: string) => partiels.find((p) => p.id === id)?.nom ?? "Parcelle inconnue";
+  const getParcelNoms = (ids: string[]) => ids.map(id => getParcelNom(id)).join(", ") || "Parcelle inconnue";
   const getParcel = (id: string) => partiels.find((p) => p.id === id);
 
   const handleCreate = async (data: FormData) => {
     setSaving(true);
     try {
       const result = await createSejour({
-        parcelId: data.parcelId,
+        parcelIds: data.parcelIds,
         typeAnimal: data.typeAnimal,
         nombreAnimaux: parseInt(data.nombreAnimaux),
         dateEntree: data.dateEntree,
@@ -283,7 +288,7 @@ export default function PaturagePage() {
     setSaving(true);
     try {
       const result = await updateSejour(editTarget.id, {
-        parcelId: data.parcelId,
+        parcelIds: data.parcelIds,
         typeAnimal: data.typeAnimal,
         nombreAnimaux: parseInt(data.nombreAnimaux),
         dateEntree: data.dateEntree,
@@ -316,10 +321,10 @@ export default function PaturagePage() {
 
   const handleExport = () => {
     const rows = sejoursPaturage.map((s) => {
-      const p = getParcel(s.parcelId);
+      const p = getParcel(s.parcelIds?.[0] ?? "");
       return {
-        Parcelle: getParcelNom(s.parcelId),
-        "Surface (ha)": p?.surface ?? "",
+        Parcelle: getParcelNoms(s.parcelIds),
+        "Surface (ha)": s.parcelIds.map(id => partiels.find(p=>p.id===id)?.surface ?? "").filter(Boolean).join(", "),
         "Type animal": TYPE_LABELS[s.typeAnimal],
         "Nb têtes": s.nombreAnimaux,
         Entrée: formatDate(s.dateEntree),
@@ -382,13 +387,13 @@ export default function PaturagePage() {
           </div>
           <div className="divide-y divide-stone-100">
             {enCours.map((s) => {
-              const p = getParcel(s.parcelId);
+              const p = getParcel(s.parcelIds[0]);
               return (
                 <div key={s.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-medium text-stone-800 truncate">{getParcelNom(s.parcelId)}</span>
+                      <span className="text-[13px] font-medium text-stone-800 truncate">{getParcelNoms(s.parcelIds)}</span>
                       {p?.surface && <span className="text-[11px] text-stone-400 shrink-0">{p.surface.toFixed(2)} ha</span>}
                       <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border shrink-0 ${TYPE_COLORS[s.typeAnimal]}`}>
                         {getAnimalIcon(s.typeAnimal)} {s.nombreAnimaux} {TYPE_LABELS[s.typeAnimal]}
@@ -461,14 +466,14 @@ export default function PaturagePage() {
           </div>
           <div className="divide-y divide-stone-100">
             {filtered.map((s) => {
-              const p = getParcel(s.parcelId);
+              const p = getParcel(s.parcelIds?.[0] ?? "");
               const isEnCours = !s.dateSortie;
               return (
                 <div key={s.id} className="flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition-colors">
                   <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isEnCours ? "bg-brand-400" : "bg-stone-300"}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-medium text-stone-800 truncate">{getParcelNom(s.parcelId)}</span>
+                      <span className="text-[13px] font-medium text-stone-800 truncate">{getParcelNoms(s.parcelIds)}</span>
                       {p?.surface && <span className="text-[11px] text-stone-400 shrink-0">{p.surface.toFixed(2)} ha</span>}
                       <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border shrink-0 ${TYPE_COLORS[s.typeAnimal]}`}>
                         {getAnimalIcon(s.typeAnimal)} {s.nombreAnimaux} {TYPE_LABELS[s.typeAnimal]}
@@ -514,7 +519,7 @@ export default function PaturagePage() {
           <SejourForm
             partiels={partiels} animaux={animaux}
             initial={{
-              parcelId: editTarget.parcelId,
+              parcelIds: editTarget.parcelIds,
               typeAnimal: editTarget.typeAnimal,
               nombreAnimaux: String(editTarget.nombreAnimaux),
               dateEntree: editTarget.dateEntree,
@@ -529,7 +534,7 @@ export default function PaturagePage() {
       <ConfirmModal
         isOpen={!!cloreTarget} onClose={() => setCloreTarget(null)} onConfirm={handleClore}
         title="Clore le séjour"
-        message={`Clore le séjour de <strong>${cloreTarget ? TYPE_LABELS[cloreTarget.typeAnimal] : ""}</strong> sur <strong>${cloreTarget ? getParcelNom(cloreTarget.parcelId) : ""}</strong> ?<br>La date de sortie sera fixée à aujourd'hui.`}
+        message={`Clore le séjour de <strong>${cloreTarget ? TYPE_LABELS[cloreTarget.typeAnimal] : ""}</strong> sur <strong>${cloreTarget ? getParcelNoms(cloreTarget.parcelIds) : ""}</strong> ?<br>La date de sortie sera fixée à aujourd'hui.`}
         confirmText="Clore"
       />
 
