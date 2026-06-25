@@ -326,21 +326,21 @@ export default function ParcellairePage() {
   return (
     <div className="max-w-7xl mx-auto">
       {/* En-tête */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-stone-900">🗺️ Parcellaire</h1>
-          <p className="text-stone-500 mt-1">Gérez vos parcelles fourragères</p>
+          <h1 className="text-2xl font-bold text-stone-900">Parcellaire</h1>
+          <p className="text-[13px] text-stone-400 mt-0.5">Gérez vos parcelles fourragères</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 shrink-0">
           <button
             onClick={() => { setDrawMode(true); setPendingGeometry(null); }}
-            className="px-4 py-2 text-sm font-medium text-stone-700 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 hover:border-stone-300 transition-colors cursor-pointer"
+            className="px-3 py-1.5 text-[13px] font-medium text-stone-600 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 transition-colors cursor-pointer"
           >
-            ✍️ Tracer à main levée
+            Tracer à main levée
           </button>
           <button
             onClick={() => setShowMap(true)}
-            className="px-4 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors cursor-pointer"
+            className="px-3 py-1.5 text-[13px] font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors cursor-pointer"
           >
             + Nouvelle parcelle
           </button>
