@@ -74,13 +74,13 @@ function RucheForm({ initial, onSubmit, onCancel, loading }: {
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1">Nom de la ruche *</label>
           <input type="text" required
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             value={form.nom} onChange={(e) => setForm((p) => ({ ...p, nom: e.target.value }))}
             placeholder="Ex : Ruche 1" />
         </div>
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1">Statut</label>
-          <select className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          <select className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             value={form.statut} onChange={(e) => setForm((p) => ({ ...p, statut: e.target.value as Ruche["statut"] }))}>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
@@ -92,27 +92,27 @@ function RucheForm({ initial, onSubmit, onCancel, loading }: {
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1">Emplacement</label>
           <input type="text"
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             value={form.emplacement} onChange={(e) => setForm((p) => ({ ...p, emplacement: e.target.value }))}
             placeholder="Ex : Verger nord" />
         </div>
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1">Date d&apos;installation</label>
           <input type="date"
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             value={form.dateInstallation} onChange={(e) => setForm((p) => ({ ...p, dateInstallation: e.target.value }))} />
         </div>
       </div>
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">Notes</label>
         <textarea rows={2}
-          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
           value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
           placeholder="Observations..." />
       </div>
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">Annuler</button>
-        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50">
+        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
       </div>
@@ -152,13 +152,13 @@ function RecolteForm({ ruches, initial, onSubmit, onCancel, loading }: {
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1">Date de récolte *</label>
           <input type="date" required
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             value={form.dateRecolte} onChange={(e) => setForm((p) => ({ ...p, dateRecolte: e.target.value }))} />
         </div>
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1">Poids (kg) *</label>
           <input type="number" min="0" step="0.1" required
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             value={form.poidsKg} onChange={(e) => setForm((p) => ({ ...p, poidsKg: e.target.value }))}
             placeholder="Ex : 12.5" />
         </div>
@@ -166,7 +166,7 @@ function RecolteForm({ ruches, initial, onSubmit, onCancel, loading }: {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1">Ruche</label>
-          <select className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          <select className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             value={form.rucheId} onChange={(e) => setForm((p) => ({ ...p, rucheId: e.target.value }))}>
             <option value="">— Toutes ruches —</option>
             {ruches.filter((r) => r.statut === "active").map((r) => (
@@ -176,7 +176,7 @@ function RecolteForm({ ruches, initial, onSubmit, onCancel, loading }: {
         </div>
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1">Type de miel</label>
-          <select className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          <select className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as RecolteMiel["type"] | "" }))}>
             <option value="">— Non spécifié —</option>
             {(Object.entries(TYPE_MIEL_LABELS) as [NonNullable<RecolteMiel["type"]>, string][]).map(([k, v]) => (
@@ -188,13 +188,13 @@ function RecolteForm({ ruches, initial, onSubmit, onCancel, loading }: {
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">Notes</label>
         <textarea rows={2}
-          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
           value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
           placeholder="Conditions, observations..." />
       </div>
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">Annuler</button>
-        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50">
+        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
       </div>
@@ -276,7 +276,7 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">Date de vente *</label>
         <input type="date" required
-          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           value={form.dateVente} onChange={(e) => setForm((p) => ({ ...p, dateVente: e.target.value }))} />
       </div>
 
@@ -284,7 +284,7 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1">Taille du pot</label>
           <select
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             value={taillePot}
             onChange={(e) => handlePotsChange(parseFloat(e.target.value) as 0.5 | 1, nbPots)}
           >
@@ -295,7 +295,7 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1">Nombre de pots</label>
           <input type="number" min="1" step="1" required
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             value={nbPots}
             onChange={(e) => handlePotsChange(taillePot, Math.max(1, parseInt(e.target.value) || 1))}
           />
@@ -309,7 +309,7 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">Type de miel</label>
         <select
-          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           value={form.typeMiel}
           onChange={(e) => setForm((p) => ({ ...p, typeMiel: e.target.value }))}
         >
@@ -322,7 +322,7 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">Encaissé par</label>
         <select
-          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           value={form.beneficiaire}
           onChange={(e) => setForm((p) => ({ ...p, beneficiaire: e.target.value }))}
         >
@@ -335,7 +335,7 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">Prix total (€) *</label>
         <input type="number" min="0" step="0.01" required
-          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           value={form.prixTotal} onChange={(e) => setForm((p) => ({ ...p, prixTotal: e.target.value }))}
           placeholder="Ex : 45.00" />
       </div>
@@ -343,14 +343,14 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">Notes</label>
         <textarea rows={2}
-          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
           value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
           placeholder="Client, lieu de vente..." />
       </div>
 
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">Annuler</button>
-        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50">
+        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
       </div>
@@ -439,11 +439,164 @@ export default function ApiculturePage() {
         .filter((r) => { const d = new Date(r.dateRecolte); return d.getMonth() === idx && d.getFullYear() === thisYear; })
         .reduce((s, r) => s + r.poidsKg, 0);
       const ca = ventesMiel
-        .filter((v) => { const d = new Date(v.dateVente);
+        .filter((v) => { const d = new Date(v.dateVente); return d.getMonth() === idx && d.getFullYear() === thisYear; })
+        .reduce((s, v) => s + v.prixTotal, 0);
+      return { mois, kg: kg || null, ca: ca || null };
+    }),
+  [recolteMiel, ventesMiel, thisYear]);
 
-... [OUTPUT TRUNCATED - 8169 chars omitted out of 58169 total] ...
+  const parRuche = useMemo(() => {
+    const map: Record<string, number> = {};
+    recolteMiel
+      .filter((r) => new Date(r.dateRecolte).getFullYear() === thisYear)
+      .forEach((r) => {
+        const key = r.rucheId
+          ? (ruches.find((ru) => ru.id === r.rucheId)?.nom ?? r.rucheId)
+          : "Non attribué";
+        map[key] = (map[key] ?? 0) + r.poidsKg;
+      });
+    return Object.entries(map).map(([ruche, kg]) => ({ ruche, kg })).sort((a, b) => b.kg - a.kg);
+  }, [recolteMiel, ruches, thisYear]);
 
-l-yellow-500" valueColorClass="text-yellow-600" />
+  const parType = useMemo(() => {
+    const map: Record<string, number> = {};
+    recolteMiel.forEach((r) => {
+      const key = r.type ? TYPE_MIEL_LABELS[r.type] : "Non spécifié";
+      map[key] = (map[key] ?? 0) + r.poidsKg;
+    });
+    return Object.entries(map).map(([type, kg]) => ({ type, kg })).sort((a, b) => b.kg - a.kg);
+  }, [recolteMiel]);
+
+  const recoltesTri = [...recolteMiel].sort((a, b) => new Date(b.dateRecolte).getTime() - new Date(a.dateRecolte).getTime());
+  const ventesTri = [...ventesMiel].sort((a, b) => new Date(b.dateVente).getTime() - new Date(a.dateVente).getTime());
+
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const formatEur = (n: number) =>
+    n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+
+  // ——— Handlers ruches ———
+  const handleCreateRuche = async (data: RucheFormData) => {
+    setSaving(true);
+    try {
+      const res = await createRuche({ nom: data.nom, emplacement: data.emplacement || undefined, dateInstallation: data.dateInstallation || undefined, statut: data.statut, notes: data.notes || undefined });
+      if (res.success) { showToast({ type: "success", title: "Ruche créée" }); setModalRuche(false); }
+      else showToast({ type: "error", title: "Erreur", message: res.error });
+    } finally { setSaving(false); }
+  };
+  const handleUpdateRuche = async (data: RucheFormData) => {
+    if (!editRuche) return;
+    setSaving(true);
+    try {
+      const res = await updateRuche(editRuche.id, { nom: data.nom, emplacement: data.emplacement || undefined, dateInstallation: data.dateInstallation || undefined, statut: data.statut, notes: data.notes || undefined });
+      if (res.success) { showToast({ type: "success", title: "Ruche mise à jour" }); setEditRuche(null); }
+      else showToast({ type: "error", title: "Erreur", message: res.error });
+    } finally { setSaving(false); }
+  };
+  const handleDeleteRuche = async () => {
+    if (!deleteRucheTarget) return;
+    const res = await deleteRuche(deleteRucheTarget.id);
+    if (res.success) showToast({ type: "success", title: "Ruche supprimée" });
+    else showToast({ type: "error", title: "Erreur", message: res.error });
+    setDeleteRucheTarget(null);
+  };
+
+  // ——— Handlers récoltes ———
+  const handleCreateRecolte = async (data: RecolteFormData) => {
+    setSaving(true);
+    try {
+      const res = await createRecolte({ rucheId: data.rucheId || undefined, dateRecolte: data.dateRecolte, poidsKg: parseFloat(data.poidsKg), type: (data.type || undefined) as RecolteMiel["type"], notes: data.notes || undefined });
+      if (res.success) { showToast({ type: "success", title: "Récolte enregistrée" }); setModalRecolte(false); }
+      else showToast({ type: "error", title: "Erreur", message: res.error });
+    } finally { setSaving(false); }
+  };
+  const handleUpdateRecolte = async (data: RecolteFormData) => {
+    if (!editRecolte) return;
+    setSaving(true);
+    try {
+      const res = await updateRecolte(editRecolte.id, { rucheId: data.rucheId || undefined, dateRecolte: data.dateRecolte, poidsKg: parseFloat(data.poidsKg), type: (data.type || undefined) as RecolteMiel["type"], notes: data.notes || undefined });
+      if (res.success) { showToast({ type: "success", title: "Récolte mise à jour" }); setEditRecolte(null); }
+      else showToast({ type: "error", title: "Erreur", message: res.error });
+    } finally { setSaving(false); }
+  };
+  const handleDeleteRecolte = async () => {
+    if (!deleteRecolteTarget) return;
+    const res = await deleteRecolte(deleteRecolteTarget.id);
+    if (res.success) showToast({ type: "success", title: "Récolte supprimée" });
+    else showToast({ type: "error", title: "Erreur", message: res.error });
+    setDeleteRecolteTarget(null);
+  };
+
+  // ——— Handlers ventes ———
+  const handleCreateVente = async (data: VenteFormData) => {
+    setSaving(true);
+    try {
+      const res = await createVente({
+        beneficiaire: data.beneficiaire || undefined,
+        dateVente: data.dateVente,
+        nbPots500g: parseInt(data.nbPots500g) || 0,
+        nbPots1kg: parseInt(data.nbPots1kg) || 0,
+        typeMiel: data.typeMiel || undefined,
+        prixTotal: parseFloat(data.prixTotal),
+        notes: data.notes || undefined,
+      });
+      if (res.success) { showToast({ type: "success", title: "Vente enregistrée" }); setModalVente(false); }
+      else showToast({ type: "error", title: "Erreur", message: res.error });
+    } finally { setSaving(false); }
+  };
+  const handleUpdateVente = async (data: VenteFormData) => {
+    if (!editVente) return;
+    setSaving(true);
+    try {
+      const res = await updateVente(editVente.id, {
+        beneficiaire: data.beneficiaire || undefined,
+        dateVente: data.dateVente,
+        nbPots500g: parseInt(data.nbPots500g) || 0,
+        nbPots1kg: parseInt(data.nbPots1kg) || 0,
+        typeMiel: data.typeMiel || undefined,
+        prixTotal: parseFloat(data.prixTotal),
+        notes: data.notes || undefined,
+      }, editVente);
+      if (res.success) { showToast({ type: "success", title: "Vente mise à jour" }); setEditVente(null); }
+      else showToast({ type: "error", title: "Erreur", message: res.error });
+    } finally { setSaving(false); }
+  };
+  const handleDeleteVente = async () => {
+    if (!deleteVenteTarget) return;
+    const res = await deleteVente(deleteVenteTarget.id, deleteVenteTarget.transactionId);
+    if (res.success) showToast({ type: "success", title: "Vente supprimée" });
+    else showToast({ type: "error", title: "Erreur", message: res.error });
+    setDeleteVenteTarget(null);
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto">
+      {/* En-tête */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-stone-900">🍯 Apiculture</h1>
+          <p className="text-stone-500 mt-1">Suivi des ruches, récoltes et ventes de miel</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={() => setModalVente(true)}
+            className="px-3 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 cursor-pointer shadow-md">
+            + Vente
+          </button>
+          <button onClick={() => setModalRecolte(true)}
+            className="px-3 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 cursor-pointer shadow-md">
+            + Récolte
+          </button>
+          <button onClick={() => setModalRuche(true)}
+            className="px-3 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md">
+            + Ruche
+          </button>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <KpiCard label="Ruches actives" value={ruchesActives} subtitle={`${ruches.length} total`} borderColorClass="border-l-amber-500" valueColorClass="text-amber-600" />
+        <KpiCard label={`Récolte ${thisYear}`} value={mielCetteAnnee > 0 ? `${mielCetteAnnee.toFixed(1)} kg` : "—"} subtitle={mielCeMois > 0 ? `${mielCeMois.toFixed(1)} kg ce mois` : undefined} borderColorClass="border-l-yellow-500" valueColorClass="text-yellow-600" />
         <KpiCard label={`CA ${thisYear}`} value={caCetteAnnee > 0 ? formatEur(caCetteAnnee) : "—"} subtitle={caTotal !== caCetteAnnee && caTotal > 0 ? `${formatEur(caTotal)} total` : undefined} borderColorClass="border-l-green-500" valueColorClass="text-green-600" />
         <KpiCard label="Pots vendus" value={totalPots500 + totalPots1kg > 0 ? totalPots500 + totalPots1kg : "—"} subtitle={totalPots500 + totalPots1kg > 0 ? `${totalPots500}×½kg · ${totalPots1kg}×1kg` : undefined} borderColorClass="border-l-orange-500" valueColorClass="text-orange-600" />
       </div>
@@ -679,7 +832,7 @@ l-yellow-500" valueColorClass="text-yellow-600" />
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={() => setEditVente(v)}
-                  className="p-2 text-stone-400 hover:text-brand-600 hover:bg-stone-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
+                  className="p-2 text-stone-400 hover:text-primary hover:bg-stone-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
                   ✏️
                 </button>
                 <button onClick={() => setDeleteVenteTarget(v)}
@@ -835,7 +988,7 @@ l-yellow-500" valueColorClass="text-yellow-600" />
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button onClick={() => setEditRecolte(r)}
-                    className="p-2 text-stone-400 hover:text-brand-600 hover:bg-stone-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
+                    className="p-2 text-stone-400 hover:text-primary hover:bg-stone-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
                     ✏️
                   </button>
                   <button onClick={() => setDeleteRecolteTarget(r)}
@@ -879,7 +1032,7 @@ l-yellow-500" valueColorClass="text-yellow-600" />
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button onClick={() => setEditRuche(r)}
-                    className="p-2 text-stone-400 hover:text-brand-600 hover:bg-stone-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
+                    className="p-2 text-stone-400 hover:text-primary hover:bg-stone-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
                     ✏️
                   </button>
                   <button onClick={() => setDeleteRucheTarget(r)}

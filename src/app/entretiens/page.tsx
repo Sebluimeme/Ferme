@@ -70,7 +70,6 @@ export default function EntretiensPage() {
       <div className="flex items-center justify-center py-20">
           <div className="text-stone-400 text-lg">Chargement...</div>
         </div>
-      </div>
     );
   }
 
