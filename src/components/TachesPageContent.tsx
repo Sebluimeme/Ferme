@@ -301,7 +301,7 @@ export default function TachesPageContent() {
 
       {/* Header */}
       <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-stone-900">📋 Tâches</h1>
+        <h1 className="text-2xl font-bold text-stone-900">Tâches</h1>
         <button
           onClick={() => setShowAddModal(true)}
           className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer"

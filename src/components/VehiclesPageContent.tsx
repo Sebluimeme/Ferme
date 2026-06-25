@@ -133,7 +133,7 @@ export default function VehiclesPageContent() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-stone-900">🚜 Parc de véhicules</h1>
+          <h1 className="text-2xl font-bold text-stone-900">Parc de véhicules</h1>
           <p className="text-stone-400 text-sm mt-0.5">Gérez vos véhicules et leur maintenance</p>
         </div>
       </div>

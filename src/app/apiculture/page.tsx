@@ -570,7 +570,7 @@ export default function ApiculturePage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="fade-in">
       {/* En-tête */}
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -783,7 +783,7 @@ export default function ApiculturePage() {
           {/* Récap année */}
           {ventesMiel.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-4 mb-2">
-              <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="grid grid-cols-3 gap-3 text-center">
                 <div>
                   <p className="text-xs text-stone-400 font-medium">CA total</p>
                   <p className="text-xl font-bold text-green-700">{formatEur(caTotal)}</p>

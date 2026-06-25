@@ -22,7 +22,7 @@ export default function VehicleHeader({ vehicle }: VehicleHeaderProps) {
       <div className="flex items-start gap-4">
         <div className="text-5xl">{getVehicleIcon(vehicle.type)}</div>
         <div className="flex-1">
-          <h1 className="text-2xl md:text-3xl font-bold text-stone-900">{displayName}</h1>
+          <h1 className="text-2xl md:text-2xl font-bold text-stone-900">{displayName}</h1>
           <div className="flex flex-wrap gap-2 mt-2">
             <span className={`text-xs font-medium px-3 py-1 rounded-full ${getStatusColor(vehicle.statut)}`}>
               {getStatusLabel(vehicle.statut)}

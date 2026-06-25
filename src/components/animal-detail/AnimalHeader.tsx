@@ -53,7 +53,7 @@ export default function AnimalHeader({ animal, onEdit, onDelete }: AnimalHeaderP
         </button>
         <span className="text-3xl sm:text-4xl">{getAnimalIcon(animal.type)}</span>
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold m-0 break-words">
+          <h1 className="text-xl sm:text-2xl font-bold text-stone-900 break-words">
             {animal.nom || animal.numeroBoucle || "Animal sans identifiant"}
           </h1>
           {animal.numeroBoucle && animal.nom && (

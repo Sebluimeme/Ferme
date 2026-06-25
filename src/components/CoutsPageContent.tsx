@@ -489,7 +489,7 @@ export default function CoutsPageContent() {
 
                 {/* Vue tableau — desktop uniquement */}
                 <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full min-w-[500px]">
                     <thead>
                       <tr className="border-b border-stone-200">
                         {["Date", "Production", "Catégorie", "Produit", "Fournisseur", "Qté", "Payeur", "Montant", ""].map((h) => (
@@ -589,7 +589,7 @@ export default function CoutsPageContent() {
 
               {/* Vue tableau — desktop */}
               <div className="hidden md:block">
-                <table className="w-full">
+                <table className="w-full min-w-[500px]">
                   <thead>
                     <tr className="border-b border-stone-200">
                       {["Production", "Dépenses", "Revenus", "Balance", "Couverture"].map((h) => (

@@ -324,7 +324,7 @@ export default function ParcellairePage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div>
       {/* En-tête */}
       <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>

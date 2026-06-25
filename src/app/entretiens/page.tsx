@@ -78,7 +78,7 @@ export default function EntretiensPage() {
   return (
     <div className="fade-in">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-stone-900">Entretiens</h1>
+        <h1 className="text-2xl md:text-2xl font-bold text-stone-900">Entretiens</h1>
         <p className="text-stone-600 mt-1">Vue d&apos;ensemble de tous les entretiens de vos véhicules</p>
       </div>
 

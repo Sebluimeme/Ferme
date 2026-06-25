@@ -104,16 +104,16 @@ export default function SourcePage() {
   const sortedDesc = [...releves].sort((a, b) => b.date.localeCompare(a.date));
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-stone-900">💧 Source</h1>
+          <h1 className="text-2xl font-bold text-stone-900">Source</h1>
           <p className="text-stone-500 mt-1">Suivi du débit de la source</p>
         </div>
         <button
           onClick={openCreate}
-          className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 transition-colors transition-all shadow-sm cursor-pointer"
+          className="px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer"
         >
           + Nouveau relevé
         </button>
@@ -193,7 +193,7 @@ export default function SourcePage() {
 
         {releves.length === 0 ? (
           <p className="text-sm text-stone-400 text-center py-10">
-            Aucun relevé enregistré — commencez par <button onClick={openCreate} className="text-blue-500 underline cursor-pointer">ajouter un relevé</button>.
+            Aucun relevé enregistré — commencez par <button onClick={openCreate} className="text-brand-600 underline cursor-pointer">ajouter un relevé</button>.
           </p>
         ) : (
           <>
@@ -220,7 +220,7 @@ export default function SourcePage() {
 
             {/* Vue tableau desktop */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[500px]">
                 <thead>
                   <tr className="bg-stone-50 text-left text-xs font-semibold text-stone-500 uppercase tracking-wide">
                     <th className="px-5 py-3">Date</th>
@@ -326,7 +326,7 @@ export default function SourcePage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 transition-colors disabled:opacity-50 cursor-pointer transition-all"
+                  className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 transition-colors disabled:opacity-50 cursor-pointer transition-all"
                 >
                   {saving ? "Enregistrement…" : editTarget ? "Mettre à jour" : "Enregistrer"}
                 </button>

@@ -188,7 +188,7 @@ export default function WeatherWidget({ partiels }: { partiels: Partiel[] }) {
       )}
 
       {days && (
-        <div className="grid grid-cols-7 gap-1.5">
+        <div className="overflow-x-auto -mx-1"><div className="grid grid-cols-7 gap-1 min-w-[340px] px-1">
           {days.map((day, i) => {
             const score = hayScore(day);
             const cfg = SCORE_CONFIG[score];
@@ -216,7 +216,7 @@ export default function WeatherWidget({ partiels }: { partiels: Partiel[] }) {
               </div>
             );
           })}
-        </div>
+        </div></div>
       )}
 
       {days && (

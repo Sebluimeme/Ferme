@@ -113,7 +113,7 @@ export default function WeightChart({ animalId, animalType, weights }: WeightCha
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[500px]">
             <thead>
               <tr className="border-b border-stone-200">
                 <th className="text-left py-2 font-medium text-stone-500">Date</th>

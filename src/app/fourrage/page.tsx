@@ -519,16 +519,16 @@ export default function FourragePage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div>
       {/* En-tête */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-stone-900">🌾 Fourrage</h1>
+          <h1 className="text-2xl font-bold text-stone-900">Fourrage</h1>
           <p className="text-stone-500 mt-1">Gestion des activités de coupe et de récolte</p>
         </div>
         <button
           onClick={() => setModalOpen(true)}
-          className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer shadow-md"
+          className="px-4 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors cursor-pointer"
         >
           + Nouvelle activité
         </button>
@@ -627,7 +627,7 @@ export default function FourragePage() {
       {/* Analytics récoltes foin / regain */}
       {(totalFoinT > 0 || totalRegainT > 0) && (
         <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5 mb-8">
-          <h2 className="text-base font-semibold text-stone-800 mb-4">📊 Analytics récoltes</h2>
+          <h2 className="text-base font-semibold text-stone-800 mb-4">Analytics récoltes</h2>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
             <KpiCard
@@ -677,7 +677,7 @@ export default function FourragePage() {
           {rdtParParcelle.length > 0 && (
             <>
               <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mt-5 mb-2">Rendement par parcelle</p>
-              <div className="overflow-x-auto rounded-lg border border-stone-100">
+              <div className="overflow-x-auto overflow-x-auto rounded-lg border border-stone-100">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-stone-50 text-xs text-stone-500 font-semibold">

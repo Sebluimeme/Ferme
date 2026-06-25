@@ -36,17 +36,15 @@ export default function VehicleDetailPage() {
 
   if (!vehicle) {
     return (
-      <div className="p-4 md:p-6 lg:p-8">
-        <div className="text-center py-16">
-          <div className="text-4xl mb-4">⏳</div>
-          <p className="text-stone-500">Chargement du véhicule...</p>
-        </div>
+      <div className="text-center py-16">
+        <div className="text-4xl mb-4">⏳</div>
+        <p className="text-stone-500">Chargement du véhicule...</p>
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 lg:p-8">
+    <div className="fade-in">
       <VehicleHeader vehicle={vehicle} />
 
       {/* Onglets */}
@@ -56,7 +54,7 @@ export default function VehicleDetailPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-6 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 activeTab === tab.id
                   ? "border-brand-600 text-brand-600"
                   : "border-transparent text-stone-600 hover:text-stone-800"
