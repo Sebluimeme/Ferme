@@ -105,7 +105,7 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
   if (state.loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="text-gray-400 text-lg">Chargement...</div>
+        <div className="text-stone-400 text-lg">Chargement...</div>
       </div>
     );
   }
@@ -116,10 +116,10 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
       <div className="text-center py-20">
         <div className="text-6xl mb-4">🔍</div>
         <h2 className="text-2xl font-semibold mb-2">Animal introuvable</h2>
-        <p className="text-gray-600 mb-6">Cet animal n&apos;existe pas ou a été supprimé.</p>
+        <p className="text-stone-600 mb-6">Cet animal n&apos;existe pas ou a été supprimé.</p>
         <button
           onClick={() => router.back()}
-          className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg cursor-pointer"
+          className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg cursor-pointer"
         >
           Retour aux animaux
         </button>
@@ -137,15 +137,15 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
 
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm mb-6 overflow-x-auto">
-        <div className="flex border-b border-gray-200 min-w-max">
+        <div className="flex border-b border-stone-200 min-w-max">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-5 py-3 text-sm font-medium transition-colors cursor-pointer border-b-2 ${
                 activeTab === tab.id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
+                  ? "border-brand-600 text-brand-600"
+                  : "border-transparent text-stone-500 hover:text-stone-700"
               }`}
             >
               {tab.label}
@@ -170,10 +170,10 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
       <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Modifier l'animal" size="large">
         <AnimalForm animal={animal} formRef={formRef} />
         <div className="flex gap-3 justify-end mt-6">
-          <button onClick={() => setShowEditModal(false)} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">
+          <button onClick={() => setShowEditModal(false)} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">
             Annuler
           </button>
-          <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+          <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer disabled:opacity-50">
             {saving ? "Enregistrement..." : "Enregistrer"}
           </button>
         </div>

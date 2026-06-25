@@ -60,7 +60,7 @@ export default function TraitementsPage() {
   if (state.loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="text-gray-400 text-lg">Chargement...</div>
+        <div className="text-stone-400 text-lg">Chargement...</div>
       </div>
     );
   }
@@ -70,8 +70,8 @@ export default function TraitementsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Traitements</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-stone-900">Traitements</h1>
+          <p className="text-stone-500 text-sm mt-1">
             {enCoursCount} en cours &middot; {clotureCount} cloture{clotureCount > 1 ? "s" : ""}
           </p>
         </div>
@@ -91,8 +91,8 @@ export default function TraitementsPage() {
                 onClick={() => setFilter(f.value)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-lg cursor-pointer transition-colors ${
                   filter === f.value
-                    ? "bg-primary text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    ? "bg-brand-600 text-white"
+                    : "bg-stone-100 text-stone-600 hover:bg-stone-200"
                 }`}
               >
                 {f.label} ({f.count})
@@ -105,7 +105,7 @@ export default function TraitementsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Rechercher par traitement ou animal..."
-              className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full px-3 py-1.5 text-sm border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
             />
           </div>
         </div>
@@ -115,13 +115,13 @@ export default function TraitementsPage() {
       {filteredTraitements.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
           <div className="text-4xl mb-2">💊</div>
-          <p className="text-gray-400">
+          <p className="text-stone-400">
             {traitements.length === 0
               ? "Aucun traitement enregistre"
               : "Aucun resultat pour cette recherche"}
           </p>
           {traitements.length === 0 && (
-            <p className="text-gray-400 text-sm mt-1">
+            <p className="text-stone-400 text-sm mt-1">
               Ajoutez des fiches soins depuis la page d&apos;un animal (onglet Soins)
             </p>
           )}
@@ -156,20 +156,20 @@ export default function TraitementsPage() {
                     {animal && (
                       <Link
                         href={`/animaux/${animal.id}`}
-                        className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-primary mb-1 no-underline"
+                        className="inline-flex items-center gap-1.5 text-xs text-stone-500 hover:text-brand-600 mb-1 no-underline"
                       >
                         <span>{getAnimalIcon(animal.type)}</span>
                         <span>{animal.nom || animal.numeroBoucle || "Animal"}</span>
                       </Link>
                     )}
 
-                    <div className="text-xs text-gray-400">
+                    <div className="text-xs text-stone-400">
                       Debut : {formatDate(soin.dateDebut)}
                       {soin.dateFin && <> &middot; Fin : {formatDate(soin.dateFin)}</>}
                     </div>
 
                     {soin.description && (
-                      <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap line-clamp-2">
+                      <p className="text-sm text-stone-600 mt-2 whitespace-pre-wrap line-clamp-2">
                         {soin.description}
                       </p>
                     )}
@@ -179,7 +179,7 @@ export default function TraitementsPage() {
                         href={soin.photoUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-2 inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+                        className="mt-2 inline-flex items-center gap-1.5 text-xs text-brand-600 hover:underline"
                       >
                         <span>📎</span>
                         <span>{soin.photoNom || "Ordonnance"}</span>
@@ -193,7 +193,7 @@ export default function TraitementsPage() {
                       href={soin.photoUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-gray-200"
+                      className="shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-stone-200"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
@@ -206,7 +206,7 @@ export default function TraitementsPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-3 mt-3 pt-2 border-t border-gray-100">
+                <div className="flex items-center gap-3 mt-3 pt-2 border-t border-stone-100">
                   {soin.statut === "en_cours" ? (
                     <button
                       onClick={() => handleCloturer(soin)}
@@ -224,10 +224,10 @@ export default function TraitementsPage() {
                   )}
                   {animal && (
                     <>
-                      <span className="text-gray-300">|</span>
+                      <span className="text-stone-300">|</span>
                       <Link
                         href={`/animaux/${animal.id}`}
-                        className="text-xs text-primary hover:underline no-underline"
+                        className="text-xs text-brand-600 hover:underline no-underline"
                       >
                         Voir l&apos;animal
                       </Link>

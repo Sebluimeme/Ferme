@@ -98,19 +98,19 @@ export default function HistoryTimeline({ animalId, history }: HistoryTimelinePr
         <h2 className="text-lg font-semibold">Historique</h2>
         <button
           onClick={() => { setEditEntry(null); setShowForm(true); }}
-          className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer"
+          className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer"
         >
           + Ajouter
         </button>
       </div>
 
       {sortedHistory.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-12 text-stone-400">
           <div className="text-4xl mb-2">📝</div>
           <p>Aucun historique</p>
         </div>
       ) : (
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-stone-100">
           {sortedHistory.map((entry) => {
             const isExpanded = expandedIds.has(entry.id);
             return (
@@ -119,23 +119,23 @@ export default function HistoryTimeline({ animalId, history }: HistoryTimelinePr
                   className="flex items-center gap-3 cursor-pointer select-none"
                   onClick={() => toggleExpand(entry.id)}
                 >
-                  <span className="text-gray-400 text-xs w-5 text-center shrink-0">
+                  <span className="text-stone-400 text-xs w-5 text-center shrink-0">
                     {isExpanded ? "▾" : "▸"}
                   </span>
-                  <span className="text-xs text-gray-400 shrink-0 w-[85px]">{formatDate(entry.date)}</span>
+                  <span className="text-xs text-stone-400 shrink-0 w-[85px]">{formatDate(entry.date)}</span>
                   <span className="font-medium text-sm flex-1">{entry.sujet}</span>
                 </div>
                 {isExpanded && (
-                  <div className="ml-8 mt-2 pl-4 border-l-2 border-gray-200">
+                  <div className="ml-8 mt-2 pl-4 border-l-2 border-stone-200">
                     {entry.description ? (
-                      <p className="text-sm text-gray-600 whitespace-pre-wrap">{entry.description}</p>
+                      <p className="text-sm text-stone-600 whitespace-pre-wrap">{entry.description}</p>
                     ) : (
-                      <p className="text-sm text-gray-400 italic">Pas de description</p>
+                      <p className="text-sm text-stone-400 italic">Pas de description</p>
                     )}
                     <div className="flex gap-3 mt-2">
                       <button
                         onClick={() => openEdit(entry)}
-                        className="text-xs text-primary hover:underline cursor-pointer bg-transparent border-none p-0"
+                        className="text-xs text-brand-600 hover:underline cursor-pointer bg-transparent border-none p-0"
                       >
                         Modifier
                       </button>
@@ -163,41 +163,41 @@ export default function HistoryTimeline({ animalId, history }: HistoryTimelinePr
       >
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Date *</label>
+            <label className="block mb-1 text-sm font-medium text-stone-700">Date *</label>
             <input
               type="date"
               name="date"
               defaultValue={editEntry?.date || new Date().toISOString().split("T")[0]}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
             />
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Sujet *</label>
+            <label className="block mb-1 text-sm font-medium text-stone-700">Sujet *</label>
             <input
               type="text"
               name="sujet"
               defaultValue={editEntry?.sujet || ""}
               required
               placeholder="Visite vétérinaire, vaccination..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
             />
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Description (optionnel)</label>
+            <label className="block mb-1 text-sm font-medium text-stone-700">Description (optionnel)</label>
             <textarea
               name="description"
               defaultValue={editEntry?.description || ""}
               placeholder="Détails complémentaires..."
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 resize-y"
+              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 resize-y"
             />
           </div>
           <div className="flex gap-3 justify-end mt-2">
-            <button type="button" onClick={closeModal} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">
+            <button type="button" onClick={closeModal} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">
               Annuler
             </button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer disabled:opacity-50">
               {saving ? "Enregistrement..." : editEntry ? "Enregistrer" : "Ajouter"}
             </button>
           </div>
@@ -206,11 +206,11 @@ export default function HistoryTimeline({ animalId, history }: HistoryTimelinePr
 
       {/* Confirm delete */}
       <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Supprimer l'entrée" size="small">
-        <p className="text-gray-700">
+        <p className="text-stone-700">
           Voulez-vous vraiment supprimer l&apos;entrée <strong>{deleteTarget?.sujet}</strong> du {deleteTarget && formatDate(deleteTarget.date)} ?
         </p>
         <div className="flex gap-3 justify-end mt-6">
-          <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">
+          <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">
             Annuler
           </button>
           <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 cursor-pointer">

@@ -42,7 +42,7 @@ export default function ParentCards({ animal, animaux }: ParentCardsProps) {
       {hasParents && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {animal.numeroBouclePere && (
-            <div className="border border-gray-200 rounded-lg p-4 bg-blue-50/50">
+            <div className="border border-stone-200 rounded-lg p-4 bg-blue-50/50">
               <div className="text-xs font-semibold text-blue-600 uppercase mb-2">♂ Père</div>
               {pere ? (
                 <div>
@@ -52,22 +52,22 @@ export default function ParentCards({ animal, animaux }: ParentCardsProps) {
                   >
                     {pere.nom || pere.numeroBoucle || "Père"}
                   </button>
-                  {pere.numeroBoucle && <div className="text-sm text-gray-600 mt-1">{pere.numeroBoucle}</div>}
-                  <div className="text-sm text-gray-600">
+                  {pere.numeroBoucle && <div className="text-sm text-stone-600 mt-1">{pere.numeroBoucle}</div>}
+                  <div className="text-sm text-stone-600">
                     {pere.race || "-"} · {formatAgeFromBirthDate(pere.dateNaissance)}
                   </div>
                 </div>
               ) : (
                 <div>
-                  <div className="text-sm font-medium text-gray-700">{animal.numeroBouclePere}</div>
-                  <div className="text-xs text-gray-400 mt-1">Non trouvé dans le troupeau</div>
+                  <div className="text-sm font-medium text-stone-700">{animal.numeroBouclePere}</div>
+                  <div className="text-xs text-stone-400 mt-1">Non trouvé dans le troupeau</div>
                 </div>
               )}
             </div>
           )}
 
           {animal.numeroBoucleMere && (
-            <div className="border border-gray-200 rounded-lg p-4 bg-pink-50/50">
+            <div className="border border-stone-200 rounded-lg p-4 bg-pink-50/50">
               <div className="text-xs font-semibold text-pink-600 uppercase mb-2">♀ Mère</div>
               {mere ? (
                 <div>
@@ -77,15 +77,15 @@ export default function ParentCards({ animal, animaux }: ParentCardsProps) {
                   >
                     {mere.nom || mere.numeroBoucle || "Mère"}
                   </button>
-                  {mere.numeroBoucle && <div className="text-sm text-gray-600 mt-1">{mere.numeroBoucle}</div>}
-                  <div className="text-sm text-gray-600">
+                  {mere.numeroBoucle && <div className="text-sm text-stone-600 mt-1">{mere.numeroBoucle}</div>}
+                  <div className="text-sm text-stone-600">
                     {mere.race || "-"} · {formatAgeFromBirthDate(mere.dateNaissance)}
                   </div>
                 </div>
               ) : (
                 <div>
-                  <div className="text-sm font-medium text-gray-700">{animal.numeroBoucleMere}</div>
-                  <div className="text-xs text-gray-400 mt-1">Non trouvé dans le troupeau</div>
+                  <div className="text-sm font-medium text-stone-700">{animal.numeroBoucleMere}</div>
+                  <div className="text-xs text-stone-400 mt-1">Non trouvé dans le troupeau</div>
                 </div>
               )}
             </div>
@@ -96,7 +96,7 @@ export default function ParentCards({ animal, animaux }: ParentCardsProps) {
       {/* Descendants */}
       {hasDescendants && (
         <div className={hasParents ? "mt-6" : ""}>
-          <h3 className="text-sm font-semibold text-gray-700 uppercase mb-3">
+          <h3 className="text-sm font-semibold text-stone-700 uppercase mb-3">
             Descendants ({descendants.length})
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -110,25 +110,25 @@ export default function ParentCards({ animal, animaux }: ParentCardsProps) {
                 <button
                   key={petit.id}
                   onClick={() => router.push(`/animaux/${petit.id}`)}
-                  className="border border-gray-200 rounded-lg p-3 bg-green-50/50 hover:bg-green-100/50 transition-colors text-left cursor-pointer"
+                  className="border border-stone-200 rounded-lg p-3 bg-green-50/50 hover:bg-green-100/50 transition-colors text-left cursor-pointer"
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-lg">{getAnimalIcon(petit.type)}</span>
                     <span className="text-sm font-semibold text-green-800 truncate">
                       {petit.nom || petit.numeroBoucle || "Sans identifiant"}
                     </span>
-                    <span className="text-xs text-gray-500 ml-auto">
+                    <span className="text-xs text-stone-500 ml-auto">
                       {petit.sexe === "M" ? "♂" : "♀"}
                     </span>
                   </div>
                   {petit.numeroBoucle && petit.nom && (
-                    <div className="text-xs text-gray-500 mb-1">{petit.numeroBoucle}</div>
+                    <div className="text-xs text-stone-500 mb-1">{petit.numeroBoucle}</div>
                   )}
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-stone-600">
                     {petit.race || "-"} · {formatAgeFromBirthDate(petit.dateNaissance)}
                   </div>
                   {/* Indiquer le lien de parenté */}
-                  <div className="text-[10px] text-gray-400 mt-1">
+                  <div className="text-[10px] text-stone-400 mt-1">
                     {petit.numeroBoucleMere === animal.numeroBoucle &&
                      petit.numeroBouclePere === animal.numeroBoucle
                       ? "mère & père"

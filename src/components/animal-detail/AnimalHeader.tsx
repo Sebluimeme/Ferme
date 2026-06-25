@@ -14,7 +14,7 @@ interface AnimalHeaderProps {
 const statutColors: Record<string, string> = {
   actif: "bg-green-100 text-green-700",
   vendu: "bg-blue-100 text-blue-700",
-  mort: "bg-gray-100 text-gray-500",
+  mort: "bg-stone-100 text-stone-500",
   reforme: "bg-amber-100 text-amber-700",
 };
 
@@ -47,7 +47,7 @@ export default function AnimalHeader({ animal, onEdit, onDelete }: AnimalHeaderP
       <div className="flex items-start gap-3 sm:gap-4">
         <button
           onClick={() => router.push(`/animaux?type=${animal.type}`)}
-          className="text-gray-500 hover:text-gray-800 text-xl cursor-pointer bg-transparent border-none p-1"
+          className="text-stone-500 hover:text-stone-800 text-xl cursor-pointer bg-transparent border-none p-1"
         >
           &larr;
         </button>
@@ -57,7 +57,7 @@ export default function AnimalHeader({ animal, onEdit, onDelete }: AnimalHeaderP
             {animal.nom || animal.numeroBoucle || "Animal sans identifiant"}
           </h1>
           {animal.numeroBoucle && animal.nom && (
-            <div className="text-sm text-gray-500 mt-1">{animal.numeroBoucle}</div>
+            <div className="text-sm text-stone-500 mt-1">{animal.numeroBoucle}</div>
           )}
           <div className="flex gap-2 mt-2 flex-wrap">
             <span className={`text-xs font-medium px-2 py-1 rounded-full ${getAnimalBgColor(animal.type)}`}>
@@ -67,7 +67,7 @@ export default function AnimalHeader({ animal, onEdit, onDelete }: AnimalHeaderP
               {statutLabels[animal.statut] || animal.statut}
             </span>
             {animal.sexe && (
-              <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+              <span className="text-xs font-medium px-2 py-1 rounded-full bg-stone-100 text-stone-600">
                 {animal.sexe === "M" ? "♂ Mâle" : "♀ Femelle"}
               </span>
             )}
@@ -78,7 +78,7 @@ export default function AnimalHeader({ animal, onEdit, onDelete }: AnimalHeaderP
         <div className="hidden sm:flex gap-2">
           <button
             onClick={onEdit}
-            className="px-3 py-1.5 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+            className="px-3 py-1.5 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
           >
             Modifier
           </button>
@@ -94,16 +94,16 @@ export default function AnimalHeader({ animal, onEdit, onDelete }: AnimalHeaderP
         <div className="sm:hidden relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg cursor-pointer bg-transparent border-none text-xl leading-none"
+            className="p-2 text-stone-500 hover:text-stone-800 hover:bg-stone-100 rounded-lg cursor-pointer bg-transparent border-none text-xl leading-none"
             aria-label="Actions"
           >
             &#8942;
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 min-w-[140px] animate-[fadeIn_0.15s_ease-out]">
+            <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-stone-200 py-1 z-50 min-w-[140px] animate-[fadeIn_0.15s_ease-out]">
               <button
                 onClick={() => { setMenuOpen(false); onEdit(); }}
-                className="w-full px-4 py-2.5 text-sm text-left text-gray-700 hover:bg-gray-50 cursor-pointer bg-transparent border-none flex items-center gap-2"
+                className="w-full px-4 py-2.5 text-sm text-left text-stone-700 hover:bg-stone-50 cursor-pointer bg-transparent border-none flex items-center gap-2"
               >
                 ✏️ Modifier
               </button>

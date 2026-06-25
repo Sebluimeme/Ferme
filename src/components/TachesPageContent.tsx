@@ -37,11 +37,11 @@ function getStatutLabel(statut: string): string {
 
 function getStatutBadgeClass(statut: string): string {
   const classes: Record<string, string> = {
-    a_faire: "bg-gray-100 text-gray-700",
+    a_faire: "bg-stone-100 text-stone-700",
     en_cours: "bg-blue-100 text-blue-700",
     terminee: "bg-green-100 text-green-700",
   };
-  return classes[statut] || "bg-gray-100 text-gray-700";
+  return classes[statut] || "bg-stone-100 text-stone-700";
 }
 
 function getEcheanceBadge(task: Task): { label: string; className: string } | null {
@@ -236,14 +236,14 @@ export default function TachesPageContent() {
             <button
               onClick={(e) => { e.stopPropagation(); handleToggleStatus(task); }}
               className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 cursor-pointer transition-all ${
-                isDone ? "bg-green-500 border-green-500 text-white" : "border-gray-300 hover:border-primary bg-white"
+                isDone ? "bg-green-500 border-green-500 text-white" : "border-stone-300 hover:border-brand-600 bg-white"
               }`}
             >
               {isDone && <span className="text-xs">✓</span>}
             </button>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
-                <h3 className={`text-sm font-semibold m-0 ${isDone ? "line-through text-gray-400" : "text-gray-900"}`}>
+                <h3 className={`text-sm font-semibold m-0 ${isDone ? "line-through text-stone-400" : "text-stone-900"}`}>
                   {task.titre}
                 </h3>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${getStatutBadgeClass(task.statut)}`}>
@@ -256,14 +256,14 @@ export default function TachesPageContent() {
                 )}
               </div>
               {task.description && (
-                <p className={`text-xs mb-1.5 ${isDone ? "text-gray-300" : "text-gray-600"}`}>{task.description}</p>
+                <p className={`text-xs mb-1.5 ${isDone ? "text-stone-300" : "text-stone-600"}`}>{task.description}</p>
               )}
               {task.photoUrl && (
                 <div className="mb-1.5">
-                  <img src={task.photoUrl} alt="Photo jointe" className="w-16 h-16 object-cover rounded-md border border-gray-200" />
+                  <img src={task.photoUrl} alt="Photo jointe" className="w-16 h-16 object-cover rounded-md border border-stone-200" />
                 </div>
               )}
-              <div className="flex items-center gap-3 flex-wrap text-xs text-gray-500">
+              <div className="flex items-center gap-3 flex-wrap text-xs text-stone-500">
                 {task.dateEcheance && <span>📅 {formatDate(task.dateEcheance)}</span>}
                 {task.categorie && (
                   <span className="bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">{task.categorie}</span>
@@ -282,7 +282,7 @@ export default function TachesPageContent() {
             <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={(e) => { e.stopPropagation(); setDeleteTarget(task); }}
-                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
                 title="Supprimer"
               >
                 🗑️
@@ -301,10 +301,10 @@ export default function TachesPageContent() {
 
       {/* Header */}
       <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
-        <h1 className="text-2xl font-bold m-0">📋 Tâches</h1>
+        <h1 className="text-2xl font-bold text-stone-900">📋 Tâches</h1>
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
+          className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
         >
           + Nouvelle tâche
         </button>
@@ -313,7 +313,7 @@ export default function TachesPageContent() {
       {/* Filtre par personne */}
       {availableNames.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap mb-4">
-          <span className="text-xs text-gray-500 font-medium">👤 Mon profil :</span>
+          <span className="text-xs text-stone-500 font-medium">👤 Mon profil :</span>
           {availableNames.map((name) => (
             <button
               key={name}
@@ -321,7 +321,7 @@ export default function TachesPageContent() {
               className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all cursor-pointer border ${
                 myName === name
                   ? "bg-indigo-600 text-white border-indigo-600"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-indigo-400 hover:bg-indigo-50"
+                  : "bg-white text-stone-600 border-stone-200 hover:border-indigo-400 hover:bg-indigo-50"
               }`}
             >
               {name}
@@ -348,8 +348,8 @@ export default function TachesPageContent() {
             onClick={() => setStatusFilter(key)}
             className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all cursor-pointer border ${
               statusFilter === key
-                ? "bg-primary text-white border-primary"
-                : "bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:bg-gray-50"
+                ? "bg-brand-600 text-white border-brand-600"
+                : "bg-white text-stone-600 border-stone-200 hover:border-stone-400 hover:bg-stone-50"
             }`}
           >
             {label} ({count})
@@ -364,7 +364,7 @@ export default function TachesPageContent() {
           placeholder="🔍 Rechercher par titre, description, catégorie..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+          className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
         />
       </div>
 
@@ -373,12 +373,12 @@ export default function TachesPageContent() {
         <div className="text-center py-16">
           <div className="text-6xl mb-4">📋</div>
           <h3 className="text-2xl font-semibold mb-2">Aucune tâche</h3>
-          <p className="text-gray-600 mb-6">
+          <p className="text-stone-600 mb-6">
             {searchQuery ? "Aucune tâche trouvée pour cette recherche" : "Commencez par ajouter votre première tâche"}
           </p>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer"
+            className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer"
           >
             + Nouvelle tâche
           </button>
@@ -392,7 +392,7 @@ export default function TachesPageContent() {
               <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">{myTaches.length}</span>
             </div>
             {myTaches.length === 0 ? (
-              <p className="text-sm text-gray-400 py-3 text-center bg-white rounded-lg border border-dashed border-gray-200">Aucune tâche assignée à {myName}</p>
+              <p className="text-sm text-stone-400 py-3 text-center bg-white rounded-lg border border-dashed border-stone-200">Aucune tâche assignée à {myName}</p>
             ) : (
               <div className="space-y-2">
                 {myTaches.map((task) => renderTask(task))}
@@ -403,8 +403,8 @@ export default function TachesPageContent() {
           {otherTaches.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-sm font-semibold text-gray-500">Autres tâches</span>
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">{otherTaches.length}</span>
+                <span className="text-sm font-semibold text-stone-500">Autres tâches</span>
+                <span className="text-xs bg-stone-100 text-stone-600 px-2 py-0.5 rounded-full font-medium">{otherTaches.length}</span>
               </div>
               <div className="space-y-2 opacity-75">
                 {otherTaches.map((task) => renderTask(task))}
@@ -429,14 +429,14 @@ export default function TachesPageContent() {
         <div className="flex gap-3 justify-end mt-6">
           <button
             onClick={() => setShowAddModal(false)}
-            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+            className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
           >
             Annuler
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? "Enregistrement..." : "Ajouter"}
           </button>
@@ -454,14 +454,14 @@ export default function TachesPageContent() {
         <div className="flex gap-3 justify-end mt-6">
           <button
             onClick={() => setEditTarget(null)}
-            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+            className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
           >
             Annuler
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? "Enregistrement..." : "Enregistrer"}
           </button>

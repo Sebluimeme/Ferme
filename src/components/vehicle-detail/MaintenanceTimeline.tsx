@@ -155,16 +155,16 @@ export default function MaintenanceTimeline({ vehicleId }: MaintenanceTimelinePr
         <h3 className="text-lg font-semibold">Historique d&apos;entretien</h3>
         <button
           onClick={() => setShowForm(true)}
-          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+          className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors"
         >
           + Ajouter un entretien
         </button>
       </div>
 
       {entries.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+        <div className="text-center py-12 bg-white rounded-lg border border-stone-200">
           <div className="text-4xl mb-3">🔧</div>
-          <p className="text-gray-500">Aucun entretien enregistré</p>
+          <p className="text-stone-500">Aucun entretien enregistré</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -176,26 +176,26 @@ export default function MaintenanceTimeline({ vehicleId }: MaintenanceTimelinePr
               <div
                 key={entry.id}
                 className={`bg-white border rounded-lg overflow-hidden transition-all ${
-                  showAlert ? "border-orange-300 bg-orange-50/30" : "border-gray-200"
+                  showAlert ? "border-orange-300 bg-orange-50/30" : "border-stone-200"
                 }`}
               >
                 <div
                   onClick={() => toggleExpand(entry.id)}
-                  className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                  className="p-4 cursor-pointer hover:bg-stone-50 transition-colors"
                 >
                   <div className="flex items-start gap-3">
                     <span className="text-2xl">{entry.type ? getMaintenanceTypeIcon(entry.type) : "🔧"}</span>
                     <div className="flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <h4 className="font-semibold text-gray-800">{entry.titre || "Entretien"}</h4>
-                          <p className="text-sm text-gray-600">{entry.type ? getMaintenanceTypeLabel(entry.type) : ""}</p>
+                          <h4 className="font-semibold text-stone-800">{entry.titre || "Entretien"}</h4>
+                          <p className="text-sm text-stone-600">{entry.type ? getMaintenanceTypeLabel(entry.type) : ""}</p>
                         </div>
                         <span className={`text-xs font-medium px-2 py-1 rounded-full ${getMaintenanceStatusColor(entry.statut || "termine")}`}>
                           {entry.statut === "planifie" ? "Planifié" : entry.statut === "en_cours" ? "En cours" : entry.statut === "termine" ? "Terminé" : "Annulé"}
                         </span>
                       </div>
-                      <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">
+                      <div className="flex flex-wrap gap-3 mt-2 text-xs text-stone-500">
                         {entry.dateEffectuee && <span>✅ Effectué le {formatDate(entry.dateEffectuee)}</span>}
                         {entry.datePlanifiee && !entry.dateEffectuee && <span>📅 Planifié le {formatDate(entry.datePlanifiee)}</span>}
                         {entry.garage && <span>🔧 {entry.garage}</span>}
@@ -207,46 +207,46 @@ export default function MaintenanceTimeline({ vehicleId }: MaintenanceTimelinePr
                         </div>
                       )}
                     </div>
-                    <span className="text-gray-400">{isExpandedEntry ? "▼" : "▶"}</span>
+                    <span className="text-stone-400">{isExpandedEntry ? "▼" : "▶"}</span>
                   </div>
                 </div>
 
                 {isExpandedEntry && (
-                  <div className="border-t border-gray-200 p-4 bg-gray-50">
+                  <div className="border-t border-stone-200 p-4 bg-stone-50">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                       {entry.description && (
                         <div className="md:col-span-2">
-                          <p className="text-sm text-gray-700">{entry.description}</p>
+                          <p className="text-sm text-stone-700">{entry.description}</p>
                         </div>
                       )}
                       {entry.kilometrageEffectue && (
                         <div>
-                          <p className="text-xs text-gray-500">Kilométrage</p>
+                          <p className="text-xs text-stone-500">Kilométrage</p>
                           <p className="text-sm font-medium">{formatKilometrage(entry.kilometrageEffectue)}</p>
                         </div>
                       )}
                       {entry.heuresEffectuees && (
                         <div>
-                          <p className="text-xs text-gray-500">Heures</p>
+                          <p className="text-xs text-stone-500">Heures</p>
                           <p className="text-sm font-medium">{formatHeures(entry.heuresEffectuees)}</p>
                         </div>
                       )}
                       {entry.prochainKm && (
                         <div>
-                          <p className="text-xs text-gray-500">Prochain entretien (km)</p>
+                          <p className="text-xs text-stone-500">Prochain entretien (km)</p>
                           <p className="text-sm font-medium">{formatKilometrage(entry.prochainKm)}</p>
                         </div>
                       )}
                       {entry.prochaineDate && (
                         <div>
-                          <p className="text-xs text-gray-500">Prochain entretien (date)</p>
+                          <p className="text-xs text-stone-500">Prochain entretien (date)</p>
                           <p className="text-sm font-medium">{formatDate(entry.prochaineDate)}</p>
                         </div>
                       )}
                       {entry.facture && (
                         <div>
-                          <p className="text-xs text-gray-500">Facture</p>
-                          <a href={entry.facture} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-primary hover:underline">
+                          <p className="text-xs text-stone-500">Facture</p>
+                          <a href={entry.facture} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-brand-600 hover:underline">
                             📄 Voir la facture
                           </a>
                         </div>
@@ -258,7 +258,7 @@ export default function MaintenanceTimeline({ vehicleId }: MaintenanceTimelinePr
                           e.stopPropagation();
                           setEditEntry(entry);
                         }}
-                        className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                        className="px-3 py-1.5 text-sm bg-stone-200 text-stone-700 rounded-lg hover:bg-stone-300"
                       >
                         Modifier
                       </button>
@@ -299,14 +299,14 @@ export default function MaintenanceTimeline({ vehicleId }: MaintenanceTimelinePr
               setEditEntry(null);
               formRef.current?.reset();
             }}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+            className="px-4 py-2 bg-stone-100 text-stone-700 rounded-lg hover:bg-stone-200"
           >
             Annuler
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50"
+            className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50"
           >
             {loading ? "Enregistrement..." : "Enregistrer"}
           </button>
@@ -333,7 +333,7 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
     <form ref={formRef} className="grid gap-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Type</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Type</label>
           <select name="type" defaultValue={entry?.type || ""} className="w-full px-3 py-2 border rounded-lg">
             <option value="">Sélectionnez...</option>
             <option value="vidange">🛢️ Vidange</option>
@@ -350,7 +350,7 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
           </select>
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Titre</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Titre</label>
           <input
             type="text"
             name="titre"
@@ -362,7 +362,7 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
       </div>
 
       <div>
-        <label className="block mb-1 text-sm font-medium text-gray-700">Description</label>
+        <label className="block mb-1 text-sm font-medium text-stone-700">Description</label>
         <textarea
           name="description"
           defaultValue={entry?.description || ""}
@@ -374,7 +374,7 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Statut</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Statut</label>
           <select name="statut" defaultValue={entry?.statut || "termine"} className="w-full px-3 py-2 border rounded-lg">
             <option value="planifie">Planifié</option>
             <option value="en_cours">En cours</option>
@@ -383,7 +383,7 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
           </select>
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Mécanicien</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Mécanicien</label>
           <input
             type="text"
             name="garage"
@@ -396,7 +396,7 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Date</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Date</label>
           <input
             type="date"
             name="dateEffectuee"
@@ -405,7 +405,7 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
           />
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Coût (€)</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Coût (€)</label>
           <input
             type="number"
             name="coutTotal"
@@ -419,7 +419,7 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Kilométrage</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Kilométrage</label>
           <input
             type="number"
             name="kilometrageEffectue"
@@ -429,7 +429,7 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
           />
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Heures</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Heures</label>
           <input
             type="number"
             name="heuresEffectuees"
@@ -440,10 +440,10 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
         </div>
       </div>
 
-      <h4 className="font-semibold text-gray-700 mt-2">Prochain entretien</h4>
+      <h4 className="font-semibold text-stone-700 mt-2">Prochain entretien</h4>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">À X km</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">À X km</label>
           <input
             type="number"
             name="prochainKm"
@@ -453,7 +453,7 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
           />
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">À X heures</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">À X heures</label>
           <input
             type="number"
             name="prochainesHeures"
@@ -463,7 +463,7 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
           />
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">À la date</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">À la date</label>
           <input
             type="date"
             name="prochaineDate"
@@ -475,15 +475,15 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
 
       {/* Facture jointe */}
       <div>
-        <label className="block mb-1 text-sm font-medium text-gray-700">Facture</label>
+        <label className="block mb-1 text-sm font-medium text-stone-700">Facture</label>
         {facturePreview ? (
           <div className="flex items-center gap-3">
             {facturePreview.startsWith("data:image") || facturePreview.startsWith("http") ? (
-              <a href={facturePreview} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline flex items-center gap-1">
+              <a href={facturePreview} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-600 hover:underline flex items-center gap-1">
                 📄 Voir la facture
               </a>
             ) : (
-              <span className="text-sm text-gray-700">📄 {facturePreview}</span>
+              <span className="text-sm text-stone-700">📄 {facturePreview}</span>
             )}
             <button
               type="button"
@@ -500,9 +500,9 @@ function MaintenanceForm({ entry, formRef, factureFileRef }: { entry: Maintenanc
         ) : (
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="w-full px-3 py-4 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+            className="w-full px-3 py-4 border-2 border-dashed border-stone-300 rounded-lg text-center cursor-pointer hover:border-brand-600 hover:bg-brand-600/5 transition-colors"
           >
-            <span className="text-gray-400 text-sm">Cliquez pour ajouter une facture (photo ou PDF)</span>
+            <span className="text-stone-400 text-sm">Cliquez pour ajouter une facture (photo ou PDF)</span>
           </div>
         )}
         <input

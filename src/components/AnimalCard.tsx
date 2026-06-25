@@ -35,7 +35,7 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
               {animal.nom || animal.numeroBoucle || "Animal sans identifiant"}
             </div>
             {animal.numeroBoucle && animal.nom && (
-              <div className="text-[11px] sm:text-xs text-gray-600 truncate">{animal.numeroBoucle}</div>
+              <div className="text-[11px] sm:text-xs text-stone-600 truncate">{animal.numeroBoucle}</div>
             )}
           </div>
           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap ${getAnimalBgColor(animal.type)}`}>
@@ -47,19 +47,19 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
         <div className="px-3 pb-1.5">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-0.5 text-[11px] sm:text-xs">
             <div>
-              <div className="text-gray-400">Sexe</div>
+              <div className="text-stone-400">Sexe</div>
               <div className="font-medium">{animal.sexe === "M" ? "♂ Mâle" : "♀ Fem."}</div>
             </div>
             <div>
-              <div className="text-gray-400">Race</div>
+              <div className="text-stone-400">Race</div>
               <div className="font-medium truncate">{animal.race || "-"}</div>
             </div>
             <div>
-              <div className="text-gray-400">Âge</div>
+              <div className="text-stone-400">Âge</div>
               <div className="font-medium">{formatAgeFromBirthDate(animal.dateNaissance)}</div>
             </div>
             <div>
-              <div className="text-gray-400">Poids</div>
+              <div className="text-stone-400">Poids</div>
               <div className="font-medium">{animal.poids ? formatNumber(animal.poids, 2) + " kg" : "-"}</div>
             </div>
           </div>
@@ -67,17 +67,17 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
 
         {/* Dernière modification */}
         {lastModified && (
-          <div className="px-3 pb-1 text-[9px] sm:text-[11px] text-gray-400">
+          <div className="px-3 pb-1 text-[9px] sm:text-[11px] text-stone-400">
             Modifié le {lastModified}
           </div>
         )}
       </div>
 
       {/* Boutons d'action - positionnés clairement en bas */}
-      <div className="px-3 py-1.5 border-t border-gray-100 flex gap-1.5 justify-end">
+      <div className="px-3 py-1.5 border-t border-stone-100 flex gap-1.5 justify-end">
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(animal.id); }}
-          className="px-2 py-0.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200 rounded-md hover:bg-gray-200 transition-all cursor-pointer"
+          className="px-2 py-0.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-xs font-medium bg-stone-100 text-stone-600 border border-stone-200 rounded-md hover:bg-stone-200 transition-all cursor-pointer"
           title="Modifier"
         >
           ✏️ <span className="hidden sm:inline">Modifier</span>

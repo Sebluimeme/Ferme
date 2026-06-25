@@ -133,22 +133,22 @@ export default function WeatherWidget({ partiels }: { partiels: Partiel[] }) {
 
   if (!auto && !useManual) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-8">
-        <h2 className="text-base font-semibold text-gray-800 mb-3">🌤️ Météo — fenêtre fenaison</h2>
-        <p className="text-sm text-gray-500 mb-3">Aucune parcelle géolocalisée. Entrez vos coordonnées pour afficher la météo.</p>
+      <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5 mb-8">
+        <h2 className="text-base font-semibold text-stone-800 mb-3">🌤️ Météo — fenêtre fenaison</h2>
+        <p className="text-sm text-stone-500 mb-3">Aucune parcelle géolocalisée. Entrez vos coordonnées pour afficher la météo.</p>
         <div className="flex gap-2 items-end flex-wrap">
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Latitude</label>
+            <label className="text-xs text-stone-500 mb-1 block">Latitude</label>
             <input type="text" placeholder="ex: 48.20" value={manualLat} onChange={(e) => setManualLat(e.target.value)}
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-primary" />
+              className="border border-stone-300 rounded-lg px-2 py-1.5 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Longitude</label>
+            <label className="text-xs text-stone-500 mb-1 block">Longitude</label>
             <input type="text" placeholder="ex: 7.10" value={manualLon} onChange={(e) => setManualLon(e.target.value)}
-              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-primary" />
+              className="border border-stone-300 rounded-lg px-2 py-1.5 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <button onClick={() => setUseManual(true)}
-            className="px-4 py-1.5 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary cursor-pointer">
+            className="px-4 py-1.5 text-sm font-semibold text-white rounded-lg bg-brand-600 cursor-pointer">
             Afficher
           </button>
         </div>
@@ -157,11 +157,11 @@ export default function WeatherWidget({ partiels }: { partiels: Partiel[] }) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-8">
+    <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5 mb-8">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-base font-semibold text-gray-800">🌤️ Météo — fenêtre fenaison</h2>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <h2 className="text-base font-semibold text-stone-800">🌤️ Météo — fenêtre fenaison</h2>
+          <p className="text-xs text-stone-400 mt-0.5">
             {auto && !useManual ? `Centroïde parcelles — ${auto.lat.toFixed(3)}, ${auto.lon.toFixed(3)}` : `${lat?.toFixed(3)}, ${lon?.toFixed(3)}`}
           </p>
         </div>
@@ -181,7 +181,7 @@ export default function WeatherWidget({ partiels }: { partiels: Partiel[] }) {
       </div>
 
       {loading && (
-        <div className="h-24 flex items-center justify-center text-gray-400 text-sm">Chargement météo...</div>
+        <div className="h-24 flex items-center justify-center text-stone-400 text-sm">Chargement météo...</div>
       )}
       {error && (
         <div className="text-sm text-red-500 py-4 text-center">{error}</div>
@@ -198,17 +198,17 @@ export default function WeatherWidget({ partiels }: { partiels: Partiel[] }) {
                 key={day.date}
                 className={`rounded-xl border p-2 text-center flex flex-col gap-0.5 ${cfg.bg} ${cfg.border} ${isWindow ? "ring-2 ring-green-400 ring-offset-1" : ""}`}
               >
-                <p className="text-xs font-semibold text-gray-500 truncate">{dayLabel(day.date)}</p>
+                <p className="text-xs font-semibold text-stone-500 truncate">{dayLabel(day.date)}</p>
                 <p className="text-xl leading-none">{codeToEmoji(day.code)}</p>
-                <p className="text-xs text-gray-500 truncate">{codeToLabel(day.code)}</p>
-                <p className="text-xs font-bold text-gray-800">{day.tempMax}° / {day.tempMin}°</p>
+                <p className="text-xs text-stone-500 truncate">{codeToLabel(day.code)}</p>
+                <p className="text-xs font-bold text-stone-800">{day.tempMax}° / {day.tempMin}°</p>
                 {day.precipSum > 0 && (
                   <p className="text-xs text-blue-600">💧 {day.precipSum.toFixed(1)} mm</p>
                 )}
-                {day.precipSum === 0 && <p className="text-xs text-gray-300">—</p>}
-                <p className="text-xs text-gray-500">💨 {day.windMax} km/h</p>
+                {day.precipSum === 0 && <p className="text-xs text-stone-300">—</p>}
+                <p className="text-xs text-stone-500">💨 {day.windMax} km/h</p>
                 {day.precipProb > 0 && (
-                  <p className="text-xs text-gray-400">{day.precipProb}% pluie</p>
+                  <p className="text-xs text-stone-400">{day.precipProb}% pluie</p>
                 )}
                 <div className="mt-1 flex justify-center">
                   <span className={`inline-block w-2 h-2 rounded-full ${cfg.dot}`} title={cfg.label} />
@@ -220,7 +220,7 @@ export default function WeatherWidget({ partiels }: { partiels: Partiel[] }) {
       )}
 
       {days && (
-        <div className="flex gap-3 mt-3 justify-end text-xs text-gray-400">
+        <div className="flex gap-3 mt-3 justify-end text-xs text-stone-400">
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 inline-block" /> Favorable (sec, chaud, peu de vent)</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" /> Passable</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" /> Défavorable</span>

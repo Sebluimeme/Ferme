@@ -126,10 +126,10 @@ export function getVehicleTailwindColor(type: VehicleType): string {
     quad: "text-orange-600",
     tracteur: "text-green-600",
     utilitaire: "text-purple-600",
-    remorque: "text-gray-600",
+    remorque: "text-stone-600",
     engin_tp: "text-amber-700",
   };
-  return colors[type] || "text-gray-500";
+  return colors[type] || "text-stone-500";
 }
 
 export function getVehicleBorderColor(type: VehicleType): string {
@@ -139,10 +139,10 @@ export function getVehicleBorderColor(type: VehicleType): string {
     quad: "border-l-orange-600",
     tracteur: "border-l-green-600",
     utilitaire: "border-l-purple-600",
-    remorque: "border-l-gray-600",
+    remorque: "border-l-stone-600",
     engin_tp: "border-l-amber-700",
   };
-  return colors[type] || "border-l-gray-500";
+  return colors[type] || "border-l-stone-500";
 }
 
 export function getVehicleBgColor(type: VehicleType): string {
@@ -152,10 +152,10 @@ export function getVehicleBgColor(type: VehicleType): string {
     quad: "bg-orange-50 text-orange-700",
     tracteur: "bg-green-50 text-green-700",
     utilitaire: "bg-purple-50 text-purple-700",
-    remorque: "bg-gray-50 text-gray-700",
+    remorque: "bg-stone-50 text-stone-700",
     engin_tp: "bg-amber-50 text-amber-700",
   };
-  return colors[type] || "bg-gray-100 text-gray-700";
+  return colors[type] || "bg-stone-100 text-stone-700";
 }
 
 export function getStatusColor(status: VehicleStatus): string {
@@ -163,10 +163,10 @@ export function getStatusColor(status: VehicleStatus): string {
     actif: "bg-green-100 text-green-800",
     en_reparation: "bg-orange-100 text-orange-800",
     stocke: "bg-blue-100 text-blue-800",
-    vendu: "bg-gray-100 text-gray-800",
+    vendu: "bg-stone-100 text-stone-800",
     reforme: "bg-red-100 text-red-800",
   };
-  return colors[status] || "bg-gray-100 text-gray-800";
+  return colors[status] || "bg-stone-100 text-stone-800";
 }
 
 export function getMaintenanceStatusColor(status: string): string {
@@ -174,9 +174,9 @@ export function getMaintenanceStatusColor(status: string): string {
     planifie: "bg-blue-100 text-blue-800",
     en_cours: "bg-yellow-100 text-yellow-800",
     termine: "bg-green-100 text-green-800",
-    annule: "bg-gray-100 text-gray-800",
+    annule: "bg-stone-100 text-stone-800",
   };
-  return colors[status] || "bg-gray-100 text-gray-800";
+  return colors[status] || "bg-stone-100 text-stone-800";
 }
 
 // ==================== FORMATAGE ====================

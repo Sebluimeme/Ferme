@@ -98,9 +98,9 @@ function ActiviteForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Type d&apos;activité *</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Type d&apos;activité *</label>
           <select
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.typeActivite}
             onChange={(e) => setForm((p) => ({ ...p, typeActivite: e.target.value as TypeActivite }))}
             required
@@ -113,10 +113,10 @@ function ActiviteForm({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Date *</label>
           <input
             type="date"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.dateActivite}
             onChange={(e) => setForm((p) => ({ ...p, dateActivite: e.target.value }))}
             required
@@ -125,7 +125,7 @@ function ActiviteForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Parcelles concernées</label>
+        <label className="block text-sm font-medium text-stone-700 mb-2">Parcelles concernées</label>
         {partiels.length === 0 ? (
           <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             Aucune parcelle créée — allez dans <strong>Parcellaire</strong> pour en ajouter.
@@ -141,23 +141,23 @@ function ActiviteForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de bottes</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Nombre de bottes</label>
           <input
             type="number"
             min="0"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.nombreBottes}
             onChange={(e) => setForm((p) => ({ ...p, nombreBottes: e.target.value }))}
             placeholder="Ex : 120"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Poids par botte (kg)</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Poids par botte (kg)</label>
           <input
             type="number"
             min="0"
             step="0.01"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.poidsBotteKg}
             onChange={(e) => setForm((p) => ({ ...p, poidsBotteKg: e.target.value }))}
             placeholder="Ex : 16.05"
@@ -166,16 +166,16 @@ function ActiviteForm({
       </div>
       {poidsTotalT !== null && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2.5 text-sm flex items-center justify-between">
-          <span className="text-gray-600">Poids total calculé</span>
-          <span className="font-bold text-gray-900">{poidsTotalT.toFixed(3)} t</span>
+          <span className="text-stone-600">Poids total calculé</span>
+          <span className="font-bold text-stone-900">{poidsTotalT.toFixed(3)} t</span>
         </div>
       )}
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Notes</label>
         <textarea
           rows={3}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
           value={form.notes}
           onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
           placeholder="Observations, conditions météo..."
@@ -186,14 +186,14 @@ function ActiviteForm({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+          className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
         >
           Annuler
         </button>
         <button
           type="submit"
           disabled={loading}
-          className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50"
+          className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50"
         >
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
@@ -227,11 +227,11 @@ function BottesForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de bottes *</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Nombre de bottes *</label>
         <input
           type="number"
           min="0"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           value={form.nombreBottes}
           onChange={(e) => setForm((p) => ({ ...p, nombreBottes: e.target.value }))}
           placeholder="Ex : 120"
@@ -239,12 +239,12 @@ function BottesForm({
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Poids par botte (kg)</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Poids par botte (kg)</label>
         <input
           type="number"
           min="0"
           step="0.01"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           value={form.poidsBotteKg}
           onChange={(e) => setForm((p) => ({ ...p, poidsBotteKg: e.target.value }))}
           placeholder="Ex : 16.05"
@@ -252,22 +252,22 @@ function BottesForm({
       </div>
       {poidsTotalT !== null && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2.5 text-sm flex items-center justify-between">
-          <span className="text-gray-600">Poids total calculé</span>
-          <span className="font-bold text-gray-900">{poidsTotalT.toFixed(3)} t</span>
+          <span className="text-stone-600">Poids total calculé</span>
+          <span className="font-bold text-stone-900">{poidsTotalT.toFixed(3)} t</span>
         </div>
       )}
       <div className="flex justify-end gap-3 pt-2">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+          className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
         >
           Annuler
         </button>
         <button
           type="submit"
           disabled={loading}
-          className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50"
+          className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50"
         >
           {loading ? "Enregistrement..." : "Confirmer"}
         </button>
@@ -523,12 +523,12 @@ export default function FourragePage() {
       {/* En-tête */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">🌾 Fourrage</h1>
-          <p className="text-gray-500 mt-1">Gestion des activités de coupe et de récolte</p>
+          <h1 className="text-3xl font-bold text-stone-900">🌾 Fourrage</h1>
+          <p className="text-stone-500 mt-1">Gestion des activités de coupe et de récolte</p>
         </div>
         <button
           onClick={() => setModalOpen(true)}
-          className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md"
+          className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer shadow-md"
         >
           + Nouvelle activité
         </button>
@@ -540,7 +540,7 @@ export default function FourragePage() {
           label="Parcellaire"
           value={partiels.length}
           subtitle="parcelles gérées"
-          borderColorClass="border-l-primary"
+          borderColorClass="border-l-brand-600"
         />
         <KpiCard
           label="Activités ce mois"
@@ -565,11 +565,11 @@ export default function FourragePage() {
 
       {/* Objectif foin */}
       {objectifFoinT > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-8">
+        <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5 mb-8">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-base font-semibold text-gray-800">🎯 Objectif foin — saison</h2>
-              <p className="text-xs text-gray-400 mt-0.5">{DUREE_STABULATION} jours de stabulation · {animauxActifs.length} animaux actifs</p>
+              <h2 className="text-base font-semibold text-stone-800">🎯 Objectif foin — saison</h2>
+              <p className="text-xs text-stone-400 mt-0.5">{DUREE_STABULATION} jours de stabulation · {animauxActifs.length} animaux actifs</p>
             </div>
             <div className="text-right">
               <span className={`text-2xl font-bold ${progressPct >= 100 ? "text-green-600" : progressPct >= 60 ? "text-yellow-600" : "text-red-500"}`}>
@@ -579,7 +579,7 @@ export default function FourragePage() {
           </div>
 
           {/* Barre de progression */}
-          <div className="w-full bg-gray-100 rounded-full h-3 mb-3">
+          <div className="w-full bg-stone-100 rounded-full h-3 mb-3">
             <div
               className={`h-3 rounded-full transition-all ${progressPct >= 100 ? "bg-green-500" : progressPct >= 60 ? "bg-yellow-400" : "bg-red-400"}`}
               style={{ width: `${progressPct}%` }}
@@ -588,12 +588,12 @@ export default function FourragePage() {
 
           {/* Chiffres */}
           <div className="flex items-center justify-between text-sm mb-4">
-            <span className="text-gray-600">
-              <span className="font-semibold text-gray-800">{foinsRecoltesT.toFixed(1)} t</span> récoltées
+            <span className="text-stone-600">
+              <span className="font-semibold text-stone-800">{foinsRecoltesT.toFixed(1)} t</span> récoltées
             </span>
-            <span className="text-gray-400">sur</span>
-            <span className="text-gray-600">
-              objectif <span className="font-semibold text-gray-800">{objectifFoinT.toFixed(1)} t</span>
+            <span className="text-stone-400">sur</span>
+            <span className="text-stone-600">
+              objectif <span className="font-semibold text-stone-800">{objectifFoinT.toFixed(1)} t</span>
             </span>
             {manquantT > 0 && (
               <span className="text-red-500 font-medium">−{manquantT.toFixed(1)} t restantes</span>
@@ -605,11 +605,11 @@ export default function FourragePage() {
 
           {/* Détail par type */}
           {detailParType.length > 0 && (
-            <div className="border-t border-gray-100 pt-3">
-              <p className="text-xs text-gray-400 mb-2">Détail par type</p>
+            <div className="border-t border-stone-100 pt-3">
+              <p className="text-xs text-stone-400 mb-2">Détail par type</p>
               <div className="flex flex-wrap gap-2">
                 {detailParType.map((d) => (
-                  <div key={d.type} className="bg-gray-50 rounded-lg px-3 py-1.5 text-xs text-gray-600">
+                  <div key={d.type} className="bg-stone-50 rounded-lg px-3 py-1.5 text-xs text-stone-600">
                     <span className="font-medium capitalize">{d.type}</span>
                     {" · "}{d.count} têtes{" · "}
                     {((d.count * d.conso * DUREE_STABULATION) / 1000).toFixed(1)} t
@@ -626,8 +626,8 @@ export default function FourragePage() {
 
       {/* Analytics récoltes foin / regain */}
       {(totalFoinT > 0 || totalRegainT > 0) && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-8">
-          <h2 className="text-base font-semibold text-gray-800 mb-4">📊 Analytics récoltes</h2>
+        <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5 mb-8">
+          <h2 className="text-base font-semibold text-stone-800 mb-4">📊 Analytics récoltes</h2>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
             <KpiCard
@@ -661,7 +661,7 @@ export default function FourragePage() {
           </div>
 
           {/* Courbe annuelle */}
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Récoltes {thisYear} — par mois (tonnes)</p>
+          <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2">Récoltes {thisYear} — par mois (tonnes)</p>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={donneesMensuelles} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -676,11 +676,11 @@ export default function FourragePage() {
 
           {rdtParParcelle.length > 0 && (
             <>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-5 mb-2">Rendement par parcelle</p>
-              <div className="overflow-x-auto rounded-lg border border-gray-100">
+              <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mt-5 mb-2">Rendement par parcelle</p>
+              <div className="overflow-x-auto rounded-lg border border-stone-100">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-50 text-xs text-gray-500 font-semibold">
+                    <tr className="bg-stone-50 text-xs text-stone-500 font-semibold">
                       <th className="text-left px-4 py-2.5">Parcelle</th>
                       <th className="text-right px-4 py-2.5">Surface</th>
                       <th className="text-right px-4 py-2.5">Foin récolté</th>
@@ -688,18 +688,18 @@ export default function FourragePage() {
                       <th className="text-right px-4 py-2.5">Rdt t/ha</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-stone-50">
                     {rdtParParcelle.map((r) => (
-                      <tr key={r.parcelle.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2.5 font-medium text-gray-900">{r.parcelle.nom}</td>
-                        <td className="px-4 py-2.5 text-right text-gray-500">{r.parcelle.surface} ha</td>
+                      <tr key={r.parcelle.id} className="hover:bg-stone-50">
+                        <td className="px-4 py-2.5 font-medium text-stone-900">{r.parcelle.nom}</td>
+                        <td className="px-4 py-2.5 text-right text-stone-500">{r.parcelle.surface} ha</td>
                         <td className="px-4 py-2.5 text-right text-yellow-700">
                           {r.foinT > 0 ? `${r.foinT.toFixed(2)} t` : "—"}
                         </td>
                         <td className="px-4 py-2.5 text-right text-amber-700">
                           {r.regainT > 0 ? `${r.regainT.toFixed(2)} t` : "—"}
                         </td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-gray-800">
+                        <td className="px-4 py-2.5 text-right font-semibold text-stone-800">
                           {r.rdt.toFixed(2)} t/ha
                         </td>
                       </tr>
@@ -707,7 +707,7 @@ export default function FourragePage() {
                   </tbody>
                 </table>
               </div>
-              <p className="text-xs text-gray-400 mt-1.5">* Uniquement les chantiers avec une seule parcelle sélectionnée</p>
+              <p className="text-xs text-stone-400 mt-1.5">* Uniquement les chantiers avec une seule parcelle sélectionnée</p>
             </>
           )}
         </div>
@@ -716,7 +716,7 @@ export default function FourragePage() {
       {/* Liste activités */}
       <div className="space-y-3">
         {activitesTri.length === 0 && (
-          <div className="text-center py-16 text-gray-400">
+          <div className="text-center py-16 text-stone-400">
             <div className="text-5xl mb-3">🌾</div>
             <p className="text-lg font-medium">Aucune activité enregistrée</p>
             <p className="text-sm mt-1">Cliquez sur &quot;+ Nouvelle activité&quot; pour commencer.</p>
@@ -725,7 +725,7 @@ export default function FourragePage() {
         {activitesTri.map((activite) => (
           <div
             key={activite.id}
-            className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4"
+            className="bg-white rounded-xl shadow-sm border border-stone-100 p-4 flex items-center gap-4"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -739,12 +739,12 @@ export default function FourragePage() {
                     En cours
                   </span>
                 )}
-                <span className="text-sm text-gray-500">{formatDate(activite.dateActivite)}</span>
+                <span className="text-sm text-stone-500">{formatDate(activite.dateActivite)}</span>
               </div>
-              <div className="mt-1 text-sm text-gray-700">
+              <div className="mt-1 text-sm text-stone-700">
                 <span className="font-medium">Parcelles :</span> {getPartielsNoms(activite.parcelIds)}
               </div>
-              <div className="mt-0.5 text-sm text-gray-600">
+              <div className="mt-0.5 text-sm text-stone-600">
                 {activite.nombreBottes != null ? (
                   <>
                     <span className="font-medium">{activite.nombreBottes} bottes</span>
@@ -755,28 +755,28 @@ export default function FourragePage() {
                 )}
               </div>
               {activite.notes && (
-                <div className="mt-0.5 text-xs text-gray-400 italic truncate">{activite.notes}</div>
+                <div className="mt-0.5 text-xs text-stone-400 italic truncate">{activite.notes}</div>
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {activite.statut === "en_cours" && (
                 <button
                   onClick={() => setBottesModal(activite)}
-                  className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg bg-gradient-to-br from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-semibold text-white rounded-lg bg-amber-500 hover:bg-amber-600 transition-colors cursor-pointer"
                 >
                   + Bottes
                 </button>
               )}
               <button
                 onClick={() => setEditActivite(activite)}
-                className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg cursor-pointer transition-colors"
+                className="p-2 text-stone-400 hover:text-brand-600 hover:bg-stone-100 rounded-lg cursor-pointer transition-colors"
                 title="Modifier"
               >
                 ✏️
               </button>
               <button
                 onClick={() => setDeleteTarget(activite)}
-                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
                 title="Supprimer"
               >
                 🗑️

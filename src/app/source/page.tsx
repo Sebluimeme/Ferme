@@ -108,12 +108,12 @@ export default function SourcePage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">💧 Source</h1>
-          <p className="text-gray-500 mt-1">Suivi du débit de la source</p>
+          <h1 className="text-3xl font-bold text-stone-900">💧 Source</h1>
+          <p className="text-stone-500 mt-1">Suivi du débit de la source</p>
         </div>
         <button
           onClick={openCreate}
-          className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 transition-all shadow-sm cursor-pointer"
+          className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 transition-colors transition-all shadow-sm cursor-pointer"
         >
           + Nouveau relevé
         </button>
@@ -145,9 +145,9 @@ export default function SourcePage() {
 
       {/* Graphique */}
       <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-5">
-        <h2 className="text-base font-semibold text-gray-800 mb-4">Évolution du débit</h2>
+        <h2 className="text-base font-semibold text-stone-800 mb-4">Évolution du débit</h2>
         {chartData.length < 2 ? (
-          <p className="text-sm text-gray-400 text-center py-10">
+          <p className="text-sm text-stone-400 text-center py-10">
             Ajoutez au moins 2 relevés pour afficher le graphique.
           </p>
         ) : (
@@ -187,12 +187,12 @@ export default function SourcePage() {
       {/* Tableau desktop / Cartes mobile */}
       <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
         <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-800">Historique des relevés</h2>
-          <span className="text-xs text-gray-400">{releves.length} relevé(s)</span>
+          <h2 className="text-base font-semibold text-stone-800">Historique des relevés</h2>
+          <span className="text-xs text-stone-400">{releves.length} relevé(s)</span>
         </div>
 
         {releves.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-10">
+          <p className="text-sm text-stone-400 text-center py-10">
             Aucun relevé enregistré — commencez par <button onClick={openCreate} className="text-blue-500 underline cursor-pointer">ajouter un relevé</button>.
           </p>
         ) : (
@@ -207,10 +207,10 @@ export default function SourcePage() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <p className="text-sm font-semibold text-gray-800">
+                      <p className="text-sm font-semibold text-stone-800">
                         {new Date(r.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
                       </p>
-                      {r.remarque && <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[180px]">{r.remarque}</p>}
+                      {r.remarque && <p className="text-xs text-stone-400 mt-0.5 truncate max-w-[180px]">{r.remarque}</p>}
                     </div>
                     <span className="text-base font-bold text-blue-600 shrink-0">{fmtDebit(r.debit, r.unite)}</span>
                   </div>
@@ -222,7 +222,7 @@ export default function SourcePage() {
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-stone-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  <tr className="bg-stone-50 text-left text-xs font-semibold text-stone-500 uppercase tracking-wide">
                     <th className="px-5 py-3">Date</th>
                     <th className="px-5 py-3">Débit</th>
                     <th className="px-5 py-3">Unité</th>
@@ -237,12 +237,12 @@ export default function SourcePage() {
                       onClick={() => openEdit(r)}
                       className="hover:bg-stone-50/80 transition-colors group cursor-pointer"
                     >
-                      <td className="px-5 py-3 font-medium text-gray-800">
+                      <td className="px-5 py-3 font-medium text-stone-800">
                         {new Date(r.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
                       </td>
                       <td className="px-5 py-3 font-bold text-blue-600">{r.debit.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</td>
-                      <td className="px-5 py-3 text-gray-500">{r.unite}</td>
-                      <td className="px-5 py-3 text-gray-400 max-w-[220px] truncate">{r.remarque ?? "—"}</td>
+                      <td className="px-5 py-3 text-stone-500">{r.unite}</td>
+                      <td className="px-5 py-3 text-stone-400 max-w-[220px] truncate">{r.remarque ?? "—"}</td>
                       <td className="px-5 py-3 text-right">
                         <button
                           onClick={(e) => { e.stopPropagation(); setDeleteTarget(r); }}
@@ -276,19 +276,19 @@ export default function SourcePage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-5 pt-5 pb-4 border-b border-stone-100 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-gray-900">
+              <h2 className="text-base font-semibold text-stone-900">
                 {editTarget ? "Modifier le relevé" : "Nouveau relevé"}
               </h2>
-              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600 cursor-pointer text-xl leading-none">×</button>
+              <button onClick={closeModal} className="text-stone-400 hover:text-stone-600 cursor-pointer text-xl leading-none">×</button>
             </div>
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Date *</label>
+                  <label className="block text-xs font-medium text-stone-600 mb-1">Date *</label>
                   <input type="date" value={form.date} onChange={set("date")} required className={inputClass} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Débit *</label>
+                  <label className="block text-xs font-medium text-stone-600 mb-1">Débit *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -302,7 +302,7 @@ export default function SourcePage() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Unité</label>
+                <label className="block text-xs font-medium text-stone-600 mb-1">Unité</label>
                 <select value={form.unite} onChange={set("unite")} className={inputClass}>
                   {UNITES.map((u) => (
                     <option key={u} value={u}>{u}</option>
@@ -310,7 +310,7 @@ export default function SourcePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Remarque</label>
+                <label className="block text-xs font-medium text-stone-600 mb-1">Remarque</label>
                 <textarea
                   value={form.remarque}
                   onChange={set("remarque")}
@@ -320,13 +320,13 @@ export default function SourcePage() {
                 />
               </div>
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={closeModal} className="flex-1 py-2.5 rounded-xl border border-stone-200 text-sm text-gray-600 hover:bg-stone-50 cursor-pointer">
+                <button type="button" onClick={closeModal} className="flex-1 py-2.5 rounded-xl border border-stone-200 text-sm text-stone-600 hover:bg-stone-50 cursor-pointer">
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 disabled:opacity-50 cursor-pointer transition-all"
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 transition-colors disabled:opacity-50 cursor-pointer transition-all"
                 >
                   {saving ? "Enregistrement…" : editTarget ? "Mettre à jour" : "Enregistrer"}
                 </button>
@@ -346,14 +346,14 @@ export default function SourcePage() {
             className="bg-white w-full max-w-sm mx-4 rounded-2xl p-6 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-semibold text-gray-900">Supprimer ce relevé ?</h3>
-            <p className="text-sm text-gray-500">
+            <h3 className="font-semibold text-stone-900">Supprimer ce relevé ?</h3>
+            <p className="text-sm text-stone-500">
               Relevé du{" "}
               {new Date(deleteTarget.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}{" "}
               — <strong>{fmtDebit(deleteTarget.debit, deleteTarget.unite)}</strong>
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2 rounded-xl border border-stone-200 text-sm text-gray-600 hover:bg-stone-50 cursor-pointer">
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2 rounded-xl border border-stone-200 text-sm text-stone-600 hover:bg-stone-50 cursor-pointer">
                 Annuler
               </button>
               <button onClick={handleDelete} className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 cursor-pointer">

@@ -98,7 +98,7 @@ export default function VehiclePhotoGallery({ vehicleId }: VehiclePhotoGalleryPr
     <div>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">Photos du véhicule</h3>
-        <label className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer transition-colors">
+        <label className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer transition-colors">
           {uploading ? "Upload..." : "+ Ajouter des photos"}
           <input
             ref={fileRef}
@@ -113,10 +113,10 @@ export default function VehiclePhotoGallery({ vehicleId }: VehiclePhotoGalleryPr
       </div>
 
       {photos.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+        <div className="text-center py-12 bg-stone-50 rounded-lg border-2 border-dashed border-stone-200">
           <div className="text-4xl mb-3">📷</div>
-          <p className="text-gray-500 mb-1">Aucune photo</p>
-          <p className="text-gray-400 text-sm">
+          <p className="text-stone-500 mb-1">Aucune photo</p>
+          <p className="text-stone-400 text-sm">
             Ajoutez des photos de votre véhicule
           </p>
         </div>
@@ -125,7 +125,7 @@ export default function VehiclePhotoGallery({ vehicleId }: VehiclePhotoGalleryPr
           {photos.map((photo, index) => (
             <div
               key={photo.id}
-              className="group relative aspect-square rounded-lg overflow-hidden bg-gray-100 shadow-sm hover:shadow-md transition-shadow"
+              className="group relative aspect-square rounded-lg overflow-hidden bg-stone-100 shadow-sm hover:shadow-md transition-shadow"
             >
               <img
                 src={photo.url}
@@ -191,10 +191,10 @@ export default function VehiclePhotoGallery({ vehicleId }: VehiclePhotoGalleryPr
 
             {/* Info photo */}
             <div className="mt-3 flex items-center justify-between">
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-stone-500">
                 {lightboxIndex + 1} / {photos.length}
                 {photos[lightboxIndex].description && (
-                  <span className="ml-2 text-gray-700">
+                  <span className="ml-2 text-stone-700">
                     — {photos[lightboxIndex].description}
                   </span>
                 )}
@@ -217,13 +217,13 @@ export default function VehiclePhotoGallery({ vehicleId }: VehiclePhotoGalleryPr
         title="Supprimer la photo"
         size="small"
       >
-        <p className="text-gray-700">
+        <p className="text-stone-700">
           Voulez-vous vraiment supprimer cette photo ?
         </p>
         <div className="flex gap-3 justify-end mt-6">
           <button
             onClick={() => setDeleteTarget(null)}
-            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+            className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
           >
             Annuler
           </button>

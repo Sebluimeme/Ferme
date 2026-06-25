@@ -67,9 +67,8 @@ export default function EntretiensPage() {
 
   if (state.loading) {
     return (
-      <div className="p-4 md:p-6 lg:p-8">
-        <div className="flex items-center justify-center py-20">
-          <div className="text-gray-400 text-lg">Chargement...</div>
+      <div className="flex items-center justify-center py-20">
+          <div className="text-stone-400 text-lg">Chargement...</div>
         </div>
       </div>
     );
@@ -78,30 +77,30 @@ export default function EntretiensPage() {
   const hasNoData = sortedAlerts.length === 0 && plannedEntries.length === 0 && recentHistory.length === 0;
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 fade-in">
+    <div className="fade-in">
       <div className="mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Entretiens</h1>
-        <p className="text-gray-600 mt-1">Vue d&apos;ensemble de tous les entretiens de vos véhicules</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-stone-900">Entretiens</h1>
+        <p className="text-stone-600 mt-1">Vue d&apos;ensemble de tous les entretiens de vos véhicules</p>
       </div>
 
       {hasNoData ? (
         <div className="text-center py-16">
           <div className="text-6xl mb-4">🔧</div>
-          <p className="text-gray-500 mb-2">Aucun entretien enregistré</p>
-          <p className="text-gray-400 text-sm mb-6">
+          <p className="text-stone-500 mb-2">Aucun entretien enregistré</p>
+          <p className="text-stone-400 text-sm mb-6">
             Ajoutez des entretiens depuis la fiche de chaque véhicule
           </p>
           {state.vehicles.length > 0 ? (
             <button
               onClick={() => router.push("/vehicules")}
-              className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+              className="px-6 py-3 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors"
             >
               Voir mes véhicules
             </button>
           ) : (
             <button
               onClick={() => router.push("/vehicules")}
-              className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+              className="px-6 py-3 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors"
             >
               + Ajouter un véhicule
             </button>
@@ -112,10 +111,10 @@ export default function EntretiensPage() {
           {/* Section Alertes */}
           {sortedAlerts.length > 0 && (
             <section>
-              <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-stone-800 mb-3 flex items-center gap-2">
                 <span>⚠️</span>
                 Entretiens à prévoir
-                <span className="text-sm font-normal text-gray-500">({sortedAlerts.length})</span>
+                <span className="text-sm font-normal text-stone-500">({sortedAlerts.length})</span>
               </h2>
               <div className="space-y-2">
                 {sortedAlerts.map((alert, index) => {
@@ -134,7 +133,7 @@ export default function EntretiensPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-sm">{vType ? getVehicleIcon(vType) : "🚗"}</span>
-                            <span className="text-xs font-medium text-gray-500 truncate">
+                            <span className="text-xs font-medium text-stone-500 truncate">
                               {alert.vehicleNom || getVehicleName(alert.vehicleId)}
                             </span>
                           </div>
@@ -163,10 +162,10 @@ export default function EntretiensPage() {
           {/* Section Entretiens planifiés / en cours */}
           {plannedEntries.length > 0 && (
             <section>
-              <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-stone-800 mb-3 flex items-center gap-2">
                 <span>📋</span>
                 Planifiés / En cours
-                <span className="text-sm font-normal text-gray-500">({plannedEntries.length})</span>
+                <span className="text-sm font-normal text-stone-500">({plannedEntries.length})</span>
               </h2>
               <div className="space-y-2">
                 {plannedEntries.map((entry) => {
@@ -175,24 +174,24 @@ export default function EntretiensPage() {
                     <div
                       key={entry.id}
                       onClick={() => router.push(`/vehicules/${entry.vehicleId}?tab=entretien`)}
-                      className="bg-white border border-gray-200 rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                      className="bg-white border border-stone-200 rounded-lg p-4 cursor-pointer hover:bg-stone-50 transition-colors"
                     >
                       <div className="flex items-start gap-3">
                         <span className="text-2xl">{entry.type ? getMaintenanceTypeIcon(entry.type) : "🔧"}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-sm">{vType ? getVehicleIcon(vType) : "🚗"}</span>
-                            <span className="text-xs font-medium text-gray-500 truncate">
+                            <span className="text-xs font-medium text-stone-500 truncate">
                               {getVehicleName(entry.vehicleId)}
                             </span>
                           </div>
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-semibold text-gray-800 text-sm">{entry.titre || "Entretien"}</h4>
+                            <h4 className="font-semibold text-stone-800 text-sm">{entry.titre || "Entretien"}</h4>
                             <span className={`text-xs font-medium px-2 py-1 rounded-full shrink-0 ${getMaintenanceStatusColor(entry.statut || "planifie")}`}>
                               {entry.statut === "planifie" ? "Planifié" : "En cours"}
                             </span>
                           </div>
-                          <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-500">
+                          <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-stone-500">
                             {entry.datePlanifiee && <span>📅 {formatDate(entry.datePlanifiee)}</span>}
                             {entry.garage && <span>🔧 {entry.garage}</span>}
                             {entry.coutTotal && <span>💰 {formatCurrency(entry.coutTotal)}</span>}
@@ -209,7 +208,7 @@ export default function EntretiensPage() {
           {/* Section Historique récent */}
           {recentHistory.length > 0 && (
             <section>
-              <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-stone-800 mb-3 flex items-center gap-2">
                 <span>✅</span>
                 Historique récent
               </h2>
@@ -222,8 +221,8 @@ export default function EntretiensPage() {
                     <div
                       key={entry.id}
                       onClick={() => router.push(`/vehicules/${entry.vehicleId}?tab=entretien`)}
-                      className={`bg-white border rounded-lg p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
-                        showAlert ? "border-orange-300" : "border-gray-200"
+                      className={`bg-white border rounded-lg p-4 cursor-pointer hover:bg-stone-50 transition-colors ${
+                        showAlert ? "border-orange-300" : "border-stone-200"
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -231,17 +230,17 @@ export default function EntretiensPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-sm">{vType ? getVehicleIcon(vType) : "🚗"}</span>
-                            <span className="text-xs font-medium text-gray-500 truncate">
+                            <span className="text-xs font-medium text-stone-500 truncate">
                               {getVehicleName(entry.vehicleId)}
                             </span>
                           </div>
                           <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-semibold text-gray-800 text-sm">{entry.titre || "Entretien"}</h4>
+                            <h4 className="font-semibold text-stone-800 text-sm">{entry.titre || "Entretien"}</h4>
                             <span className={`text-xs font-medium px-2 py-1 rounded-full shrink-0 ${getMaintenanceStatusColor("termine")}`}>
                               Terminé
                             </span>
                           </div>
-                          <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-500">
+                          <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-stone-500">
                             {entry.dateEffectuee && <span>✅ {formatDate(entry.dateEffectuee)}</span>}
                             {entry.kilometrageEffectue && <span>📏 {formatKilometrage(entry.kilometrageEffectue)}</span>}
                             {entry.heuresEffectuees && <span>⏱️ {formatHeures(entry.heuresEffectuees)}</span>}

@@ -129,8 +129,16 @@ export default function VehiclesPageContent() {
   };
 
   return (
-    <>
-      {/* En-tête avec recherche et filtres */}
+    <div className="fade-in">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-stone-900">🚜 Parc de véhicules</h1>
+          <p className="text-stone-400 text-sm mt-0.5">Gérez vos véhicules et leur maintenance</p>
+        </div>
+      </div>
+
+      {/* Recherche et filtres */}
       <div className="mb-6 space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
@@ -139,14 +147,14 @@ export default function VehiclesPageContent() {
               placeholder="🔍 Rechercher par nom, plaque, marque, modèle..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full px-4 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
             />
           </div>
           <div className="flex gap-2 flex-wrap">
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value as VehicleType | "")}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 flex-1 md:flex-none min-w-0"
+              className="px-4 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 flex-1 md:flex-none min-w-0"
             >
               <option value="">Tous les types</option>
               <option value="voiture">🚗 {getVehicleTypeLabel("voiture")}</option>
@@ -160,7 +168,7 @@ export default function VehiclesPageContent() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 flex-1 md:flex-none min-w-0"
+              className="px-4 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 flex-1 md:flex-none min-w-0"
             >
               <option value="">Tous les statuts</option>
               <option value="actif">Actif</option>
@@ -172,7 +180,7 @@ export default function VehiclesPageContent() {
             {/* Bouton ajouter */}
             <button
               onClick={() => setShowAddModal(true)}
-              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors whitespace-nowrap cursor-pointer"
+              className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors whitespace-nowrap cursor-pointer"
             >
               + Ajouter un véhicule
             </button>
@@ -183,7 +191,7 @@ export default function VehiclesPageContent() {
       {/* Bouton flottant "Ajouter" sur mobile */}
       <button
         onClick={() => setShowAddModal(true)}
-        className="md:hidden fixed bottom-6 right-6 z-50 w-14 h-14 bg-primary text-white rounded-full shadow-lg hover:bg-primary-dark transition-colors flex items-center justify-center text-2xl"
+        className="md:hidden fixed bottom-6 right-6 z-50 w-14 h-14 bg-brand-600 text-white rounded-full shadow-lg hover:bg-brand-700 transition-colors flex items-center justify-center text-2xl"
         aria-label="Ajouter un véhicule"
       >
         +
@@ -193,14 +201,14 @@ export default function VehiclesPageContent() {
       {filteredVehicles.length === 0 ? (
         <div className="text-center py-16">
           <div className="text-6xl mb-4">🚗</div>
-          <p className="text-gray-500 mb-6">
+          <p className="text-stone-500 mb-6">
             {searchQuery || typeFilter || statusFilter
               ? "Aucun véhicule ne correspond à votre recherche"
               : "Aucun véhicule enregistré"}
           </p>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+            className="px-6 py-3 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors"
           >
             + Ajouter votre premier véhicule
           </button>
@@ -236,9 +244,9 @@ export default function VehiclesPageContent() {
           <div className="flex flex-col gap-8">
             {grouped.map((group) => (
               <div key={group.type}>
-                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <h2 className="text-sm font-bold text-stone-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                   {group.label}
-                  <span className="text-xs font-normal text-gray-400 normal-case tracking-normal">
+                  <span className="text-xs font-normal text-stone-400 normal-case tracking-normal">
                     ({group.vehicles.length})
                   </span>
                 </h2>
@@ -286,14 +294,14 @@ export default function VehiclesPageContent() {
               setShowAddModal(false);
               formRef.current?.reset();
             }}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            className="px-4 py-2 bg-stone-100 text-stone-700 rounded-lg hover:bg-stone-200 transition-colors"
           >
             Annuler
           </button>
           <button
             onClick={handleAddVehicle}
             disabled={loading}
-            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-50"
           >
             {loading ? "Enregistrement..." : "Enregistrer"}
           </button>
@@ -317,14 +325,14 @@ export default function VehiclesPageContent() {
               setEditVehicle(null);
               formRef.current?.reset();
             }}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            className="px-4 py-2 bg-stone-100 text-stone-700 rounded-lg hover:bg-stone-200 transition-colors"
           >
             Annuler
           </button>
           <button
             onClick={handleEditVehicle}
             disabled={loading}
-            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-50"
           >
             {loading ? "Enregistrement..." : "Enregistrer les modifications"}
           </button>
@@ -339,6 +347,6 @@ export default function VehiclesPageContent() {
         danger
         message={`Êtes-vous sûr de vouloir supprimer le véhicule <strong>${deleteTarget?.nom}</strong> ? Cette action est irréversible.`}
       />
-    </>
+    </div>
   );
 }

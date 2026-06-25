@@ -98,24 +98,24 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
         <InfoCard title="Compteurs">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-xs text-gray-500">Kilométrage</div>
-              <div className="text-sm font-medium text-gray-800">{formatKilometrage(vehicle.kilometrage)}</div>
+              <div className="text-xs text-stone-500">Kilométrage</div>
+              <div className="text-sm font-medium text-stone-800">{formatKilometrage(vehicle.kilometrage)}</div>
             </div>
             <button
               onClick={() => openMeterModal("kilometrage")}
-              className="px-2.5 py-1 text-xs bg-primary/10 text-primary rounded-md hover:bg-primary/20 transition-colors font-medium"
+              className="px-2.5 py-1 text-xs bg-brand-600/10 text-brand-600 rounded-md hover:bg-brand-600/20 transition-colors font-medium"
             >
               Mettre à jour
             </button>
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-xs text-gray-500">Heures d&apos;utilisation</div>
-              <div className="text-sm font-medium text-gray-800">{formatHeures(vehicle.heuresUtilisation)}</div>
+              <div className="text-xs text-stone-500">Heures d&apos;utilisation</div>
+              <div className="text-sm font-medium text-stone-800">{formatHeures(vehicle.heuresUtilisation)}</div>
             </div>
             <button
               onClick={() => openMeterModal("heures")}
-              className="px-2.5 py-1 text-xs bg-primary/10 text-primary rounded-md hover:bg-primary/20 transition-colors font-medium"
+              className="px-2.5 py-1 text-xs bg-brand-600/10 text-brand-600 rounded-md hover:bg-brand-600/20 transition-colors font-medium"
             >
               Mettre à jour
             </button>
@@ -123,7 +123,7 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
           {readings.length > 0 && (
             <button
               onClick={() => setShowHistory(!showHistory)}
-              className="text-xs text-primary hover:underline mt-1"
+              className="text-xs text-brand-600 hover:underline mt-1"
             >
               {showHistory ? "Masquer l'historique" : `Voir l'historique (${readings.length} relevés)`}
             </button>
@@ -150,7 +150,7 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
         {vehicle.commentaire && (
           <div className="md:col-span-2 lg:col-span-3">
             <InfoCard title="Commentaires">
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{vehicle.commentaire}</p>
+              <p className="text-sm text-stone-700 whitespace-pre-wrap">{vehicle.commentaire}</p>
             </InfoCard>
           </div>
         )}
@@ -158,20 +158,20 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
 
       {/* Historique des relevés */}
       {showHistory && readings.length > 0 && (
-        <div className="mt-4 bg-white border border-gray-200 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Historique des relevés</h3>
+        <div className="mt-4 bg-white border border-stone-200 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-stone-500 uppercase tracking-wide mb-3">Historique des relevés</h3>
           <div className="space-y-1">
             {/* En-tête km */}
             {kmReadings.length > 0 && (
               <>
-                <div className="text-xs font-semibold text-gray-600 mt-2 mb-1">Kilométrage</div>
+                <div className="text-xs font-semibold text-stone-600 mt-2 mb-1">Kilométrage</div>
                 {kmReadings.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between text-sm py-1 border-b border-gray-100 last:border-0">
+                  <div key={r.id} className="flex items-center justify-between text-sm py-1 border-b border-stone-100 last:border-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-500">{formatDate(r.date)}</span>
+                      <span className="text-stone-500">{formatDate(r.date)}</span>
                       <span className="font-medium">{formatKilometrage(r.valeur)}</span>
                     </div>
-                    {r.commentaire && <span className="text-xs text-gray-400">{r.commentaire}</span>}
+                    {r.commentaire && <span className="text-xs text-stone-400">{r.commentaire}</span>}
                   </div>
                 ))}
               </>
@@ -179,14 +179,14 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
             {/* En-tête heures */}
             {heuresReadings.length > 0 && (
               <>
-                <div className="text-xs font-semibold text-gray-600 mt-3 mb-1">Heures d&apos;utilisation</div>
+                <div className="text-xs font-semibold text-stone-600 mt-3 mb-1">Heures d&apos;utilisation</div>
                 {heuresReadings.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between text-sm py-1 border-b border-gray-100 last:border-0">
+                  <div key={r.id} className="flex items-center justify-between text-sm py-1 border-b border-stone-100 last:border-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-500">{formatDate(r.date)}</span>
+                      <span className="text-stone-500">{formatDate(r.date)}</span>
                       <span className="font-medium">{formatHeures(r.valeur)}</span>
                     </div>
-                    {r.commentaire && <span className="text-xs text-gray-400">{r.commentaire}</span>}
+                    {r.commentaire && <span className="text-xs text-stone-400">{r.commentaire}</span>}
                   </div>
                 ))}
               </>
@@ -204,7 +204,7 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
       >
         <div className="space-y-4">
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
+            <label className="block mb-1 text-sm font-medium text-stone-700">
               {meterType === "kilometrage" ? "Kilométrage actuel (km)" : "Heures actuelles (h)"}
             </label>
             <input
@@ -212,47 +212,47 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
               value={meterValue}
               onChange={(e) => setMeterValue(e.target.value)}
               placeholder={meterType === "kilometrage" ? "Ex: 52000" : "Ex: 1250"}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
               min="0"
               autoFocus
             />
             {vehicle[meterType === "kilometrage" ? "kilometrage" : "heuresUtilisation"] !== undefined && (
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-stone-400 mt-1">
                 Valeur actuelle : {meterType === "kilometrage" ? formatKilometrage(vehicle.kilometrage) : formatHeures(vehicle.heuresUtilisation)}
               </p>
             )}
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Date du relevé</label>
+            <label className="block mb-1 text-sm font-medium text-stone-700">Date du relevé</label>
             <input
               type="date"
               value={meterDate}
               onChange={(e) => setMeterDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
             />
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Commentaire (optionnel)</label>
+            <label className="block mb-1 text-sm font-medium text-stone-700">Commentaire (optionnel)</label>
             <input
               type="text"
               value={meterComment}
               onChange={(e) => setMeterComment(e.target.value)}
               placeholder="Ex: Relevé semestriel"
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
             />
           </div>
         </div>
         <div className="flex gap-2 justify-end mt-6">
           <button
             onClick={() => setShowMeterModal(false)}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            className="px-4 py-2 bg-stone-100 text-stone-700 rounded-lg hover:bg-stone-200 transition-colors"
           >
             Annuler
           </button>
           <button
             onClick={handleMeterSubmit}
             disabled={meterLoading || !meterValue}
-            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-50"
           >
             {meterLoading ? "Enregistrement..." : "Enregistrer"}
           </button>
@@ -264,8 +264,8 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
 
 function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
-      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{title}</h3>
+    <div className="bg-white border border-stone-200 rounded-lg p-4">
+      <h3 className="text-sm font-semibold text-stone-500 uppercase tracking-wide mb-3">{title}</h3>
       <div className="space-y-2">{children}</div>
     </div>
   );
@@ -284,8 +284,8 @@ function InfoItem({
 }) {
   return (
     <div>
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className="text-sm font-medium text-gray-800">
+      <div className="text-xs text-stone-500">{label}</div>
+      <div className="text-sm font-medium text-stone-800">
         {value || "-"}
         {alert && alertMessage && (
           <span className={`ml-2 text-xs font-semibold ${alert === "expired" ? "text-red-600" : "text-orange-600"}`}>

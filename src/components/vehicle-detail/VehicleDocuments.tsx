@@ -161,26 +161,26 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
           <h3 className="text-lg font-semibold">Documents du véhicule</h3>
           <button
             onClick={() => setShowAddForm(true)}
-            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer transition-colors"
           >
             + Ajouter un document
           </button>
         </div>
 
         {documents.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+          <div className="text-center py-12 bg-stone-50 rounded-lg border-2 border-dashed border-stone-200">
             <div className="text-4xl mb-3">📋</div>
-            <p className="text-gray-500 mb-1">Aucun document</p>
-            <p className="text-gray-400 text-sm">
+            <p className="text-stone-500 mb-1">Aucun document</p>
+            <p className="text-stone-400 text-sm">
               Ajoutez carte grise, assurance, contrôle technique...
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
+          <div className="bg-white rounded-lg border border-stone-200 divide-y divide-stone-100">
             {documents.map((doc) => (
               <div
                 key={doc.id}
-                className={`flex items-start gap-3 p-4 hover:bg-gray-50 transition-colors ${
+                className={`flex items-start gap-3 p-4 hover:bg-stone-50 transition-colors ${
                   doc.dateExpiration && isExpired(doc.dateExpiration)
                     ? "bg-red-50/50"
                     : doc.dateExpiration && isApproaching(doc.dateExpiration, 30)
@@ -193,13 +193,13 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 flex-shrink-0">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 flex-shrink-0">
                       {getDocumentTypeLabel(doc.type)}
                     </span>
                     {getExpirationBadge(doc.dateExpiration)}
                   </div>
                   <div className="font-medium text-sm mt-0.5">{doc.nom}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">
+                  <div className="text-xs text-stone-400 mt-0.5">
                     {doc.dateDocument && (
                       <span>Date : {formatDate(doc.dateDocument)}</span>
                     )}
@@ -214,14 +214,14 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
                     )}
                   </div>
                   {doc.description && (
-                    <p className="text-xs text-gray-500 mt-1">{doc.description}</p>
+                    <p className="text-xs text-stone-500 mt-1">{doc.description}</p>
                   )}
                   <div className="flex gap-2 mt-2">
                     <a
                       href={doc.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200"
+                      className="px-3 py-1.5 text-xs font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200"
                     >
                       Ouvrir
                     </a>
@@ -243,11 +243,11 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
       {maintenanceEntries.length > 0 && (
         <div>
           <h3 className="text-lg font-semibold mb-4">Factures d'entretien</h3>
-          <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
+          <div className="bg-white rounded-lg border border-stone-200 divide-y divide-stone-100">
             {maintenanceEntries.map((entry) => (
               <div
                 key={entry.id}
-                className="flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-3 p-4 hover:bg-stone-50 transition-colors"
               >
                 <span className="text-2xl flex-shrink-0">
                   {entry.type ? getMaintenanceTypeIcon(entry.type) : "🧾"}
@@ -263,7 +263,7 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-gray-400 mt-0.5">
+                  <div className="text-xs text-stone-400 mt-0.5">
                     {entry.dateEffectuee && (
                       <span>{formatDate(entry.dateEffectuee)}</span>
                     )}
@@ -285,14 +285,14 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
                   href={entry.facture!}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 flex-shrink-0"
+                  className="px-3 py-1.5 text-xs font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 flex-shrink-0"
                 >
                   Voir la facture
                 </a>
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-400 mt-2 ml-1">
+          <p className="text-xs text-stone-400 mt-2 ml-1">
             Ces factures sont gérées depuis l'onglet Entretien
           </p>
         </div>
@@ -312,7 +312,7 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
         <form ref={formRef} className="grid gap-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-700">
+              <label className="block mb-1 text-sm font-medium text-stone-700">
                 Nom du document *
               </label>
               <input
@@ -324,7 +324,7 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
               />
             </div>
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-700">
+              <label className="block mb-1 text-sm font-medium text-stone-700">
                 Type de document
               </label>
               <select name="type" defaultValue="autre" className="w-full px-3 py-2 border rounded-lg">
@@ -339,7 +339,7 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-700">
+              <label className="block mb-1 text-sm font-medium text-stone-700">
                 Date du document
               </label>
               <input
@@ -349,7 +349,7 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
               />
             </div>
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-700">
+              <label className="block mb-1 text-sm font-medium text-stone-700">
                 Date d'expiration
               </label>
               <input
@@ -361,7 +361,7 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
           </div>
 
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
+            <label className="block mb-1 text-sm font-medium text-stone-700">
               Description
             </label>
             <input
@@ -373,11 +373,11 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
           </div>
 
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
+            <label className="block mb-1 text-sm font-medium text-stone-700">
               Fichier *
             </label>
             {selectedFile ? (
-              <div className="flex items-center gap-3 px-3 py-2 border rounded-lg bg-gray-50">
+              <div className="flex items-center gap-3 px-3 py-2 border rounded-lg bg-stone-50">
                 <span className="text-lg">{getFileIcon(selectedFile.name)}</span>
                 <span className="text-sm truncate flex-1">{selectedFile.name}</span>
                 <button
@@ -394,9 +394,9 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
             ) : (
               <div
                 onClick={() => fileRef.current?.click()}
-                className="w-full px-3 py-6 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+                className="w-full px-3 py-6 border-2 border-dashed border-stone-300 rounded-lg text-center cursor-pointer hover:border-brand-600 hover:bg-brand-600/5 transition-colors"
               >
-                <span className="text-gray-400 text-sm">
+                <span className="text-stone-400 text-sm">
                   Cliquez pour sélectionner un fichier (PDF, image...)
                 </span>
               </div>
@@ -421,14 +421,14 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
               setSelectedFile(null);
               formRef.current?.reset();
             }}
-            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+            className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
           >
             Annuler
           </button>
           <button
             onClick={handleAddDocument}
             disabled={uploading || !selectedFile}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-dark disabled:opacity-50 cursor-pointer"
+            className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 disabled:opacity-50 cursor-pointer"
           >
             {uploading ? "Upload..." : "Ajouter"}
           </button>
@@ -442,13 +442,13 @@ export default function VehicleDocuments({ vehicleId }: VehicleDocumentsProps) {
         title="Supprimer le document"
         size="small"
       >
-        <p className="text-gray-700">
+        <p className="text-stone-700">
           Voulez-vous vraiment supprimer <strong>{deleteTarget?.nom}</strong> ?
         </p>
         <div className="flex gap-3 justify-end mt-6">
           <button
             onClick={() => setDeleteTarget(null)}
-            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+            className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
           >
             Annuler
           </button>

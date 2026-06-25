@@ -28,13 +28,13 @@ export default function VehicleCard({ vehicle, onEdit, onDelete, onClick }: Vehi
       className={`bg-white rounded-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all border-l-4 ${getVehicleBorderColor(vehicle.type)}`}
     >
       <div onClick={() => onClick?.(vehicle)} className="cursor-pointer">
-        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-200">
+        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-stone-200">
           {vehicle.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={vehicle.photoUrl}
               alt={displayName}
-              className="w-10 h-10 rounded-md object-cover border border-gray-200 flex-shrink-0"
+              className="w-10 h-10 rounded-md object-cover border border-stone-200 flex-shrink-0"
             />
           ) : (
             <span className="text-2xl">{getVehicleIcon(vehicle.type)}</span>
@@ -42,10 +42,10 @@ export default function VehicleCard({ vehicle, onEdit, onDelete, onClick }: Vehi
           <div className="flex-1">
             <div className="font-semibold text-sm sm:text-base">{displayName}</div>
             {vehicle.plaqueImmatriculation && (
-              <div className="text-xs text-gray-600">{vehicle.plaqueImmatriculation}</div>
+              <div className="text-xs text-stone-600">{vehicle.plaqueImmatriculation}</div>
             )}
             {vehicle.marque && vehicle.modele && (
-              <div className="text-[11px] text-gray-500">
+              <div className="text-[11px] text-stone-500">
                 {vehicle.marque} {vehicle.modele}
               </div>
             )}
@@ -63,7 +63,7 @@ export default function VehicleCard({ vehicle, onEdit, onDelete, onClick }: Vehi
         <div className="px-3 py-2">
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div>
-              <div className="text-gray-500">Mise en circulation</div>
+              <div className="text-stone-500">Mise en circulation</div>
               <div className="font-medium">
                 {vehicle.dateMiseEnCirculation
                   ? new Date(vehicle.dateMiseEnCirculation).toLocaleDateString("fr-FR")
@@ -71,7 +71,7 @@ export default function VehicleCard({ vehicle, onEdit, onDelete, onClick }: Vehi
               </div>
             </div>
             <div>
-              <div className="text-gray-500">
+              <div className="text-stone-500">
                 {vehicle.type === "tracteur" ? "Heures" : "Kilométrage"}
               </div>
               <div className="font-medium">
@@ -84,14 +84,14 @@ export default function VehicleCard({ vehicle, onEdit, onDelete, onClick }: Vehi
         </div>
       </div>
 
-      <div className="px-3 py-1.5 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+      <div className="px-3 py-1.5 border-t border-stone-200 bg-stone-50 rounded-b-lg">
         <div className="flex gap-1.5 justify-end">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onEdit(vehicle.id);
             }}
-            className="px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-200 transition-all cursor-pointer"
+            className="px-2.5 py-1 text-xs font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-md hover:bg-stone-200 transition-all cursor-pointer"
           >
             ✏️ Modifier
           </button>

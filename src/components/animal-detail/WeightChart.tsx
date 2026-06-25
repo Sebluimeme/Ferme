@@ -80,7 +80,7 @@ export default function WeightChart({ animalId, animalType, weights }: WeightCha
         <h2 className="text-lg font-semibold">Évolution du poids</h2>
         <button
           onClick={() => setShowForm(true)}
-          className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer"
+          className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer"
         >
           + Ajouter une pesée
         </button>
@@ -100,14 +100,14 @@ export default function WeightChart({ animalId, animalType, weights }: WeightCha
           </ResponsiveContainer>
         </div>
       ) : chartData.length === 1 ? (
-        <div className="text-center py-8 text-gray-400 mb-6">
+        <div className="text-center py-8 text-stone-400 mb-6">
           <p>Ajoutez au moins 2 pesées pour voir le graphique</p>
         </div>
       ) : null}
 
       {/* Tableau */}
       {weights.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-12 text-stone-400">
           <div className="text-4xl mb-2">⚖️</div>
           <p>Aucune pesée enregistrée</p>
         </div>
@@ -115,19 +115,19 @@ export default function WeightChart({ animalId, animalType, weights }: WeightCha
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-2 font-medium text-gray-500">Date</th>
-                <th className="text-left py-2 font-medium text-gray-500">Poids</th>
-                <th className="text-left py-2 font-medium text-gray-500">Note</th>
-                <th className="text-right py-2 font-medium text-gray-500">Actions</th>
+              <tr className="border-b border-stone-200">
+                <th className="text-left py-2 font-medium text-stone-500">Date</th>
+                <th className="text-left py-2 font-medium text-stone-500">Poids</th>
+                <th className="text-left py-2 font-medium text-stone-500">Note</th>
+                <th className="text-right py-2 font-medium text-stone-500">Actions</th>
               </tr>
             </thead>
             <tbody>
               {[...weights].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((w) => (
-                <tr key={w.id} className="border-b border-gray-100">
+                <tr key={w.id} className="border-b border-stone-100">
                   <td className="py-2">{formatDate(w.date)}</td>
                   <td className="py-2 font-medium">{formatNumber(w.poids, 2)} kg</td>
-                  <td className="py-2 text-gray-500">{w.note || "-"}</td>
+                  <td className="py-2 text-stone-500">{w.note || "-"}</td>
                   <td className="py-2 text-right">
                     <button
                       onClick={() => setDeleteTarget(w)}
@@ -147,17 +147,17 @@ export default function WeightChart({ animalId, animalType, weights }: WeightCha
       <Modal isOpen={showForm} onClose={() => setShowForm(false)} title="Ajouter une pesée" size="small">
         <form onSubmit={handleAdd} className="grid gap-4">
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Date *</label>
+            <label className="block mb-1 text-sm font-medium text-stone-700">Date *</label>
             <input
               type="date"
               name="date"
               defaultValue={new Date().toISOString().split("T")[0]}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
             />
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Poids (kg) *</label>
+            <label className="block mb-1 text-sm font-medium text-stone-700">Poids (kg) *</label>
             <input
               type="number"
               name="poids"
@@ -165,23 +165,23 @@ export default function WeightChart({ animalId, animalType, weights }: WeightCha
               min="0"
               required
               placeholder="45.50"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
             />
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Note (optionnel)</label>
+            <label className="block mb-1 text-sm font-medium text-stone-700">Note (optionnel)</label>
             <input
               type="text"
               name="note"
               placeholder="Après sevrage..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
             />
           </div>
           <div className="flex gap-3 justify-end mt-2">
-            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">
+            <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">
               Annuler
             </button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+            <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer disabled:opacity-50">
               {saving ? "Enregistrement..." : "Ajouter"}
             </button>
           </div>
@@ -190,11 +190,11 @@ export default function WeightChart({ animalId, animalType, weights }: WeightCha
 
       {/* Confirm delete */}
       <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Supprimer la pesée" size="small">
-        <p className="text-gray-700">
+        <p className="text-stone-700">
           Voulez-vous vraiment supprimer la pesée du <strong>{deleteTarget && formatDate(deleteTarget.date)}</strong> ({deleteTarget?.poids} kg) ?
         </p>
         <div className="flex gap-3 justify-end mt-6">
-          <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">
+          <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">
             Annuler
           </button>
           <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 cursor-pointer">

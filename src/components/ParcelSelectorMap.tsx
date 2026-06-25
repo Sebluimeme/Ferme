@@ -48,7 +48,8 @@ export default function ParcelSelectorMap({ partiels, selectedIds, onToggle }: P
     <div className="flex flex-col gap-3">
       {withGeometry.length > 0 ? (
         <>
-          <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: "300px" }}>
+          <p className="text-[11px] text-stone-400">Cliquez sur une parcelle pour la sélectionner / désélectionner.</p>
+          <div className="rounded-xl overflow-hidden border border-stone-200" style={{ height: "300px" }}>
             <MapContainer center={[48.172, 7.141]} zoom={14} style={{ height: "100%", width: "100%" }}>
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -70,14 +71,17 @@ export default function ParcelSelectorMap({ partiels, selectedIds, onToggle }: P
                     key={`${p.id}-${isSelected}`}
                     data={p.geometry as GeoJSON.GeoJsonObject}
                     style={{
-                      color: isSelected ? "#22c55e" : "#3b82f6",
-                      weight: 2,
-                      fillColor: isSelected ? "#22c55e" : "#3b82f6",
-                      fillOpacity: isSelected ? 0.4 : 0.15,
+                      color: isSelected ? "#33935e" : "#3b82f6",
+                      weight: isSelected ? 3 : 2,
+                      fillColor: isSelected ? "#33935e" : "#3b82f6",
+                      fillOpacity: isSelected ? 0.45 : 0.12,
                     }}
                     eventHandlers={{ click: () => onToggle(p.id) }}
                     onEachFeature={(_, layer) => {
-                      layer.bindTooltip(p.nom, { sticky: true });
+                      const label = p.surface
+                        ? `${p.nom} (${p.surface.toFixed(2)} ha)`
+                        : p.nom;
+                      layer.bindTooltip(label, { sticky: true, className: "leaflet-tooltip-parcelle" });
                     }}
                   />
                 );
@@ -86,27 +90,30 @@ export default function ParcelSelectorMap({ partiels, selectedIds, onToggle }: P
             </MapContainer>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {withGeometry.map((p) => {
-              const isSelected = selectedIds.includes(p.id);
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => onToggle(p.id)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
-                    isSelected
-                      ? "bg-green-100 border-green-400 text-green-800"
-                      : "bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {isSelected ? "✓ " : ""}
-                  {p.nom}
-                  {p.surface ? ` (${p.surface.toFixed(2)} ha)` : ""}
-                </button>
-              );
-            })}
-          </div>
+          {/* Résumé des parcelles sélectionnées */}
+          {selectedIds.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {selectedIds
+                .map((id) => partiels.find((p) => p.id === id))
+                .filter(Boolean)
+                .map((p) => (
+                  <span
+                    key={p!.id}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-brand-50 text-brand-700 border border-brand-200 rounded-full"
+                  >
+                    {p!.nom}
+                    {p!.surface ? ` · ${p!.surface.toFixed(2)} ha` : ""}
+                    <button
+                      type="button"
+                      onClick={() => onToggle(p!.id)}
+                      className="ml-0.5 text-brand-400 hover:text-brand-700 cursor-pointer leading-none"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+            </div>
+          )}
         </>
       ) : (
         <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
@@ -114,10 +121,11 @@ export default function ParcelSelectorMap({ partiels, selectedIds, onToggle }: P
         </p>
       )}
 
+      {/* Parcelles sans géométrie : checkboxes uniquement */}
       {withoutGeometry.length > 0 && (
         <div>
           {withGeometry.length > 0 && (
-            <p className="text-xs text-gray-400 mb-1.5">Sans géométrie cadastrale :</p>
+            <p className="text-xs text-stone-400 mb-1.5">Sans géométrie cadastrale :</p>
           )}
           <div className="grid grid-cols-2 gap-2">
             {withoutGeometry.map((p) => (
@@ -126,9 +134,9 @@ export default function ParcelSelectorMap({ partiels, selectedIds, onToggle }: P
                   type="checkbox"
                   checked={selectedIds.includes(p.id)}
                   onChange={() => onToggle(p.id)}
-                  className="accent-primary"
+                  className="accent-brand-500"
                 />
-                <span className="text-sm text-gray-700">{p.nom}</span>
+                <span className="text-sm text-stone-700">{p.nom}</span>
               </label>
             ))}
           </div>

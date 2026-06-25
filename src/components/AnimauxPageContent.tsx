@@ -161,10 +161,10 @@ export default function AnimauxPageContent() {
     <div className="fade-in">
       {/* Header */}
       <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
-        <h1 className="text-2xl font-bold m-0">🐾 Mes Animaux</h1>
+        <h1 className="text-2xl font-bold text-stone-900">🐾 Mes Animaux</h1>
         <button
           onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
+          className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-all hover:-translate-y-0.5 hover:shadow-md cursor-pointer"
         >
           + Ajouter un animal
         </button>
@@ -177,13 +177,13 @@ export default function AnimauxPageContent() {
             label="Total"
             value={stats.actifs}
             onClick={() => setCurrentFilter(null)}
-            borderColorClass="border-l-primary"
+            borderColorClass="border-l-brand-600"
           />
           <KpiCard
             label="💀 Morts"
             value={stats.morts}
-            borderColorClass="border-l-gray-500"
-            valueColorClass="text-gray-500"
+            borderColorClass="border-l-stone-500"
+            valueColorClass="text-stone-500"
           />
           <KpiCard
             label={`${getAnimalIcon("ovin")} Ovins`}
@@ -222,7 +222,7 @@ export default function AnimauxPageContent() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => { setCurrentFilter(null); setStatusFilter("actif"); }}
-              className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-all cursor-pointer"
+              className="p-2 text-stone-500 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-all cursor-pointer"
               title="Retour à tous les animaux"
             >
               ←
@@ -252,8 +252,8 @@ export default function AnimauxPageContent() {
                   onClick={() => setStatusFilter(key)}
                   className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all cursor-pointer border ${
                     statusFilter === key
-                      ? "bg-primary text-white border-primary"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:bg-gray-50"
+                      ? "bg-brand-600 text-white border-brand-600"
+                      : "bg-white text-stone-600 border-stone-200 hover:border-stone-400 hover:bg-stone-50"
                   }`}
                 >
                   {label} ({count})
@@ -272,13 +272,13 @@ export default function AnimauxPageContent() {
             placeholder="🔍 Rechercher par numéro, nom ou race..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+            className="flex-1 min-w-[200px] px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
           />
           {!currentFilter && (
             <select
               value={currentFilter || ""}
               onChange={(e) => setCurrentFilter(e.target.value || null)}
-              className="w-[150px] px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 cursor-pointer"
+              className="w-[150px] px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 cursor-pointer"
             >
               <option value="">Tous les types</option>
               <option value="ovin">🐑 Ovins</option>
@@ -295,14 +295,14 @@ export default function AnimauxPageContent() {
         <div className="text-center py-16">
           <div className="text-6xl mb-4">🐾</div>
           <h3 className="text-2xl font-semibold mb-2">Aucun animal</h3>
-          <p className="text-gray-600 mb-6">
+          <p className="text-stone-600 mb-6">
             {currentFilter
               ? `Aucun ${getAnimalLabel(currentFilter).toLowerCase()} ${statusFilter ? `avec le statut "${statusFilter === "actif" ? "actif" : statusFilter === "vendu" ? "vendu" : statusFilter === "mort" ? "mort" : "réformé"}" ` : ""}trouvé`
               : "Commencez par ajouter votre premier animal"}
           </p>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer"
+            className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer"
           >
             + Ajouter un animal
           </button>
@@ -319,11 +319,11 @@ export default function AnimauxPageContent() {
                   <span className="font-bold text-lg">
                     {year === "Non renseigné" ? year : `Nés en ${year}`}
                   </span>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-stone-500">
                     ({animals.length} {animals.length > 1 ? "animaux" : "animal"})
                   </span>
                 </div>
-                <div className="flex-1 h-px bg-gray-200" />
+                <div className="flex-1 h-px bg-stone-200" />
               </div>
               {/* Grille des animaux de cette année */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -350,14 +350,14 @@ export default function AnimauxPageContent() {
         <div className="flex gap-3 justify-end mt-6">
           <button
             onClick={() => setShowAddModal(false)}
-            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+            className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
           >
             Annuler
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? "Enregistrement..." : "Ajouter"}
           </button>

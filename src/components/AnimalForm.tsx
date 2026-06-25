@@ -63,7 +63,7 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
     <form ref={formRef} className="grid gap-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">
+          <label className="block mb-1 text-sm font-medium text-stone-700">
             Type d&apos;animal <span className="text-red-500">*</span>
           </label>
           <select
@@ -71,7 +71,7 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
             value={selectedType}
             onChange={(e) => setSelectedType(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+            className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
           >
             <option value="">Sélectionnez...</option>
             <option value="ovin">🐑 Ovin</option>
@@ -82,8 +82,8 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
           </select>
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">
-            Numéro de boucle <span className="text-xs text-gray-400 font-normal">(ou nom requis)</span>
+          <label className="block mb-1 text-sm font-medium text-stone-700">
+            Numéro de boucle <span className="text-xs text-stone-400 font-normal">(ou nom requis)</span>
           </label>
           <input
             type="text"
@@ -91,31 +91,31 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
             defaultValue={animal?.numeroBoucle || ""}
             placeholder="FR123456789"
             readOnly={!!animal}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 read-only:bg-gray-100 read-only:cursor-not-allowed"
+            className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 read-only:bg-stone-100 read-only:cursor-not-allowed"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Nom <span className="text-xs text-gray-400 font-normal">(ou n° boucle requis)</span></label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Nom <span className="text-xs text-stone-400 font-normal">(ou n° boucle requis)</span></label>
           <input
             type="text"
             name="nom"
             defaultValue={animal?.nom || ""}
             placeholder="Bernadette"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+            className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
           />
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">
+          <label className="block mb-1 text-sm font-medium text-stone-700">
             Sexe <span className="text-red-500">*</span>
           </label>
           <select
             name="sexe"
             defaultValue={animal?.sexe || ""}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+            className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
           >
             <option value="">Sélectionnez...</option>
             <option value="M">♂ Mâle</option>
@@ -126,7 +126,7 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="relative" ref={raceDropdownRef}>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Race</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Race</label>
           <input type="hidden" name="race" value={raceValue} />
           {isAddingNewRace ? (
             <div className="flex gap-2">
@@ -137,7 +137,7 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
                 onChange={(e) => setRaceValue(e.target.value)}
                 placeholder="Saisir le nom de la race..."
                 autoFocus
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                className="flex-1 px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
               />
               <button
                 type="button"
@@ -145,7 +145,7 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
                   setIsAddingNewRace(false);
                   if (!raceValue) setRaceDropdownOpen(false);
                 }}
-                className="px-2 py-2 text-xs text-gray-500 hover:text-gray-800 bg-gray-100 rounded-lg cursor-pointer border border-gray-300"
+                className="px-2 py-2 text-xs text-stone-500 hover:text-stone-800 bg-stone-100 rounded-lg cursor-pointer border border-stone-300"
               >
                 OK
               </button>
@@ -159,27 +159,27 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
                 setRaceSearchQuery("");
               }}
               disabled={!selectedType}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-left flex items-center justify-between cursor-pointer bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 disabled:bg-gray-100 disabled:cursor-not-allowed ${
-                raceDropdownOpen ? "border-primary ring-2 ring-primary/10" : ""
+              className={`w-full px-3 py-2 border border-stone-300 rounded-lg text-left flex items-center justify-between cursor-pointer bg-white focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 disabled:bg-stone-100 disabled:cursor-not-allowed ${
+                raceDropdownOpen ? "border-brand-600 ring-2 ring-primary/10" : ""
               }`}
             >
-              <span className={raceValue ? "text-gray-900" : "text-gray-400"}>
+              <span className={raceValue ? "text-stone-900" : "text-stone-400"}>
                 {raceValue || (selectedType ? "Sélectionner une race..." : "Choisissez d'abord un type")}
               </span>
-              <span className="text-gray-400 text-xs ml-2">{raceDropdownOpen ? "▲" : "▼"}</span>
+              <span className="text-stone-400 text-xs ml-2">{raceDropdownOpen ? "▲" : "▼"}</span>
             </button>
           )}
           {raceDropdownOpen && !isAddingNewRace && (
-            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
+            <div className="absolute z-50 mt-1 w-full bg-white border border-stone-200 rounded-lg shadow-lg max-h-60 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
               {raceSuggestions.length > 3 && (
-                <div className="p-2 border-b border-gray-100">
+                <div className="p-2 border-b border-stone-100">
                   <input
                     type="text"
                     value={raceSearchQuery}
                     onChange={(e) => setRaceSearchQuery(e.target.value)}
                     placeholder="Filtrer..."
                     autoFocus
-                    className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-primary"
+                    className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:border-brand-600"
                   />
                 </div>
               )}
@@ -192,7 +192,7 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
                       setRaceDropdownOpen(false);
                       setRaceSearchQuery("");
                     }}
-                    className="w-full px-3 py-2 text-sm text-left text-gray-400 italic hover:bg-gray-50 cursor-pointer bg-transparent border-none"
+                    className="w-full px-3 py-2 text-sm text-left text-stone-400 italic hover:bg-stone-50 cursor-pointer bg-transparent border-none"
                   >
                     Aucune race
                   </button>
@@ -206,19 +206,19 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
                       setRaceDropdownOpen(false);
                       setRaceSearchQuery("");
                     }}
-                    className={`w-full px-3 py-2 text-sm text-left hover:bg-primary/5 cursor-pointer bg-transparent border-none flex items-center justify-between ${
-                      raceValue === race ? "bg-primary/10 text-primary font-medium" : "text-gray-700"
+                    className={`w-full px-3 py-2 text-sm text-left hover:bg-brand-600/5 cursor-pointer bg-transparent border-none flex items-center justify-between ${
+                      raceValue === race ? "bg-brand-600/10 text-brand-600 font-medium" : "text-stone-700"
                     }`}
                   >
                     <span>{race}</span>
-                    {raceValue === race && <span className="text-primary">✓</span>}
+                    {raceValue === race && <span className="text-brand-600">✓</span>}
                   </button>
                 ))}
                 {raceSearchQuery && filteredRaceSuggestions.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-gray-400 italic">Aucune race trouvée</div>
+                  <div className="px-3 py-2 text-sm text-stone-400 italic">Aucune race trouvée</div>
                 )}
               </div>
-              <div className="border-t border-gray-200">
+              <div className="border-t border-stone-200">
                 <button
                   type="button"
                   onClick={() => {
@@ -227,7 +227,7 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
                     setRaceSearchQuery("");
                     setRaceValue("");
                   }}
-                  className="w-full px-3 py-2.5 text-sm text-left text-primary font-medium hover:bg-primary/5 cursor-pointer bg-transparent border-none flex items-center gap-2"
+                  className="w-full px-3 py-2.5 text-sm text-left text-brand-600 font-medium hover:bg-brand-600/5 cursor-pointer bg-transparent border-none flex items-center gap-2"
                 >
                   <span>+</span>
                   <span>Ajouter une race</span>
@@ -237,23 +237,23 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
           )}
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Date de naissance</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Date de naissance</label>
           <input
             type="date"
             name="dateNaissance"
             defaultValue={animal?.dateNaissance || ""}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+            className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Statut</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Statut</label>
           <select
             name="statut"
             defaultValue={animal?.statut || "actif"}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+            className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
           >
             <option value="actif">Actif</option>
             <option value="vendu">Vendu</option>
@@ -264,23 +264,23 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
       </div>
 
       <div>
-        <label className="block mb-1 text-sm font-medium text-gray-700">Commentaire</label>
+        <label className="block mb-1 text-sm font-medium text-stone-700">Commentaire</label>
         <textarea
           name="commentaire"
           defaultValue={animal?.commentaire || ""}
           placeholder="Bonne croissance, très docile..."
           rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 resize-y min-h-[100px]"
+          className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 resize-y min-h-[100px]"
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Père (optionnel)</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Père (optionnel)</label>
           <select
             name="numeroBouclePere"
             defaultValue={animal?.numeroBouclePere || ""}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+            className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
           >
             <option value="">Aucun</option>
             {maleAnimals.map((a) => (
@@ -291,11 +291,11 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
           </select>
         </div>
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Mère (optionnel)</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Mère (optionnel)</label>
           <select
             name="numeroBoucleMere"
             defaultValue={animal?.numeroBoucleMere || ""}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+            className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
           >
             <option value="">Aucune</option>
             {femaleAnimals.map((a) => (

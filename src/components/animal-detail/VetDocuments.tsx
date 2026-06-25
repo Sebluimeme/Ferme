@@ -69,7 +69,7 @@ export default function VetDocuments({ animalId, documents }: VetDocumentsProps)
     <div className="bg-white rounded-xl shadow-sm p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Documents vétérinaires</h2>
-        <label className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer">
+        <label className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer">
           {uploading ? "Upload..." : "+ Ajouter"}
           <input
             ref={fileRef}
@@ -84,18 +84,18 @@ export default function VetDocuments({ animalId, documents }: VetDocumentsProps)
       </div>
 
       {sortedDocs.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-12 text-stone-400">
           <div className="text-4xl mb-2">📋</div>
           <p>Aucun document</p>
         </div>
       ) : (
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-stone-100">
           {sortedDocs.map((doc) => (
             <div key={doc.id} className="flex items-center gap-3 py-3">
               <span className="text-2xl">{getFileIcon(doc.type)}</span>
               <div className="flex-1 min-w-0">
                 <div className="font-medium text-sm truncate">{doc.nom}</div>
-                <div className="text-xs text-gray-400">
+                <div className="text-xs text-stone-400">
                   {formatFileSize(doc.taille)} · {formatDate(doc.dateCreation)}
                 </div>
               </div>
@@ -103,7 +103,7 @@ export default function VetDocuments({ animalId, documents }: VetDocumentsProps)
                 href={doc.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200"
+                className="px-3 py-1.5 text-xs font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200"
               >
                 Ouvrir
               </a>
@@ -120,9 +120,9 @@ export default function VetDocuments({ animalId, documents }: VetDocumentsProps)
 
       {/* Confirm delete */}
       <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Supprimer le document" size="small">
-        <p className="text-gray-700">Voulez-vous vraiment supprimer <strong>{deleteTarget?.nom}</strong> ?</p>
+        <p className="text-stone-700">Voulez-vous vraiment supprimer <strong>{deleteTarget?.nom}</strong> ?</p>
         <div className="flex gap-3 justify-end mt-6">
-          <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">
+          <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">
             Annuler
           </button>
           <button onClick={handleDelete} className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 cursor-pointer">

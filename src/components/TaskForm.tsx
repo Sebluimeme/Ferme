@@ -167,7 +167,7 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
     <form ref={formRef} className="grid gap-4">
       {/* Titre */}
       <div>
-        <label className="block mb-1 text-sm font-medium text-gray-700">
+        <label className="block mb-1 text-sm font-medium text-stone-700">
           Titre <span className="text-red-500">*</span>
         </label>
         <input
@@ -176,21 +176,21 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
           defaultValue={task?.titre || ""}
           placeholder="Ex: Vacciner les agneaux"
           required
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+          className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
         />
       </div>
 
       {/* Statut */}
       <input type="hidden" name="priorite" value="basse" />
       <div>
-        <label className="block mb-1 text-sm font-medium text-gray-700">
+        <label className="block mb-1 text-sm font-medium text-stone-700">
           Statut <span className="text-red-500">*</span>
         </label>
         <select
           name="statut"
           defaultValue={task?.statut || "a_faire"}
           required
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+          className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
         >
           <option value="a_faire">A faire</option>
           <option value="en_cours">En cours</option>
@@ -201,20 +201,20 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
       {/* Date d'échéance + Catégorie + Assignée à */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-700">
+          <label className="block mb-1 text-sm font-medium text-stone-700">
             Date d&apos;échéance
           </label>
           <input
             type="date"
             name="dateEcheance"
             defaultValue={task?.dateEcheance || ""}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+            className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
           />
         </div>
 
         {/* Catégorie - même pattern que les races */}
         <div className="relative" ref={categorieDropdownRef}>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Catégorie</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Catégorie</label>
           <input type="hidden" name="categorie" value={categorieValue} />
           {isAddingNewCategorie ? (
             <div className="flex gap-2">
@@ -224,7 +224,7 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                 onChange={(e) => setCategorieValue(e.target.value)}
                 placeholder="Nouvelle catégorie..."
                 autoFocus
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                className="flex-1 px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
               />
               <button
                 type="button"
@@ -232,7 +232,7 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                   setIsAddingNewCategorie(false);
                   if (!categorieValue) setCategorieDropdownOpen(false);
                 }}
-                className="px-2 py-2 text-xs text-gray-500 hover:text-gray-800 bg-gray-100 rounded-lg cursor-pointer border border-gray-300"
+                className="px-2 py-2 text-xs text-stone-500 hover:text-stone-800 bg-stone-100 rounded-lg cursor-pointer border border-stone-300"
               >
                 OK
               </button>
@@ -244,27 +244,27 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                 setCategorieDropdownOpen(!categorieDropdownOpen);
                 setCategorieSearchQuery("");
               }}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-left flex items-center justify-between cursor-pointer bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 ${
-                categorieDropdownOpen ? "border-primary ring-2 ring-primary/10" : ""
+              className={`w-full px-3 py-2 border border-stone-300 rounded-lg text-left flex items-center justify-between cursor-pointer bg-white focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 ${
+                categorieDropdownOpen ? "border-brand-600 ring-2 ring-brand-500/10" : ""
               }`}
             >
-              <span className={categorieValue ? "text-gray-900" : "text-gray-400"}>
+              <span className={categorieValue ? "text-stone-900" : "text-stone-400"}>
                 {categorieValue || "Sélectionner une catégorie..."}
               </span>
-              <span className="text-gray-400 text-xs ml-2">{categorieDropdownOpen ? "▲" : "▼"}</span>
+              <span className="text-stone-400 text-xs ml-2">{categorieDropdownOpen ? "▲" : "▼"}</span>
             </button>
           )}
           {categorieDropdownOpen && !isAddingNewCategorie && (
-            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
+            <div className="absolute z-50 mt-1 w-full bg-white border border-stone-200 rounded-lg shadow-lg max-h-60 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
               {categorieSuggestions.length > 3 && (
-                <div className="p-2 border-b border-gray-100">
+                <div className="p-2 border-b border-stone-100">
                   <input
                     type="text"
                     value={categorieSearchQuery}
                     onChange={(e) => setCategorieSearchQuery(e.target.value)}
                     placeholder="Filtrer..."
                     autoFocus
-                    className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-primary"
+                    className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:border-brand-600"
                   />
                 </div>
               )}
@@ -277,7 +277,7 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                       setCategorieDropdownOpen(false);
                       setCategorieSearchQuery("");
                     }}
-                    className="w-full px-3 py-2 text-sm text-left text-gray-400 italic hover:bg-gray-50 cursor-pointer bg-transparent border-none"
+                    className="w-full px-3 py-2 text-sm text-left text-stone-400 italic hover:bg-stone-50 cursor-pointer bg-transparent border-none"
                   >
                     Aucune catégorie
                   </button>
@@ -291,19 +291,19 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                       setCategorieDropdownOpen(false);
                       setCategorieSearchQuery("");
                     }}
-                    className={`w-full px-3 py-2 text-sm text-left hover:bg-primary/5 cursor-pointer bg-transparent border-none flex items-center justify-between ${
-                      categorieValue === cat ? "bg-primary/10 text-primary font-medium" : "text-gray-700"
+                    className={`w-full px-3 py-2 text-sm text-left hover:bg-brand-600/5 cursor-pointer bg-transparent border-none flex items-center justify-between ${
+                      categorieValue === cat ? "bg-brand-600/10 text-brand-600 font-medium" : "text-stone-700"
                     }`}
                   >
                     <span>{cat}</span>
-                    {categorieValue === cat && <span className="text-primary">✓</span>}
+                    {categorieValue === cat && <span className="text-brand-600">✓</span>}
                   </button>
                 ))}
                 {categorieSearchQuery && filteredCategorieSuggestions.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-gray-400 italic">Aucune catégorie trouvée</div>
+                  <div className="px-3 py-2 text-sm text-stone-400 italic">Aucune catégorie trouvée</div>
                 )}
               </div>
-              <div className="border-t border-gray-200">
+              <div className="border-t border-stone-200">
                 <button
                   type="button"
                   onClick={() => {
@@ -312,7 +312,7 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                     setCategorieSearchQuery("");
                     setCategorieValue("");
                   }}
-                  className="w-full px-3 py-2.5 text-sm text-left text-primary font-medium hover:bg-primary/5 cursor-pointer bg-transparent border-none flex items-center gap-2"
+                  className="w-full px-3 py-2.5 text-sm text-left text-brand-600 font-medium hover:bg-brand-600/5 cursor-pointer bg-transparent border-none flex items-center gap-2"
                 >
                   <span>+</span>
                   <span>Ajouter une catégorie</span>
@@ -324,7 +324,7 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
 
         {/* Assignée à - même pattern que les catégories */}
         <div className="relative" ref={assigneADropdownRef}>
-          <label className="block mb-1 text-sm font-medium text-gray-700">Assignée à</label>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Assignée à</label>
           <input type="hidden" name="assigneA" value={assigneAValue} />
           {isAddingNewPersonne ? (
             <div className="flex gap-2">
@@ -334,7 +334,7 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                 onChange={(e) => setAssigneAValue(e.target.value)}
                 placeholder="Nom de la personne..."
                 autoFocus
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                className="flex-1 px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
               />
               <button
                 type="button"
@@ -342,7 +342,7 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                   setIsAddingNewPersonne(false);
                   if (!assigneAValue) setAssigneADropdownOpen(false);
                 }}
-                className="px-2 py-2 text-xs text-gray-500 hover:text-gray-800 bg-gray-100 rounded-lg cursor-pointer border border-gray-300"
+                className="px-2 py-2 text-xs text-stone-500 hover:text-stone-800 bg-stone-100 rounded-lg cursor-pointer border border-stone-300"
               >
                 OK
               </button>
@@ -354,27 +354,27 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                 setAssigneADropdownOpen(!assigneADropdownOpen);
                 setAssigneASearchQuery("");
               }}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-left flex items-center justify-between cursor-pointer bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 ${
-                assigneADropdownOpen ? "border-primary ring-2 ring-primary/10" : ""
+              className={`w-full px-3 py-2 border border-stone-300 rounded-lg text-left flex items-center justify-between cursor-pointer bg-white focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 ${
+                assigneADropdownOpen ? "border-brand-600 ring-2 ring-brand-500/10" : ""
               }`}
             >
-              <span className={assigneAValue ? "text-gray-900" : "text-gray-400"}>
+              <span className={assigneAValue ? "text-stone-900" : "text-stone-400"}>
                 {assigneAValue || "Sélectionner une personne..."}
               </span>
-              <span className="text-gray-400 text-xs ml-2">{assigneADropdownOpen ? "▲" : "▼"}</span>
+              <span className="text-stone-400 text-xs ml-2">{assigneADropdownOpen ? "▲" : "▼"}</span>
             </button>
           )}
           {assigneADropdownOpen && !isAddingNewPersonne && (
-            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
+            <div className="absolute z-50 mt-1 w-full bg-white border border-stone-200 rounded-lg shadow-lg max-h-60 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
               {personneSuggestions.length > 3 && (
-                <div className="p-2 border-b border-gray-100">
+                <div className="p-2 border-b border-stone-100">
                   <input
                     type="text"
                     value={assigneASearchQuery}
                     onChange={(e) => setAssigneASearchQuery(e.target.value)}
                     placeholder="Filtrer..."
                     autoFocus
-                    className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-primary"
+                    className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:border-brand-600"
                   />
                 </div>
               )}
@@ -387,7 +387,7 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                       setAssigneADropdownOpen(false);
                       setAssigneASearchQuery("");
                     }}
-                    className="w-full px-3 py-2 text-sm text-left text-gray-400 italic hover:bg-gray-50 cursor-pointer bg-transparent border-none"
+                    className="w-full px-3 py-2 text-sm text-left text-stone-400 italic hover:bg-stone-50 cursor-pointer bg-transparent border-none"
                   >
                     Aucune personne
                   </button>
@@ -401,19 +401,19 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                       setAssigneADropdownOpen(false);
                       setAssigneASearchQuery("");
                     }}
-                    className={`w-full px-3 py-2 text-sm text-left hover:bg-primary/5 cursor-pointer bg-transparent border-none flex items-center justify-between ${
-                      assigneAValue === personne ? "bg-primary/10 text-primary font-medium" : "text-gray-700"
+                    className={`w-full px-3 py-2 text-sm text-left hover:bg-brand-600/5 cursor-pointer bg-transparent border-none flex items-center justify-between ${
+                      assigneAValue === personne ? "bg-brand-600/10 text-brand-600 font-medium" : "text-stone-700"
                     }`}
                   >
                     <span>{personne}</span>
-                    {assigneAValue === personne && <span className="text-primary">✓</span>}
+                    {assigneAValue === personne && <span className="text-brand-600">✓</span>}
                   </button>
                 ))}
                 {assigneASearchQuery && filteredPersonneSuggestions.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-gray-400 italic">Aucune personne trouvée</div>
+                  <div className="px-3 py-2 text-sm text-stone-400 italic">Aucune personne trouvée</div>
                 )}
               </div>
-              <div className="border-t border-gray-200">
+              <div className="border-t border-stone-200">
                 <button
                   type="button"
                   onClick={() => {
@@ -422,7 +422,7 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                     setAssigneASearchQuery("");
                     setAssigneAValue("");
                   }}
-                  className="w-full px-3 py-2.5 text-sm text-left text-primary font-medium hover:bg-primary/5 cursor-pointer bg-transparent border-none flex items-center gap-2"
+                  className="w-full px-3 py-2.5 text-sm text-left text-brand-600 font-medium hover:bg-brand-600/5 cursor-pointer bg-transparent border-none flex items-center gap-2"
                 >
                   <span>+</span>
                   <span>Ajouter une personne</span>
@@ -435,27 +435,27 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
 
       {/* Description */}
       <div>
-        <label className="block mb-1 text-sm font-medium text-gray-700">Description</label>
+        <label className="block mb-1 text-sm font-medium text-stone-700">Description</label>
         <textarea
           name="description"
           defaultValue={task?.description || ""}
           placeholder="Détails de la tâche..."
           rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 resize-y min-h-[80px]"
+          className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 resize-y min-h-[80px]"
         />
       </div>
 
       {/* Photo jointe */}
       <div>
-        <label className="block mb-1 text-sm font-medium text-gray-700">
-          Photo jointe <span className="text-xs text-gray-400 font-normal">(optionnel)</span>
+        <label className="block mb-1 text-sm font-medium text-stone-700">
+          Photo jointe <span className="text-xs text-stone-400 font-normal">(optionnel)</span>
         </label>
         {photoPreview ? (
           <div className="flex items-start gap-3">
             <img
               src={photoPreview}
               alt="Aperçu"
-              className="w-24 h-24 object-cover rounded-lg border border-gray-200"
+              className="w-24 h-24 object-cover rounded-lg border border-stone-200"
             />
             <button
               type="button"
@@ -473,9 +473,9 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
         ) : (
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="w-full px-3 py-4 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-colors"
+            className="w-full px-3 py-4 border-2 border-dashed border-stone-300 rounded-lg text-center cursor-pointer hover:border-brand-600 hover:bg-brand-600/5 transition-colors"
           >
-            <span className="text-gray-400 text-sm">Cliquez pour ajouter une photo</span>
+            <span className="text-stone-400 text-sm">Cliquez pour ajouter une photo</span>
           </div>
         )}
         <input
@@ -499,8 +499,8 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Animal */}
         <div className="relative" ref={animalDropdownRef}>
-          <label className="block mb-1 text-sm font-medium text-gray-700">
-            Lier un animal <span className="text-xs text-gray-400 font-normal">(optionnel)</span>
+          <label className="block mb-1 text-sm font-medium text-stone-700">
+            Lier un animal <span className="text-xs text-stone-400 font-normal">(optionnel)</span>
           </label>
           <input type="hidden" name="animalId" value={selectedAnimalId} />
           <input type="hidden" name="animalNom" value={animalDisplayName} />
@@ -510,27 +510,27 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
               setAnimalDropdownOpen(!animalDropdownOpen);
               setAnimalSearchQuery("");
             }}
-            className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-left flex items-center justify-between cursor-pointer bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 ${
-              animalDropdownOpen ? "border-primary ring-2 ring-primary/10" : ""
+            className={`w-full px-3 py-2 border border-stone-300 rounded-lg text-left flex items-center justify-between cursor-pointer bg-white focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 ${
+              animalDropdownOpen ? "border-brand-600 ring-2 ring-brand-500/10" : ""
             }`}
           >
-            <span className={selectedAnimalId ? "text-gray-900" : "text-gray-400"}>
+            <span className={selectedAnimalId ? "text-stone-900" : "text-stone-400"}>
               {selectedAnimalId
                 ? `${getAnimalIcon(selectedAnimal?.type || "")} ${animalDisplayName}`
                 : "Aucun animal"}
             </span>
-            <span className="text-gray-400 text-xs ml-2">{animalDropdownOpen ? "▲" : "▼"}</span>
+            <span className="text-stone-400 text-xs ml-2">{animalDropdownOpen ? "▲" : "▼"}</span>
           </button>
           {animalDropdownOpen && (
-            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
-              <div className="p-2 border-b border-gray-100">
+            <div className="absolute z-50 mt-1 w-full bg-white border border-stone-200 rounded-lg shadow-lg max-h-60 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
+              <div className="p-2 border-b border-stone-100">
                 <input
                   type="text"
                   value={animalSearchQuery}
                   onChange={(e) => setAnimalSearchQuery(e.target.value)}
                   placeholder="Rechercher un animal..."
                   autoFocus
-                  className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-primary"
+                  className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:border-brand-600"
                 />
               </div>
               <div className="overflow-y-auto max-h-48">
@@ -542,7 +542,7 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                       setAnimalDropdownOpen(false);
                       setAnimalSearchQuery("");
                     }}
-                    className="w-full px-3 py-2 text-sm text-left text-gray-400 italic hover:bg-gray-50 cursor-pointer bg-transparent border-none"
+                    className="w-full px-3 py-2 text-sm text-left text-stone-400 italic hover:bg-stone-50 cursor-pointer bg-transparent border-none"
                   >
                     Aucun animal
                   </button>
@@ -560,19 +560,19 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                         setAnimalDropdownOpen(false);
                         setAnimalSearchQuery("");
                       }}
-                      className={`w-full px-3 py-2 text-sm text-left hover:bg-primary/5 cursor-pointer bg-transparent border-none flex items-center gap-2 ${
-                        selectedAnimalId === animal.id ? "bg-primary/10 text-primary font-medium" : "text-gray-700"
+                      className={`w-full px-3 py-2 text-sm text-left hover:bg-brand-600/5 cursor-pointer bg-transparent border-none flex items-center gap-2 ${
+                        selectedAnimalId === animal.id ? "bg-brand-600/10 text-brand-600 font-medium" : "text-stone-700"
                       }`}
                     >
                       <span>{getAnimalIcon(animal.type)}</span>
                       <span className="flex-1">{name}</span>
-                      {animal.race && <span className="text-xs text-gray-400">{animal.race}</span>}
-                      {selectedAnimalId === animal.id && <span className="text-primary">✓</span>}
+                      {animal.race && <span className="text-xs text-stone-400">{animal.race}</span>}
+                      {selectedAnimalId === animal.id && <span className="text-brand-600">✓</span>}
                     </button>
                   );
                 })}
                 {animalSearchQuery && filteredAnimals.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-gray-400 italic">Aucun animal trouvé</div>
+                  <div className="px-3 py-2 text-sm text-stone-400 italic">Aucun animal trouvé</div>
                 )}
               </div>
             </div>
@@ -581,8 +581,8 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
 
         {/* Véhicule */}
         <div className="relative" ref={vehiculeDropdownRef}>
-          <label className="block mb-1 text-sm font-medium text-gray-700">
-            Lier un véhicule <span className="text-xs text-gray-400 font-normal">(optionnel)</span>
+          <label className="block mb-1 text-sm font-medium text-stone-700">
+            Lier un véhicule <span className="text-xs text-stone-400 font-normal">(optionnel)</span>
           </label>
           <input type="hidden" name="vehiculeId" value={selectedVehiculeId} />
           <input type="hidden" name="vehiculeNom" value={vehiculeDisplayName} />
@@ -592,27 +592,27 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
               setVehiculeDropdownOpen(!vehiculeDropdownOpen);
               setVehiculeSearchQuery("");
             }}
-            className={`w-full px-3 py-2 border border-gray-300 rounded-lg text-left flex items-center justify-between cursor-pointer bg-white focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 ${
-              vehiculeDropdownOpen ? "border-primary ring-2 ring-primary/10" : ""
+            className={`w-full px-3 py-2 border border-stone-300 rounded-lg text-left flex items-center justify-between cursor-pointer bg-white focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 ${
+              vehiculeDropdownOpen ? "border-brand-600 ring-2 ring-brand-500/10" : ""
             }`}
           >
-            <span className={selectedVehiculeId ? "text-gray-900" : "text-gray-400"}>
+            <span className={selectedVehiculeId ? "text-stone-900" : "text-stone-400"}>
               {selectedVehiculeId
                 ? `${getVehicleIcon(selectedVehicle?.type || "voiture")} ${vehiculeDisplayName}`
                 : "Aucun véhicule"}
             </span>
-            <span className="text-gray-400 text-xs ml-2">{vehiculeDropdownOpen ? "▲" : "▼"}</span>
+            <span className="text-stone-400 text-xs ml-2">{vehiculeDropdownOpen ? "▲" : "▼"}</span>
           </button>
           {vehiculeDropdownOpen && (
-            <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
-              <div className="p-2 border-b border-gray-100">
+            <div className="absolute z-50 mt-1 w-full bg-white border border-stone-200 rounded-lg shadow-lg max-h-60 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
+              <div className="p-2 border-b border-stone-100">
                 <input
                   type="text"
                   value={vehiculeSearchQuery}
                   onChange={(e) => setVehiculeSearchQuery(e.target.value)}
                   placeholder="Rechercher un véhicule..."
                   autoFocus
-                  className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-primary"
+                  className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:border-brand-600"
                 />
               </div>
               <div className="overflow-y-auto max-h-48">
@@ -624,7 +624,7 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                       setVehiculeDropdownOpen(false);
                       setVehiculeSearchQuery("");
                     }}
-                    className="w-full px-3 py-2 text-sm text-left text-gray-400 italic hover:bg-gray-50 cursor-pointer bg-transparent border-none"
+                    className="w-full px-3 py-2 text-sm text-left text-stone-400 italic hover:bg-stone-50 cursor-pointer bg-transparent border-none"
                   >
                     Aucun véhicule
                   </button>
@@ -638,20 +638,20 @@ export default function TaskForm({ task, formRef, photoFileRef, onPhotoRemoved }
                       setVehiculeDropdownOpen(false);
                       setVehiculeSearchQuery("");
                     }}
-                    className={`w-full px-3 py-2 text-sm text-left hover:bg-primary/5 cursor-pointer bg-transparent border-none flex items-center gap-2 ${
-                      selectedVehiculeId === vehicle.id ? "bg-primary/10 text-primary font-medium" : "text-gray-700"
+                    className={`w-full px-3 py-2 text-sm text-left hover:bg-brand-600/5 cursor-pointer bg-transparent border-none flex items-center gap-2 ${
+                      selectedVehiculeId === vehicle.id ? "bg-brand-600/10 text-brand-600 font-medium" : "text-stone-700"
                     }`}
                   >
                     <span>{getVehicleIcon(vehicle.type)}</span>
                     <span className="flex-1">{getVehicleDisplayName(vehicle)}</span>
                     {vehicle.plaqueImmatriculation && (
-                      <span className="text-xs text-gray-400">{vehicle.plaqueImmatriculation}</span>
+                      <span className="text-xs text-stone-400">{vehicle.plaqueImmatriculation}</span>
                     )}
-                    {selectedVehiculeId === vehicle.id && <span className="text-primary">✓</span>}
+                    {selectedVehiculeId === vehicle.id && <span className="text-brand-600">✓</span>}
                   </button>
                 ))}
                 {vehiculeSearchQuery && filteredVehicles.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-gray-400 italic">Aucun véhicule trouvé</div>
+                  <div className="px-3 py-2 text-sm text-stone-400 italic">Aucun véhicule trouvé</div>
                 )}
               </div>
             </div>

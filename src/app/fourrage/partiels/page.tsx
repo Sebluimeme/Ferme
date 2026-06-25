@@ -51,10 +51,10 @@ function ParcellaireForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Nom de la parcelle *</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Nom de la parcelle *</label>
         <input
           type="text"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           value={form.nom}
           onChange={(e) => setForm((p) => ({ ...p, nom: e.target.value }))}
           placeholder="Ex : Pré du bas, Champ nord..."
@@ -64,7 +64,7 @@ function ParcellaireForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Usage</label>
+        <label className="block text-sm font-medium text-stone-700 mb-2">Usage</label>
         <div className="flex gap-2">
           {(["", "pature", "fauche"] as const).map((v) => {
             const label = v === "" ? "Non défini" : v === "pature" ? "🐄 Pâture" : "🌾 Fauche";
@@ -79,8 +79,8 @@ function ParcellaireForm({
                       ? "bg-green-100 border-green-500 text-green-800 font-semibold"
                       : v === "fauche"
                       ? "bg-yellow-100 border-yellow-500 text-yellow-800 font-semibold"
-                      : "bg-gray-200 border-gray-500 text-gray-800 font-semibold"
-                    : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"
+                      : "bg-stone-200 border-stone-500 text-stone-800 font-semibold"
+                    : "bg-white border-stone-200 text-stone-500 hover:bg-stone-50"
                 }`}
               >
                 {label}
@@ -91,12 +91,12 @@ function ParcellaireForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Surface (hectares)</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Surface (hectares)</label>
         <input
           type="text"
           inputMode="decimal"
           pattern="[0-9]*[.,]?[0-9]{0,4}"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           value={form.surface}
           onChange={(e) => {
             const v = e.target.value.replace(",", ".");
@@ -107,10 +107,10 @@ function ParcellaireForm({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Description</label>
         <textarea
           rows={3}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
           value={form.description}
           onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
           placeholder="Type de sol, exposition, notes..."
@@ -121,14 +121,14 @@ function ParcellaireForm({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+          className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
         >
           Annuler
         </button>
         <button
           type="submit"
           disabled={loading}
-          className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50"
+          className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50"
         >
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
@@ -328,19 +328,19 @@ export default function ParcellairePage() {
       {/* En-tête */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">🗺️ Parcellaire</h1>
-          <p className="text-gray-500 mt-1">Gérez vos parcelles fourragères</p>
+          <h1 className="text-3xl font-bold text-stone-900">🗺️ Parcellaire</h1>
+          <p className="text-stone-500 mt-1">Gérez vos parcelles fourragères</p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={() => { setDrawMode(true); setPendingGeometry(null); }}
-            className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 cursor-pointer shadow-md"
+            className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-amber-500 hover:bg-amber-600 transition-colors cursor-pointer shadow-md"
           >
             ✍️ Tracer à main levée
           </button>
           <button
             onClick={() => setShowMap(true)}
-            className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md"
+            className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer shadow-md"
           >
             + Nouvelle parcelle
           </button>
@@ -352,12 +352,12 @@ export default function ParcellairePage() {
         <div className="mb-6">
           <button
             onClick={() => setShowOverviewMap((v) => !v)}
-            className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-primary transition-colors mb-3 cursor-pointer"
+            className="flex items-center gap-2 text-sm font-semibold text-stone-700 hover:text-brand-600 transition-colors mb-3 cursor-pointer"
           >
             <span>{showOverviewMap ? "▾" : "▸"}</span>
             <span>🗺️ Vue générale des terres</span>
             {partiels.filter((p) => p.geometry).length > 0 && (
-              <span className="text-xs font-normal text-gray-400">
+              <span className="text-xs font-normal text-stone-400">
                 {partiels.filter((p) => p.geometry).length} parcelle{partiels.filter((p) => p.geometry).length > 1 ? "s" : ""} sur la carte
               </span>
             )}
@@ -377,19 +377,19 @@ export default function ParcellairePage() {
       {/* Parcelles avec géométrie — liste avec actions */}
       {partiels.filter((p) => p.geometry).length > 0 && (
         <div className="mb-6">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2">
             Parcelles sur la carte ({partiels.filter((p) => p.geometry).length})
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {partiels.filter((p) => p.geometry).map((partiel) => (
               <div
                 key={partiel.id}
-                className="flex flex-col justify-between bg-white border border-gray-100 rounded-xl p-4 hover:bg-gray-50 hover:border-primary/30 transition-colors min-h-[110px]"
+                className="flex flex-col justify-between bg-white border border-stone-100 rounded-xl p-4 hover:bg-stone-50 hover:border-brand-600/30 transition-colors min-h-[110px]"
               >
                 <div className="flex flex-col gap-1.5 min-w-0">
-                  <span className="font-semibold text-gray-900 text-sm leading-tight">{partiel.nom}</span>
+                  <span className="font-semibold text-stone-900 text-sm leading-tight">{partiel.nom}</span>
                   {partiel.surface != null && (
-                    <span className="text-xs text-primary font-bold">{partiel.surface} ha</span>
+                    <span className="text-xs text-brand-600 font-bold">{partiel.surface} ha</span>
                   )}
                   <TypeBadge type={partiel.type} />
                 </div>
@@ -410,14 +410,14 @@ export default function ParcellairePage() {
                   </button>
                   <button
                     onClick={() => setEditPartiel(partiel)}
-                    className="flex-1 py-1.5 text-xs text-gray-500 hover:text-primary hover:bg-primary/5 rounded-lg cursor-pointer transition-colors text-center"
+                    className="flex-1 py-1.5 text-xs text-stone-500 hover:text-brand-600 hover:bg-brand-600/5 rounded-lg cursor-pointer transition-colors text-center"
                     title="Modifier"
                   >
                     ✏️ Modifier
                   </button>
                   <button
                     onClick={() => setDeleteTarget(partiel)}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                    className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
                     title="Supprimer"
                   >
                     🗑️
@@ -432,33 +432,33 @@ export default function ParcellairePage() {
       {/* Parcelles sans géométrie */}
       {parcelsSansGeo.length > 0 && (
         <div className="mb-4">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+          <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2">
             Parcelles sans carte ({parcelsSansGeo.length})
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {parcelsSansGeo.map((partiel) => (
               <div
                 key={partiel.id}
-                className="flex flex-col justify-between bg-white border border-gray-100 rounded-xl p-4 hover:bg-gray-50 hover:border-primary/30 transition-colors min-h-[110px]"
+                className="flex flex-col justify-between bg-white border border-stone-100 rounded-xl p-4 hover:bg-stone-50 hover:border-brand-600/30 transition-colors min-h-[110px]"
               >
                 <div className="flex flex-col gap-1.5 min-w-0">
-                  <span className="font-semibold text-gray-900 text-sm leading-tight">{partiel.nom}</span>
+                  <span className="font-semibold text-stone-900 text-sm leading-tight">{partiel.nom}</span>
                   {partiel.surface != null && (
-                    <span className="text-xs text-primary font-bold">{partiel.surface} ha</span>
+                    <span className="text-xs text-brand-600 font-bold">{partiel.surface} ha</span>
                   )}
                   <TypeBadge type={partiel.type} />
                 </div>
                 <div className="flex gap-1 mt-3">
                   <button
                     onClick={() => setEditPartiel(partiel)}
-                    className="flex-1 py-1.5 text-xs text-gray-500 hover:text-primary hover:bg-primary/5 rounded-lg cursor-pointer transition-colors text-center"
+                    className="flex-1 py-1.5 text-xs text-stone-500 hover:text-brand-600 hover:bg-brand-600/5 rounded-lg cursor-pointer transition-colors text-center"
                     title="Modifier"
                   >
                     ✏️ Modifier
                   </button>
                   <button
                     onClick={() => setDeleteTarget(partiel)}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                    className="p-1.5 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
                     title="Supprimer"
                   >
                     🗑️
@@ -471,7 +471,7 @@ export default function ParcellairePage() {
       )}
 
       {partiels.length === 0 && (
-        <div className="text-center py-16 text-gray-400">
+        <div className="text-center py-16 text-stone-400">
           <div className="text-5xl mb-3">🗺️</div>
           <p className="text-lg font-medium">Aucune parcelle créée</p>
           <p className="text-sm mt-1">Cliquez sur &quot;+ Nouvelle parcelle&quot; pour commencer.</p>
@@ -581,7 +581,7 @@ export default function ParcellairePage() {
               <button
                 type="button"
                 onClick={() => { setEditGeoTarget(null); setPendingGeometry(null); }}
-                className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+                className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
               >
                 Annuler
               </button>
@@ -589,7 +589,7 @@ export default function ParcellairePage() {
                 type="button"
                 disabled={!pendingGeometry || geoSaving}
                 onClick={handleSaveGeometry}
-                className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50"
+                className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50"
               >
                 {geoSaving ? "Enregistrement..." : "Enregistrer le tracé"}
               </button>
@@ -614,7 +614,7 @@ export default function ParcellairePage() {
             <button
               type="button"
               onClick={() => { setDrawMode(false); setPendingGeometry(null); }}
-              className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+              className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
             >
               Annuler
             </button>
@@ -622,7 +622,7 @@ export default function ParcellairePage() {
               type="button"
               disabled={!pendingGeometry}
               onClick={handleSaveGeometry}
-              className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 cursor-pointer disabled:opacity-50"
+              className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-amber-500 hover:bg-amber-600 transition-colors cursor-pointer disabled:opacity-50"
             >
               Valider ce tracé →
             </button>

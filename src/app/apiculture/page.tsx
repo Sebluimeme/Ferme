@@ -39,7 +39,7 @@ const TYPE_MIEL_COLORS: Record<NonNullable<RecolteMiel["type"]>, string> = {
   acacia: "bg-green-100 text-green-800",
   lavande: "bg-violet-100 text-violet-800",
   tilleul: "bg-lime-100 text-lime-800",
-  autre: "bg-gray-100 text-gray-800",
+  autre: "bg-stone-100 text-stone-800",
 };
 
 const MOIS_LABELS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
@@ -72,15 +72,15 @@ function RucheForm({ initial, onSubmit, onCancel, loading }: {
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nom de la ruche *</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Nom de la ruche *</label>
           <input type="text" required
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.nom} onChange={(e) => setForm((p) => ({ ...p, nom: e.target.value }))}
             placeholder="Ex : Ruche 1" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
-          <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          <label className="block text-sm font-medium text-stone-700 mb-1">Statut</label>
+          <select className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.statut} onChange={(e) => setForm((p) => ({ ...p, statut: e.target.value as Ruche["statut"] }))}>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
@@ -90,29 +90,29 @@ function RucheForm({ initial, onSubmit, onCancel, loading }: {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Emplacement</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Emplacement</label>
           <input type="text"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.emplacement} onChange={(e) => setForm((p) => ({ ...p, emplacement: e.target.value }))}
             placeholder="Ex : Verger nord" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;installation</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Date d&apos;installation</label>
           <input type="date"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.dateInstallation} onChange={(e) => setForm((p) => ({ ...p, dateInstallation: e.target.value }))} />
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Notes</label>
         <textarea rows={2}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
           value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
           placeholder="Observations..." />
       </div>
       <div className="flex justify-end gap-3 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">Annuler</button>
-        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">Annuler</button>
+        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50">
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
       </div>
@@ -150,23 +150,23 @@ function RecolteForm({ ruches, initial, onSubmit, onCancel, loading }: {
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date de récolte *</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Date de récolte *</label>
           <input type="date" required
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.dateRecolte} onChange={(e) => setForm((p) => ({ ...p, dateRecolte: e.target.value }))} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Poids (kg) *</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Poids (kg) *</label>
           <input type="number" min="0" step="0.1" required
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.poidsKg} onChange={(e) => setForm((p) => ({ ...p, poidsKg: e.target.value }))}
             placeholder="Ex : 12.5" />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Ruche</label>
-          <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          <label className="block text-sm font-medium text-stone-700 mb-1">Ruche</label>
+          <select className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.rucheId} onChange={(e) => setForm((p) => ({ ...p, rucheId: e.target.value }))}>
             <option value="">— Toutes ruches —</option>
             {ruches.filter((r) => r.statut === "active").map((r) => (
@@ -175,8 +175,8 @@ function RecolteForm({ ruches, initial, onSubmit, onCancel, loading }: {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Type de miel</label>
-          <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          <label className="block text-sm font-medium text-stone-700 mb-1">Type de miel</label>
+          <select className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as RecolteMiel["type"] | "" }))}>
             <option value="">— Non spécifié —</option>
             {(Object.entries(TYPE_MIEL_LABELS) as [NonNullable<RecolteMiel["type"]>, string][]).map(([k, v]) => (
@@ -186,15 +186,15 @@ function RecolteForm({ ruches, initial, onSubmit, onCancel, loading }: {
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Notes</label>
         <textarea rows={2}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
           value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
           placeholder="Conditions, observations..." />
       </div>
       <div className="flex justify-end gap-3 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">Annuler</button>
-        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">Annuler</button>
+        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50">
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
       </div>
@@ -274,17 +274,17 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="flex flex-col gap-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Date de vente *</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Date de vente *</label>
         <input type="date" required
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           value={form.dateVente} onChange={(e) => setForm((p) => ({ ...p, dateVente: e.target.value }))} />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Taille du pot</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Taille du pot</label>
           <select
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={taillePot}
             onChange={(e) => handlePotsChange(parseFloat(e.target.value) as 0.5 | 1, nbPots)}
           >
@@ -293,9 +293,9 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de pots</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Nombre de pots</label>
           <input type="number" min="1" step="1" required
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={nbPots}
             onChange={(e) => handlePotsChange(taillePot, Math.max(1, parseInt(e.target.value) || 1))}
           />
@@ -307,9 +307,9 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Type de miel</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Type de miel</label>
         <select
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           value={form.typeMiel}
           onChange={(e) => setForm((p) => ({ ...p, typeMiel: e.target.value }))}
         >
@@ -320,9 +320,9 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Encaissé par</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Encaissé par</label>
         <select
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           value={form.beneficiaire}
           onChange={(e) => setForm((p) => ({ ...p, beneficiaire: e.target.value }))}
         >
@@ -333,24 +333,24 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Prix total (€) *</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Prix total (€) *</label>
         <input type="number" min="0" step="0.01" required
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           value={form.prixTotal} onChange={(e) => setForm((p) => ({ ...p, prixTotal: e.target.value }))}
           placeholder="Ex : 45.00" />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Notes</label>
         <textarea rows={2}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
           value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
           placeholder="Client, lieu de vente..." />
       </div>
 
       <div className="flex justify-end gap-3 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer">Annuler</button>
-        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">Annuler</button>
+        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50">
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
       </div>
@@ -439,173 +439,20 @@ export default function ApiculturePage() {
         .filter((r) => { const d = new Date(r.dateRecolte); return d.getMonth() === idx && d.getFullYear() === thisYear; })
         .reduce((s, r) => s + r.poidsKg, 0);
       const ca = ventesMiel
-        .filter((v) => { const d = new Date(v.dateVente); return d.getMonth() === idx && d.getFullYear() === thisYear; })
-        .reduce((s, v) => s + v.prixTotal, 0);
-      return { mois, kg: kg || null, ca: ca || null };
-    }),
-  [recolteMiel, ventesMiel, thisYear]);
+        .filter((v) => { const d = new Date(v.dateVente);
 
-  const parRuche = useMemo(() => {
-    const map: Record<string, number> = {};
-    recolteMiel
-      .filter((r) => new Date(r.dateRecolte).getFullYear() === thisYear)
-      .forEach((r) => {
-        const key = r.rucheId
-          ? (ruches.find((ru) => ru.id === r.rucheId)?.nom ?? r.rucheId)
-          : "Non attribué";
-        map[key] = (map[key] ?? 0) + r.poidsKg;
-      });
-    return Object.entries(map).map(([ruche, kg]) => ({ ruche, kg })).sort((a, b) => b.kg - a.kg);
-  }, [recolteMiel, ruches, thisYear]);
+... [OUTPUT TRUNCATED - 8169 chars omitted out of 58169 total] ...
 
-  const parType = useMemo(() => {
-    const map: Record<string, number> = {};
-    recolteMiel.forEach((r) => {
-      const key = r.type ? TYPE_MIEL_LABELS[r.type] : "Non spécifié";
-      map[key] = (map[key] ?? 0) + r.poidsKg;
-    });
-    return Object.entries(map).map(([type, kg]) => ({ type, kg })).sort((a, b) => b.kg - a.kg);
-  }, [recolteMiel]);
-
-  const recoltesTri = [...recolteMiel].sort((a, b) => new Date(b.dateRecolte).getTime() - new Date(a.dateRecolte).getTime());
-  const ventesTri = [...ventesMiel].sort((a, b) => new Date(b.dateVente).getTime() - new Date(a.dateVente).getTime());
-
-  const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const formatEur = (n: number) =>
-    n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
-
-  // ——— Handlers ruches ———
-  const handleCreateRuche = async (data: RucheFormData) => {
-    setSaving(true);
-    try {
-      const res = await createRuche({ nom: data.nom, emplacement: data.emplacement || undefined, dateInstallation: data.dateInstallation || undefined, statut: data.statut, notes: data.notes || undefined });
-      if (res.success) { showToast({ type: "success", title: "Ruche créée" }); setModalRuche(false); }
-      else showToast({ type: "error", title: "Erreur", message: res.error });
-    } finally { setSaving(false); }
-  };
-  const handleUpdateRuche = async (data: RucheFormData) => {
-    if (!editRuche) return;
-    setSaving(true);
-    try {
-      const res = await updateRuche(editRuche.id, { nom: data.nom, emplacement: data.emplacement || undefined, dateInstallation: data.dateInstallation || undefined, statut: data.statut, notes: data.notes || undefined });
-      if (res.success) { showToast({ type: "success", title: "Ruche mise à jour" }); setEditRuche(null); }
-      else showToast({ type: "error", title: "Erreur", message: res.error });
-    } finally { setSaving(false); }
-  };
-  const handleDeleteRuche = async () => {
-    if (!deleteRucheTarget) return;
-    const res = await deleteRuche(deleteRucheTarget.id);
-    if (res.success) showToast({ type: "success", title: "Ruche supprimée" });
-    else showToast({ type: "error", title: "Erreur", message: res.error });
-    setDeleteRucheTarget(null);
-  };
-
-  // ——— Handlers récoltes ———
-  const handleCreateRecolte = async (data: RecolteFormData) => {
-    setSaving(true);
-    try {
-      const res = await createRecolte({ rucheId: data.rucheId || undefined, dateRecolte: data.dateRecolte, poidsKg: parseFloat(data.poidsKg), type: (data.type || undefined) as RecolteMiel["type"], notes: data.notes || undefined });
-      if (res.success) { showToast({ type: "success", title: "Récolte enregistrée" }); setModalRecolte(false); }
-      else showToast({ type: "error", title: "Erreur", message: res.error });
-    } finally { setSaving(false); }
-  };
-  const handleUpdateRecolte = async (data: RecolteFormData) => {
-    if (!editRecolte) return;
-    setSaving(true);
-    try {
-      const res = await updateRecolte(editRecolte.id, { rucheId: data.rucheId || undefined, dateRecolte: data.dateRecolte, poidsKg: parseFloat(data.poidsKg), type: (data.type || undefined) as RecolteMiel["type"], notes: data.notes || undefined });
-      if (res.success) { showToast({ type: "success", title: "Récolte mise à jour" }); setEditRecolte(null); }
-      else showToast({ type: "error", title: "Erreur", message: res.error });
-    } finally { setSaving(false); }
-  };
-  const handleDeleteRecolte = async () => {
-    if (!deleteRecolteTarget) return;
-    const res = await deleteRecolte(deleteRecolteTarget.id);
-    if (res.success) showToast({ type: "success", title: "Récolte supprimée" });
-    else showToast({ type: "error", title: "Erreur", message: res.error });
-    setDeleteRecolteTarget(null);
-  };
-
-  // ——— Handlers ventes ———
-  const handleCreateVente = async (data: VenteFormData) => {
-    setSaving(true);
-    try {
-      const res = await createVente({
-        beneficiaire: data.beneficiaire || undefined,
-        dateVente: data.dateVente,
-        nbPots500g: parseInt(data.nbPots500g) || 0,
-        nbPots1kg: parseInt(data.nbPots1kg) || 0,
-        typeMiel: data.typeMiel || undefined,
-        prixTotal: parseFloat(data.prixTotal),
-        notes: data.notes || undefined,
-      });
-      if (res.success) { showToast({ type: "success", title: "Vente enregistrée" }); setModalVente(false); }
-      else showToast({ type: "error", title: "Erreur", message: res.error });
-    } finally { setSaving(false); }
-  };
-  const handleUpdateVente = async (data: VenteFormData) => {
-    if (!editVente) return;
-    setSaving(true);
-    try {
-      const res = await updateVente(editVente.id, {
-        beneficiaire: data.beneficiaire || undefined,
-        dateVente: data.dateVente,
-        nbPots500g: parseInt(data.nbPots500g) || 0,
-        nbPots1kg: parseInt(data.nbPots1kg) || 0,
-        typeMiel: data.typeMiel || undefined,
-        prixTotal: parseFloat(data.prixTotal),
-        notes: data.notes || undefined,
-      }, editVente);
-      if (res.success) { showToast({ type: "success", title: "Vente mise à jour" }); setEditVente(null); }
-      else showToast({ type: "error", title: "Erreur", message: res.error });
-    } finally { setSaving(false); }
-  };
-  const handleDeleteVente = async () => {
-    if (!deleteVenteTarget) return;
-    const res = await deleteVente(deleteVenteTarget.id, deleteVenteTarget.transactionId);
-    if (res.success) showToast({ type: "success", title: "Vente supprimée" });
-    else showToast({ type: "error", title: "Erreur", message: res.error });
-    setDeleteVenteTarget(null);
-  };
-
-  return (
-    <div className="max-w-7xl mx-auto">
-      {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">🍯 Apiculture</h1>
-          <p className="text-gray-500 mt-1">Suivi des ruches, récoltes et ventes de miel</p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={() => setModalVente(true)}
-            className="px-3 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 cursor-pointer shadow-md">
-            + Vente
-          </button>
-          <button onClick={() => setModalRecolte(true)}
-            className="px-3 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 cursor-pointer shadow-md">
-            + Récolte
-          </button>
-          <button onClick={() => setModalRuche(true)}
-            className="px-3 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md">
-            + Ruche
-          </button>
-        </div>
-      </div>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KpiCard label="Ruches actives" value={ruchesActives} subtitle={`${ruches.length} total`} borderColorClass="border-l-amber-500" valueColorClass="text-amber-600" />
-        <KpiCard label={`Récolte ${thisYear}`} value={mielCetteAnnee > 0 ? `${mielCetteAnnee.toFixed(1)} kg` : "—"} subtitle={mielCeMois > 0 ? `${mielCeMois.toFixed(1)} kg ce mois` : undefined} borderColorClass="border-l-yellow-500" valueColorClass="text-yellow-600" />
+l-yellow-500" valueColorClass="text-yellow-600" />
         <KpiCard label={`CA ${thisYear}`} value={caCetteAnnee > 0 ? formatEur(caCetteAnnee) : "—"} subtitle={caTotal !== caCetteAnnee && caTotal > 0 ? `${formatEur(caTotal)} total` : undefined} borderColorClass="border-l-green-500" valueColorClass="text-green-600" />
         <KpiCard label="Pots vendus" value={totalPots500 + totalPots1kg > 0 ? totalPots500 + totalPots1kg : "—"} subtitle={totalPots500 + totalPots1kg > 0 ? `${totalPots500}×½kg · ${totalPots1kg}×1kg` : undefined} borderColorClass="border-l-orange-500" valueColorClass="text-orange-600" />
       </div>
 
       {/* Onglets */}
-      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl flex-wrap">
+      <div className="flex gap-1 mb-6 bg-stone-100 p-1 rounded-xl flex-wrap">
         {(["dashboard", "ventes", "balance", "recoltes", "ruches"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${tab === t ? "bg-white shadow-sm text-gray-900" : "text-gray-500 hover:text-gray-700"}`}>
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${tab === t ? "bg-white shadow-sm text-stone-900" : "text-stone-500 hover:text-stone-700"}`}>
             {t === "dashboard" ? "📊 Graphiques" : t === "ventes" ? "💰 Ventes" : t === "balance" ? "⚖️ Balance" : t === "recoltes" ? "🍯 Récoltes" : "🐝 Ruches"}
           </button>
         ))}
@@ -615,7 +462,7 @@ export default function ApiculturePage() {
       {tab === "dashboard" && (
         <div className="space-y-6">
           {recolteMiel.length === 0 && ventesMiel.length === 0 ? (
-            <div className="text-center py-16 text-gray-400">
+            <div className="text-center py-16 text-stone-400">
               <div className="text-5xl mb-3">🍯</div>
               <p className="text-lg font-medium">Aucune donnée</p>
               <p className="text-sm mt-1">Enregistrez une récolte ou une vente pour voir les graphiques.</p>
@@ -624,8 +471,8 @@ export default function ApiculturePage() {
             <>
               {/* Récoltes mensuelles */}
               {recolteMiel.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Récoltes {thisYear} — par mois (kg)</p>
+                <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5">
+                  <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Récoltes {thisYear} — par mois (kg)</p>
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={donneesMensuelles} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -640,8 +487,8 @@ export default function ApiculturePage() {
 
               {/* CA mensuel */}
               {ventesMiel.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Chiffre d&apos;affaires {thisYear} — par mois (€)</p>
+                <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5">
+                  <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Chiffre d&apos;affaires {thisYear} — par mois (€)</p>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={donneesMensuelles} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -657,8 +504,8 @@ export default function ApiculturePage() {
               {/* Par ruche + par type côte à côte */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {parRuche.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Par ruche — {thisYear}</p>
+                  <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5">
+                    <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Par ruche — {thisYear}</p>
                     <ResponsiveContainer width="100%" height={Math.max(160, parRuche.length * 40)}>
                       <BarChart data={parRuche} layout="vertical" margin={{ top: 4, right: 24, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
@@ -672,18 +519,18 @@ export default function ApiculturePage() {
                 )}
 
                 {parType.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Par type de miel</p>
+                  <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5">
+                    <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Par type de miel</p>
                     <div className="space-y-2">
                       {parType.map(({ type, kg }) => {
                         const pct = totalMielKg > 0 ? (kg / totalMielKg) * 100 : 0;
                         return (
                           <div key={type}>
                             <div className="flex justify-between text-sm mb-1">
-                              <span className="text-gray-700 font-medium">{type}</span>
-                              <span className="text-gray-500">{kg.toFixed(1)} kg · {pct.toFixed(0)}%</span>
+                              <span className="text-stone-700 font-medium">{type}</span>
+                              <span className="text-stone-500">{kg.toFixed(1)} kg · {pct.toFixed(0)}%</span>
                             </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2">
+                            <div className="w-full bg-stone-100 rounded-full h-2">
                               <div className="h-2 rounded-full bg-amber-400 transition-all" style={{ width: `${pct}%` }} />
                             </div>
                           </div>
@@ -698,8 +545,8 @@ export default function ApiculturePage() {
               {(rdtMoyenParRuche != null || ventesMiel.length > 0) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {rdtMoyenParRuche != null && (
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Rendement {thisYear}</p>
+                    <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5">
+                      <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Rendement {thisYear}</p>
                       <div className="flex flex-col gap-3">
                         <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
                           <p className="text-xs text-amber-600 font-medium">Moy. par ruche active</p>
@@ -718,8 +565,8 @@ export default function ApiculturePage() {
                     const poidsVenduTotal = totalPots500 * 0.5 + totalPots1kg * 1;
                     const prixMoyKg = poidsVenduTotal > 0 ? caTotal / poidsVenduTotal : null;
                     return (
-                      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Statistiques ventes</p>
+                      <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5">
+                        <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Statistiques ventes</p>
                         <div className="flex flex-col gap-3">
                           {prixMoyPot != null && (
                             <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3">
@@ -755,8 +602,8 @@ export default function ApiculturePage() {
                 });
                 const COLORS = ["#f59e0b", "#10b981", "#6366f1", "#ef4444", "#3b82f6"];
                 return (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Comparaison annuelle (kg/mois)</p>
+                  <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5">
+                    <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-3">Comparaison annuelle (kg/mois)</p>
                     <ResponsiveContainer width="100%" height={200}>
                       <LineChart data={data} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -782,18 +629,18 @@ export default function ApiculturePage() {
         <div className="space-y-3">
           {/* Récap année */}
           {ventesMiel.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-2">
+            <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-4 mb-2">
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
-                  <p className="text-xs text-gray-400 font-medium">CA total</p>
+                  <p className="text-xs text-stone-400 font-medium">CA total</p>
                   <p className="text-xl font-bold text-green-700">{formatEur(caTotal)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 font-medium">Pots ½ kg vendus</p>
+                  <p className="text-xs text-stone-400 font-medium">Pots ½ kg vendus</p>
                   <p className="text-xl font-bold text-amber-700">{totalPots500}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 font-medium">Pots 1 kg vendus</p>
+                  <p className="text-xs text-stone-400 font-medium">Pots 1 kg vendus</p>
                   <p className="text-xl font-bold text-amber-700">{totalPots1kg}</p>
                 </div>
               </div>
@@ -801,19 +648,19 @@ export default function ApiculturePage() {
           )}
 
           {ventesTri.length === 0 ? (
-            <div className="text-center py-16 text-gray-400">
+            <div className="text-center py-16 text-stone-400">
               <div className="text-5xl mb-3">💰</div>
               <p className="text-lg font-medium">Aucune vente enregistrée</p>
               <p className="text-sm mt-1">Cliquez sur &quot;+ Vente&quot; pour en ajouter une.</p>
             </div>
           ) : ventesTri.map((v) => (
-            <div key={v.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4">
+            <div key={v.id} className="bg-white rounded-xl shadow-sm border border-stone-100 p-4 flex items-center gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-base font-bold text-green-700">{formatEur(v.prixTotal)}</span>
-                  <span className="text-sm text-gray-500">{formatDate(v.dateVente)}</span>
+                  <span className="text-sm text-stone-500">{formatDate(v.dateVente)}</span>
                 </div>
-                <div className="mt-1 flex items-center gap-3 text-sm text-gray-600 flex-wrap">
+                <div className="mt-1 flex items-center gap-3 text-sm text-stone-600 flex-wrap">
                   {v.nbPots500g > 0 && (
                     <span className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2 py-0.5 text-xs font-medium text-amber-800">
                       {v.nbPots500g} × ½ kg
@@ -824,19 +671,19 @@ export default function ApiculturePage() {
                       {v.nbPots1kg} × 1 kg
                     </span>
                   )}
-                  <span className="text-gray-400 text-xs">
+                  <span className="text-stone-400 text-xs">
                     {((v.nbPots500g * 0.5) + (v.nbPots1kg * 1)).toFixed(1)} kg vendu
                   </span>
                 </div>
-                {v.notes && <div className="mt-0.5 text-xs text-gray-400 italic truncate">{v.notes}</div>}
+                {v.notes && <div className="mt-0.5 text-xs text-stone-400 italic truncate">{v.notes}</div>}
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button onClick={() => setEditVente(v)}
-                  className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
+                  className="p-2 text-stone-400 hover:text-brand-600 hover:bg-stone-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
                   ✏️
                 </button>
                 <button onClick={() => setDeleteVenteTarget(v)}
-                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors" title="Supprimer">
+                  className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors" title="Supprimer">
                   🗑️
                 </button>
               </div>
@@ -851,47 +698,47 @@ export default function ApiculturePage() {
 
           {/* Résumé balance */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Revenus apiculture</p>
+            <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5">
+              <p className="text-xs text-stone-400 font-semibold uppercase tracking-wide mb-2">Revenus apiculture</p>
               <p className="text-2xl font-bold text-green-700">{formatEur(revenusApicultureTotal)}</p>
-              <div className="mt-2 space-y-1 text-xs text-gray-500">
+              <div className="mt-2 space-y-1 text-xs text-stone-500">
                 <div className="flex justify-between"><span>Ventes miel</span><span className="font-medium text-green-600">+{formatEur(caTotal)}</span></div>
                 {revenusTransacApiculture > 0 && <div className="flex justify-between"><span>Autres revenus</span><span className="font-medium text-green-600">+{formatEur(revenusTransacApiculture)}</span></div>}
               </div>
             </div>
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Coûts apiculture</p>
+            <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5">
+              <p className="text-xs text-stone-400 font-semibold uppercase tracking-wide mb-2">Coûts apiculture</p>
               <p className="text-2xl font-bold text-red-600">{formatEur(depensesApiculture)}</p>
               {depensesParCategorie.length > 0 && (
-                <div className="mt-2 space-y-1 text-xs text-gray-500">
+                <div className="mt-2 space-y-1 text-xs text-stone-500">
                   {depensesParCategorie.slice(0, 3).map(({ cat, montant }) => (
                     <div key={cat} className="flex justify-between">
                       <span className="truncate max-w-[120px]">{cat}</span>
                       <span className="font-medium text-red-500">−{formatEur(montant)}</span>
                     </div>
                   ))}
-                  {depensesParCategorie.length > 3 && <p className="text-gray-400 italic">+{depensesParCategorie.length - 3} autres catégories</p>}
+                  {depensesParCategorie.length > 3 && <p className="text-stone-400 italic">+{depensesParCategorie.length - 3} autres catégories</p>}
                 </div>
               )}
             </div>
             <div className={`rounded-xl shadow-sm border p-5 ${balanceApiculture >= 0 ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
-              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Balance nette</p>
+              <p className="text-xs text-stone-400 font-semibold uppercase tracking-wide mb-2">Balance nette</p>
               <p className={`text-2xl font-bold ${balanceApiculture >= 0 ? "text-green-700" : "text-red-700"}`}>
                 {balanceApiculture >= 0 ? "+" : ""}{formatEur(balanceApiculture)}
               </p>
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-stone-500 mt-2">
                 {balanceApiculture >= 0 ? "✓ Activité bénéficiaire" : "⚠ Investissement en cours"}
               </p>
               {depensesApiculture > 0 && revenusApicultureTotal > 0 && (
                 <div className="mt-3">
-                  <div className="text-xs text-gray-400 mb-1">Taux de retour</div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="text-xs text-stone-400 mb-1">Taux de retour</div>
+                  <div className="w-full bg-stone-200 rounded-full h-2">
                     <div
                       className={`h-2 rounded-full ${balanceApiculture >= 0 ? "bg-green-500" : "bg-red-400"}`}
                       style={{ width: `${Math.min(100, (revenusApicultureTotal / depensesApiculture) * 100).toFixed(0)}%` }}
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-1 text-right">
+                  <p className="text-xs text-stone-500 mt-1 text-right">
                     {((revenusApicultureTotal / depensesApiculture) * 100).toFixed(0)}% des coûts couverts
                   </p>
                 </div>
@@ -901,18 +748,18 @@ export default function ApiculturePage() {
 
           {/* Répartition dépenses par catégorie */}
           {depensesParCategorie.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Dépenses par catégorie</p>
+            <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5">
+              <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-4">Dépenses par catégorie</p>
               <div className="space-y-3">
                 {depensesParCategorie.map(({ cat, montant }) => {
                   const pct = depensesApiculture > 0 ? (montant / depensesApiculture) * 100 : 0;
                   return (
                     <div key={cat}>
                       <div className="flex justify-between text-sm mb-1">
-                        <span className="font-medium text-gray-700">{cat}</span>
-                        <span className="text-gray-500">{formatEur(montant)} · {pct.toFixed(0)}%</span>
+                        <span className="font-medium text-stone-700">{cat}</span>
+                        <span className="text-stone-500">{formatEur(montant)} · {pct.toFixed(0)}%</span>
                       </div>
-                      <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div className="w-full bg-stone-100 rounded-full h-2">
                         <div className="h-2 rounded-full bg-red-400 transition-all" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
@@ -924,20 +771,20 @@ export default function ApiculturePage() {
 
           {/* Liste détaillée des transactions */}
           {coutsApiculture.length > 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-gray-100">
-                <p className="text-[13px] font-semibold text-gray-800">Transactions liées à l&apos;apiculture</p>
-                <p className="text-xs text-gray-400 mt-0.5">Transactions avec production "Apiculture", "Miel" ou "Abeille"</p>
+            <div className="bg-white rounded-xl shadow-sm border border-stone-100 overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-stone-100">
+                <p className="text-[13px] font-semibold text-stone-800">Transactions liées à l&apos;apiculture</p>
+                <p className="text-xs text-stone-400 mt-0.5">Transactions avec production "Apiculture", "Miel" ou "Abeille"</p>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-stone-50">
                 {[...coutsApiculture]
                   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                   .map((t) => (
                     <div key={t.id} className="flex items-center gap-3 px-5 py-3">
                       <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.operation === "Revenus" ? "bg-green-400" : "bg-red-400"}`} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">{t.produit || t.categorie}</p>
-                        <p className="text-xs text-gray-400">{formatDate(t.date)} · {t.categorie}{t.sousCategorie ? ` › ${t.sousCategorie}` : ""}</p>
+                        <p className="text-sm font-medium text-stone-800 truncate">{t.produit || t.categorie}</p>
+                        <p className="text-xs text-stone-400">{formatDate(t.date)} · {t.categorie}{t.sousCategorie ? ` › ${t.sousCategorie}` : ""}</p>
                       </div>
                       <span className={`text-sm font-semibold shrink-0 ${t.operation === "Revenus" ? "text-green-600" : "text-red-500"}`}>
                         {t.operation === "Revenus" ? "+" : "−"}{formatEur(t.montant)}
@@ -947,10 +794,10 @@ export default function ApiculturePage() {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
+            <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-8 text-center">
               <p className="text-4xl mb-3">💸</p>
-              <p className="text-base font-medium text-gray-700">Aucune transaction liée à l&apos;apiculture</p>
-              <p className="text-sm text-gray-400 mt-1">
+              <p className="text-base font-medium text-stone-700">Aucune transaction liée à l&apos;apiculture</p>
+              <p className="text-sm text-stone-400 mt-1">
                 Dans <strong>Coûts</strong>, taguez vos dépenses avec la production <strong>&quot;Apiculture&quot;</strong> pour les voir apparaître ici.
               </p>
             </div>
@@ -962,7 +809,7 @@ export default function ApiculturePage() {
       {tab === "recoltes" && (
         <div className="space-y-3">
           {recoltesTri.length === 0 ? (
-            <div className="text-center py-16 text-gray-400">
+            <div className="text-center py-16 text-stone-400">
               <div className="text-5xl mb-3">🍯</div>
               <p className="text-lg font-medium">Aucune récolte</p>
               <p className="text-sm mt-1">Cliquez sur &quot;+ Récolte&quot; pour ajouter.</p>
@@ -970,7 +817,7 @@ export default function ApiculturePage() {
           ) : recoltesTri.map((r) => {
             const ruche = ruches.find((ru) => ru.id === r.rucheId);
             return (
-              <div key={r.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4">
+              <div key={r.id} className="bg-white rounded-xl shadow-sm border border-stone-100 p-4 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-base font-bold text-amber-700">{r.poidsKg.toFixed(1)} kg</span>
@@ -979,20 +826,20 @@ export default function ApiculturePage() {
                         {TYPE_MIEL_LABELS[r.type]}
                       </span>
                     )}
-                    <span className="text-sm text-gray-500">{formatDate(r.dateRecolte)}</span>
+                    <span className="text-sm text-stone-500">{formatDate(r.dateRecolte)}</span>
                   </div>
-                  <div className="mt-0.5 text-sm text-gray-600">
-                    {ruche ? <span className="font-medium">🐝 {ruche.nom}</span> : <span className="text-gray-400">Ruche non attribuée</span>}
+                  <div className="mt-0.5 text-sm text-stone-600">
+                    {ruche ? <span className="font-medium">🐝 {ruche.nom}</span> : <span className="text-stone-400">Ruche non attribuée</span>}
                   </div>
-                  {r.notes && <div className="mt-0.5 text-xs text-gray-400 italic truncate">{r.notes}</div>}
+                  {r.notes && <div className="mt-0.5 text-xs text-stone-400 italic truncate">{r.notes}</div>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button onClick={() => setEditRecolte(r)}
-                    className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
+                    className="p-2 text-stone-400 hover:text-brand-600 hover:bg-stone-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
                     ✏️
                   </button>
                   <button onClick={() => setDeleteRecolteTarget(r)}
-                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors" title="Supprimer">
+                    className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors" title="Supprimer">
                     🗑️
                   </button>
                 </div>
@@ -1006,37 +853,37 @@ export default function ApiculturePage() {
       {tab === "ruches" && (
         <div className="space-y-3">
           {ruches.length === 0 ? (
-            <div className="text-center py-16 text-gray-400">
+            <div className="text-center py-16 text-stone-400">
               <div className="text-5xl mb-3">🐝</div>
               <p className="text-lg font-medium">Aucune ruche</p>
               <p className="text-sm mt-1">Cliquez sur &quot;+ Ruche&quot; pour en ajouter.</p>
             </div>
           ) : ruches.map((r) => {
             const totalKg = recolteMiel.filter((rec) => rec.rucheId === r.id).reduce((s, rec) => s + rec.poidsKg, 0);
-            const statutColor = r.statut === "active" ? "bg-green-100 text-green-800" : r.statut === "inactive" ? "bg-gray-100 text-gray-600" : "bg-red-100 text-red-700";
+            const statutColor = r.statut === "active" ? "bg-green-100 text-green-800" : r.statut === "inactive" ? "bg-stone-100 text-stone-600" : "bg-red-100 text-red-700";
             const statutLabel = r.statut === "active" ? "Active" : r.statut === "inactive" ? "Inactive" : "Perdue";
             return (
-              <div key={r.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex items-center gap-4">
+              <div key={r.id} className="bg-white rounded-xl shadow-sm border border-stone-100 p-4 flex items-center gap-4">
                 <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-xl shrink-0">🐝</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-gray-900">{r.nom}</span>
+                    <span className="font-semibold text-stone-900">{r.nom}</span>
                     <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${statutColor}`}>{statutLabel}</span>
                   </div>
-                  <div className="mt-0.5 text-sm text-gray-500 flex gap-3 flex-wrap">
+                  <div className="mt-0.5 text-sm text-stone-500 flex gap-3 flex-wrap">
                     {r.emplacement && <span>📍 {r.emplacement}</span>}
                     {totalKg > 0 && <span className="font-medium text-amber-700">🍯 {totalKg.toFixed(1)} kg total</span>}
                     {r.dateInstallation && <span>Installée le {formatDate(r.dateInstallation)}</span>}
                   </div>
-                  {r.notes && <div className="mt-0.5 text-xs text-gray-400 italic truncate">{r.notes}</div>}
+                  {r.notes && <div className="mt-0.5 text-xs text-stone-400 italic truncate">{r.notes}</div>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button onClick={() => setEditRuche(r)}
-                    className="p-2 text-gray-400 hover:text-primary hover:bg-gray-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
+                    className="p-2 text-stone-400 hover:text-brand-600 hover:bg-stone-100 rounded-lg cursor-pointer transition-colors" title="Modifier">
                     ✏️
                   </button>
                   <button onClick={() => setDeleteRucheTarget(r)}
-                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors" title="Supprimer">
+                    className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg cursor-pointer transition-colors" title="Supprimer">
                     🗑️
                   </button>
                 </div>

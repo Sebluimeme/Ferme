@@ -39,7 +39,7 @@ export default function VehicleDetailPage() {
       <div className="p-4 md:p-6 lg:p-8">
         <div className="text-center py-16">
           <div className="text-4xl mb-4">⏳</div>
-          <p className="text-gray-500">Chargement du véhicule...</p>
+          <p className="text-stone-500">Chargement du véhicule...</p>
         </div>
       </div>
     );
@@ -51,15 +51,15 @@ export default function VehicleDetailPage() {
 
       {/* Onglets */}
       <div className="bg-white rounded-xl shadow-sm mb-6">
-        <div className="flex border-b border-gray-200 overflow-x-auto">
+        <div className="flex border-b border-stone-200 overflow-x-auto">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-6 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-600 hover:text-gray-800"
+                  ? "border-brand-600 text-brand-600"
+                  : "border-transparent text-stone-600 hover:text-stone-800"
               }`}
             >
               {tab.label}

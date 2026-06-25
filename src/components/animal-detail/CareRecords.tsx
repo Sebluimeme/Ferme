@@ -127,7 +127,7 @@ export default function CareRecords({ animalId, soins }: CareRecordsProps) {
         </div>
         <button
           onClick={() => { setEditSoin(null); setShowForm(true); }}
-          className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer"
+          className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer"
         >
           + Nouvelle fiche
         </button>
@@ -142,8 +142,8 @@ export default function CareRecords({ animalId, soins }: CareRecordsProps) {
               onClick={() => setFilter(f)}
               className={`px-3 py-1.5 text-xs font-medium rounded-lg cursor-pointer transition-colors ${
                 filter === f
-                  ? "bg-primary text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-brand-600 text-white"
+                  : "bg-stone-100 text-stone-600 hover:bg-stone-200"
               }`}
             >
               {f === "tous" ? "Tous" : f === "en_cours" ? "En cours" : "Clotures"}
@@ -153,7 +153,7 @@ export default function CareRecords({ animalId, soins }: CareRecordsProps) {
       )}
 
       {filteredSoins.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-12 text-stone-400">
           <div className="text-4xl mb-2">💊</div>
           <p>{soins.length === 0 ? "Aucune fiche soins" : "Aucun resultat pour ce filtre"}</p>
         </div>
@@ -165,7 +165,7 @@ export default function CareRecords({ animalId, soins }: CareRecordsProps) {
               className={`border rounded-lg p-4 ${
                 soin.statut === "en_cours"
                   ? "border-amber-200 bg-amber-50/50"
-                  : "border-gray-200 bg-gray-50/50"
+                  : "border-stone-200 bg-stone-50/50"
               }`}
             >
               <div className="flex items-start justify-between gap-3">
@@ -187,17 +187,17 @@ export default function CareRecords({ animalId, soins }: CareRecordsProps) {
                       {soin.statut === "en_cours" ? "En cours" : "Cloture"}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 mb-1">
+                  <div className="text-xs text-stone-500 mb-1">
                     Debut : {formatDate(soin.dateDebut)}
                     {soin.dateFin && <> &middot; Fin : {formatDate(soin.dateFin)}</>}
                   </div>
                   {soin.description && (
-                    <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">{soin.description}</p>
+                    <p className="text-sm text-stone-600 mt-2 whitespace-pre-wrap">{soin.description}</p>
                   )}
                   {soin.photoUrl && (
                     <button
                       onClick={() => setPhotoPreview(soin.photoUrl!)}
-                      className="mt-2 flex items-center gap-1.5 text-xs text-primary hover:underline cursor-pointer bg-transparent border-none p-0"
+                      className="mt-2 flex items-center gap-1.5 text-xs text-brand-600 hover:underline cursor-pointer bg-transparent border-none p-0"
                     >
                       <span>📎</span>
                       <span>{soin.photoNom || "Ordonnance"}</span>
@@ -207,7 +207,7 @@ export default function CareRecords({ animalId, soins }: CareRecordsProps) {
                 {soin.photoUrl && (
                   <button
                     onClick={() => setPhotoPreview(soin.photoUrl!)}
-                    className="shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-gray-200 cursor-pointer bg-transparent p-0"
+                    className="shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-stone-200 cursor-pointer bg-transparent p-0"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -219,7 +219,7 @@ export default function CareRecords({ animalId, soins }: CareRecordsProps) {
                 )}
               </div>
 
-              <div className="flex items-center gap-2 mt-3 pt-2 border-t border-gray-200/50">
+              <div className="flex items-center gap-2 mt-3 pt-2 border-t border-stone-200/50">
                 {soin.statut === "en_cours" ? (
                   <button
                     onClick={() => handleCloturer(soin)}
@@ -235,14 +235,14 @@ export default function CareRecords({ animalId, soins }: CareRecordsProps) {
                     Rouvrir
                   </button>
                 )}
-                <span className="text-gray-300">|</span>
+                <span className="text-stone-300">|</span>
                 <button
                   onClick={() => openEdit(soin)}
-                  className="text-xs text-primary hover:underline cursor-pointer bg-transparent border-none p-0"
+                  className="text-xs text-brand-600 hover:underline cursor-pointer bg-transparent border-none p-0"
                 >
                   Modifier
                 </button>
-                <span className="text-gray-300">|</span>
+                <span className="text-stone-300">|</span>
                 <button
                   onClick={() => setDeleteTarget(soin)}
                   className="text-xs text-red-500 hover:text-red-700 cursor-pointer bg-transparent border-none p-0"
@@ -264,48 +264,48 @@ export default function CareRecords({ animalId, soins }: CareRecordsProps) {
       >
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Titre du traitement *</label>
+            <label className="block mb-1 text-sm font-medium text-stone-700">Titre du traitement *</label>
             <input
               type="text"
               name="titre"
               defaultValue={editSoin?.titre || ""}
               required
               placeholder="Ex : Antibiotique, Vermifuge, Vaccination..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
             />
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Date de debut *</label>
+            <label className="block mb-1 text-sm font-medium text-stone-700">Date de debut *</label>
             <input
               type="date"
               name="dateDebut"
               defaultValue={editSoin?.dateDebut || new Date().toISOString().split("T")[0]}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
             />
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Description / Instructions</label>
+            <label className="block mb-1 text-sm font-medium text-stone-700">Description / Instructions</label>
             <textarea
               name="description"
               defaultValue={editSoin?.description || ""}
               placeholder="Posologie, frequence, duree du traitement..."
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 resize-y"
+              className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 resize-y"
             />
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
+            <label className="block mb-1 text-sm font-medium text-stone-700">
               Photo / Ordonnance {editSoin?.photoUrl ? "(remplacer)" : "(optionnel)"}
             </label>
             <input
               ref={fileRef}
               type="file"
               accept="image/*,.pdf"
-              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/20 file:cursor-pointer"
+              className="w-full text-sm text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-brand-600/10 file:text-brand-600 hover:file:bg-brand-600/20 file:cursor-pointer"
             />
             {editSoin?.photoUrl && !fileRef.current?.files?.length && (
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-stone-400 mt-1">
                 Photo actuelle : {editSoin.photoNom || "ordonnance"}
               </p>
             )}
@@ -314,14 +314,14 @@ export default function CareRecords({ animalId, soins }: CareRecordsProps) {
             <button
               type="button"
               onClick={closeModal}
-              className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+              className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer disabled:opacity-50"
             >
               {saving ? "Enregistrement..." : editSoin ? "Enregistrer" : "Ajouter"}
             </button>
@@ -343,7 +343,7 @@ export default function CareRecords({ animalId, soins }: CareRecordsProps) {
               href={photoPreview}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200"
+              className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200"
             >
               Ouvrir dans un nouvel onglet
             </a>
@@ -353,13 +353,13 @@ export default function CareRecords({ animalId, soins }: CareRecordsProps) {
 
       {/* Confirm delete */}
       <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Supprimer la fiche soins" size="small">
-        <p className="text-gray-700">
+        <p className="text-stone-700">
           Voulez-vous vraiment supprimer la fiche <strong>{deleteTarget?.titre}</strong> ?
         </p>
         <div className="flex gap-3 justify-end mt-6">
           <button
             onClick={() => setDeleteTarget(null)}
-            className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-200 cursor-pointer"
+            className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
           >
             Annuler
           </button>

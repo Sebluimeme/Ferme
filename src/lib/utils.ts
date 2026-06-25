@@ -87,7 +87,7 @@ export function getAnimalTailwindColor(type: string): string {
     porcin: "text-porcin",
     equin: "text-equin",
   };
-  return colors[type] || "text-gray-500";
+  return colors[type] || "text-stone-500";
 }
 
 export function getAnimalBorderColor(type: string): string {
@@ -98,7 +98,7 @@ export function getAnimalBorderColor(type: string): string {
     porcin: "border-l-porcin",
     equin: "border-l-equin",
   };
-  return colors[type] || "border-l-gray-500";
+  return colors[type] || "border-l-stone-500";
 }
 
 export function getAnimalBgColor(type: string): string {
@@ -109,5 +109,5 @@ export function getAnimalBgColor(type: string): string {
     porcin: "bg-porcin/10 text-porcin",
     equin: "bg-equin/10 text-equin",
   };
-  return colors[type] || "bg-gray-100 text-gray-500";
+  return colors[type] || "bg-stone-100 text-stone-500";
 }

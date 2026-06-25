@@ -65,14 +65,14 @@ export default function VehicleComposantsTab({ vehicleId, initialComposants }: V
         <h3 className="text-lg font-semibold">Références des composants</h3>
         <button
           onClick={addLine}
-          className="px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer"
+          className="px-3 py-1.5 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer"
         >
           + Ajouter
         </button>
       </div>
 
       {composants.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-8 text-stone-500">
           <div className="text-4xl mb-2">🔩</div>
           <p>Aucun composant enregistré</p>
           <p className="text-sm">Cliquez sur &quot;+ Ajouter&quot; pour ajouter une référence de pièce</p>
@@ -80,7 +80,7 @@ export default function VehicleComposantsTab({ vehicleId, initialComposants }: V
       ) : (
         <div className="space-y-3">
           {/* En-tête */}
-          <div className="grid grid-cols-[1fr_1fr_40px] gap-3 text-sm font-medium text-gray-500 px-1">
+          <div className="grid grid-cols-[1fr_1fr_40px] gap-3 text-sm font-medium text-stone-500 px-1">
             <div>Composant</div>
             <div>Référence</div>
             <div></div>
@@ -94,14 +94,14 @@ export default function VehicleComposantsTab({ vehicleId, initialComposants }: V
                 value={composant.nom}
                 onChange={(e) => updateLine(composant.id, "nom", e.target.value)}
                 placeholder="Ex: Moteur, Filtre..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
               />
               <input
                 type="text"
                 value={composant.reference}
                 onChange={(e) => updateLine(composant.id, "reference", e.target.value)}
                 placeholder="Ex: REF-ABC123"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
               />
               <button
                 onClick={() => removeLine(composant.id)}
@@ -120,7 +120,7 @@ export default function VehicleComposantsTab({ vehicleId, initialComposants }: V
           <button
             onClick={save}
             disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-br from-primary to-secondary rounded-lg hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? "Enregistrement..." : "Enregistrer les composants"}
           </button>
@@ -132,19 +132,19 @@ export default function VehicleComposantsTab({ vehicleId, initialComposants }: V
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setDeleteTarget(null)}>
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-2">Supprimer ce composant ?</h3>
-            <p className="text-sm text-gray-600 mb-1">
+            <p className="text-sm text-stone-600 mb-1">
               <strong>{composants.find((c) => c.id === deleteTarget)?.nom || "Composant"}</strong>
             </p>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-stone-500 mb-4">
               {composants.find((c) => c.id === deleteTarget)?.reference || ""}
             </p>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-stone-500 mb-6">
               N&apos;oubliez pas d&apos;enregistrer après la suppression.
             </p>
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+                className="px-4 py-2 text-sm bg-stone-100 text-stone-700 rounded-lg hover:bg-stone-200 transition-colors cursor-pointer"
               >
                 Annuler
               </button>
