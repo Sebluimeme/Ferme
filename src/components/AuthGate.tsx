@@ -37,12 +37,12 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex bg-stone-100" style={{ minHeight: "100dvh" }}>
+    <div className="flex bg-stone-100 w-screen overflow-hidden" style={{ minHeight: "100dvh" }}>
       {/* Sidebar desktop fixe */}
       <Sidebar />
 
       {/* Contenu principal */}
-      <div className="flex flex-col flex-1 lg:ml-[220px] min-h-[100dvh]">
+      <div className="flex flex-col flex-1 min-w-0 lg:ml-[220px] min-h-[100dvh]">
         {/* Navbar — padding top pour safe area iOS */}
         <div style={{ paddingTop: "env(safe-area-inset-top, 0px)" }} className="bg-white border-b border-stone-200 sticky top-0 z-[1020]">
           <Navbar />
@@ -50,7 +50,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
         {/* Contenu — padding bottom pour la BottomNav + safe area */}
         <main
-          className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8 lg:pb-8"
+          className="flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full p-4 md:p-6 lg:p-8 lg:pb-8"
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 3.75rem)" }}
         >
           <div className="lg:pb-0" style={{ paddingBottom: 0 }}>
