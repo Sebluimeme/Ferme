@@ -19,6 +19,7 @@ import {
   Droplets,
   LogOut,
   ChevronRight,
+  Footprints,
 } from "lucide-react";
 
 const sections = [
@@ -39,8 +40,9 @@ const sections = [
   {
     title: "Culture",
     items: [
-      { icon: Wheat, label: "Fourrage",    route: "/fourrage" },
-      { icon: Flower, label: "Apiculture",  route: "/apiculture" },
+      { icon: Wheat,       label: "Fourrage",    route: "/fourrage" },
+      { icon: Footprints,  label: "Pâturage",    route: "/paturage" },
+      { icon: Flower,      label: "Apiculture",  route: "/apiculture" },
       { icon: Map,   label: "Parcellaire", route: "/fourrage/partiels" },
       { icon: Droplets, label: "Source", route: "/source" },
     ],

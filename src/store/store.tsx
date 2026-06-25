@@ -11,6 +11,7 @@ import type { Partiel, ActiviteFourrage } from "@/types/fourrage";
 import type { Ruche, RecolteMiel, VenteMiel } from "@/types/apiculture";
 import type { Transaction } from "@/types/comptabilite";
 import type { ReleverSource } from "@/types/source";
+import type { SejourPaturage } from "@/types/paturage";
 import { calculateMaintenanceAlerts } from "@/services/vehicle-detail-service";
 
 export interface Animal {
@@ -88,6 +89,7 @@ interface AppState {
   recolteMiel: RecolteMiel[];
   ventesMiel: VenteMiel[];
   relevesSource: ReleverSource[];
+  sejoursPaturage: SejourPaturage[];
   stats: Stats;
   loading: boolean;
   sidebarOpen: boolean;
@@ -112,6 +114,7 @@ type Action =
   | { type: "SET_RECOLTE_MIEL"; payload: RecolteMiel[] }
   | { type: "SET_VENTES_MIEL"; payload: VenteMiel[] }
   | { type: "SET_RELEVES_SOURCE"; payload: ReleverSource[] }
+  | { type: "SET_SEJOURS_PATURAGE"; payload: SejourPaturage[] }
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "TOGGLE_SIDEBAR" }
   | { type: "CLOSE_SIDEBAR" }
@@ -155,6 +158,7 @@ const initialState: AppState = {
   recolteMiel: [],
   ventesMiel: [],
   relevesSource: [],
+  sejoursPaturage: [],
   stats: { totalAnimaux: 0, ovins: 0, bovins: 0, caprins: 0, porcins: 0, profitGlobal: 0 },
   loading: true,
   sidebarOpen: false,
@@ -210,6 +214,8 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case "SET_RELEVES_SOURCE":
       return { ...state, relevesSource: action.payload };
+    case "SET_SEJOURS_PATURAGE":
+      return { ...state, sejoursPaturage: action.payload };
     case "UPDATE_MAINTENANCE_ALERTS": {
       const alerts = calculateMaintenanceAlerts(state.vehicles, state.maintenanceEntries, state.meterReadings);
       return { ...state, maintenanceAlerts: alerts };
@@ -327,6 +333,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     listeners.push(
       firebaseService.listen<ReleverSource>("releves-source", (data) =>
         dispatch({ type: "SET_RELEVES_SOURCE", payload: data })
+      )
+    );
+    listeners.push(
+      firebaseService.listen<SejourPaturage>("sejours-paturage", (data) =>
+        dispatch({ type: "SET_SEJOURS_PATURAGE", payload: data })
       )
     );
 
