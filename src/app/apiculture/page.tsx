@@ -112,7 +112,7 @@ function RucheForm({ initial, onSubmit, onCancel, loading }: {
       </div>
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">Annuler</button>
-        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50">
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
       </div>
@@ -194,7 +194,7 @@ function RecolteForm({ ruches, initial, onSubmit, onCancel, loading }: {
       </div>
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">Annuler</button>
-        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50">
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
       </div>
@@ -350,7 +350,7 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
 
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onCancel} className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer">Annuler</button>
-        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer disabled:opacity-50">
+        <button type="submit" disabled={loading} className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50">
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
       </div>
@@ -579,15 +579,15 @@ export default function ApiculturePage() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <button onClick={() => setModalVente(true)}
-            className="px-3 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 cursor-pointer shadow-md">
+            className="px-4 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors cursor-pointer">
             + Vente
           </button>
           <button onClick={() => setModalRecolte(true)}
-            className="px-3 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 cursor-pointer shadow-md">
+            className="px-4 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors cursor-pointer">
             + Récolte
           </button>
           <button onClick={() => setModalRuche(true)}
-            className="px-3 py-2 text-sm font-semibold text-white rounded-xl bg-gradient-to-br from-primary to-secondary hover:from-primary-dark hover:to-secondary-dark cursor-pointer shadow-md">
+            className="px-4 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors cursor-pointer">
             + Ruche
           </button>
         </div>
@@ -1017,7 +1017,7 @@ export default function ApiculturePage() {
             const statutLabel = r.statut === "active" ? "Active" : r.statut === "inactive" ? "Inactive" : "Perdue";
             return (
               <div key={r.id} className="bg-white rounded-xl shadow-sm border border-stone-100 p-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-xl shrink-0">🐝</div>
+                <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center text-xl shrink-0">🐝</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-stone-900">{r.nom}</span>
