@@ -54,10 +54,10 @@ export default function AnimalHeader({ animal, onEdit, onDelete }: AnimalHeaderP
         <span className="text-3xl sm:text-4xl">{getAnimalIcon(animal.type)}</span>
         <div className="flex-1 min-w-0">
           <h1 className="text-xl sm:text-2xl font-bold text-stone-900 break-words">
-            {animal.nom || animal.numeroBoucle || "Animal sans identifiant"}
+            {animal.numeroBoucle || animal.nom || "Animal sans identifiant"}
           </h1>
-          {animal.numeroBoucle && animal.nom && (
-            <div className="text-sm text-stone-500 mt-1">{animal.numeroBoucle}</div>
+          {animal.nom && (
+            <div className="text-sm text-stone-500 mt-1">{animal.nom}</div>
           )}
           <div className="flex gap-2 mt-2 flex-wrap">
             <span className={`text-xs font-medium px-2 py-1 rounded-full ${getAnimalBgColor(animal.type)}`}>

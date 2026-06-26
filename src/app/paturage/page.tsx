@@ -68,7 +68,7 @@ function SejourForm({
   const today = new Date().toISOString().split("T")[0];
   const [form, setForm] = useState<FormData>({
     parcelIds: initial?.parcelIds ?? [],
-    typeAnimal: initial?.typeAnimal ?? "ovin",
+    typeAnimal: initial?.typeAnimal ?? "bovin",
     nombreAnimaux: initial?.nombreAnimaux ?? "",
     dateEntree: initial?.dateEntree ?? today,
     dateSortie: initial?.dateSortie ?? "",

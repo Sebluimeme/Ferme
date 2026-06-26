@@ -32,10 +32,10 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
           <span className="text-xl sm:text-2xl">{getAnimalIcon(animal.type)}</span>
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-sm sm:text-base truncate">
-              {animal.nom || animal.numeroBoucle || "Animal sans identifiant"}
+              {animal.numeroBoucle || animal.nom || "Animal sans identifiant"}
             </div>
-            {animal.numeroBoucle && animal.nom && (
-              <div className="text-[11px] sm:text-xs text-stone-600 truncate">{animal.numeroBoucle}</div>
+            {animal.nom && (
+              <div className="text-[11px] sm:text-xs text-stone-600 truncate">{animal.nom}</div>
             )}
           </div>
           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap ${getAnimalBgColor(animal.type)}`}>
