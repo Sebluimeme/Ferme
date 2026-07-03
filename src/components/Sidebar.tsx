@@ -53,7 +53,12 @@ const sections = [
     items: [
       { icon: Truck,  label: "Véhicules",  route: "/vehicules" },
       { icon: Wrench, label: "Entretiens", route: "/entretiens" },
-      { icon: Fuel,   label: "Carburant",  route: "/carburant" },
+    ],
+  },
+  {
+    title: "Ecobloc",
+    items: [
+      { icon: Fuel, label: "Carburant", route: "/carburant" },
     ],
   },
   {
