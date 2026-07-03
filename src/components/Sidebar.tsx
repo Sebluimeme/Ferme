@@ -20,6 +20,7 @@ import {
   LogOut,
   ChevronRight,
   Footprints,
+  Fuel,
 } from "lucide-react";
 
 const sections = [
@@ -52,6 +53,7 @@ const sections = [
     items: [
       { icon: Truck,  label: "Véhicules",  route: "/vehicules" },
       { icon: Wrench, label: "Entretiens", route: "/entretiens" },
+      { icon: Fuel,   label: "Carburant",  route: "/carburant" },
     ],
   },
   {
