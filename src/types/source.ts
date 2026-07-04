@@ -1,6 +1,6 @@
 // Suivi débit de la source
 
-export type UniteDebit = "L/min" | "L/s" | "m³/h";
+export type UniteDebit = "L/h" | "L/min" | "L/s" | "m³/h";
 
 export interface ReleverSource {
   id: string;
@@ -22,7 +22,7 @@ export interface ReleverSourceFormData {
 export const EMPTY_FORM: ReleverSourceFormData = {
   date: new Date().toISOString().split("T")[0],
   debit: "",
-  unite: "L/min",
+  unite: "L/h",
   remarque: "",
 };
 

@@ -20,7 +20,7 @@ import KpiCard from "@/components/KpiCard";
 
 const inputClass =
   "w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400";
-const UNITES: UniteDebit[] = ["L/min", "L/s", "m³/h"];
+const UNITES: UniteDebit[] = ["L/h", "L/min", "L/s", "m³/h"];
 
 export default function SourcePage() {
   const { state } = useAppStore();
