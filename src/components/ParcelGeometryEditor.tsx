@@ -4,11 +4,13 @@ import React, { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, WMSTileLayer, useMap } from "react-leaflet";
 
 // Corrige le redimensionnement dans les modals (surtout PWA/mobile)
+// On tire plusieurs fois à des délais croissants pour couvrir les animations de modal
 function MapResizer() {
   const map = useMap();
   useEffect(() => {
-    const t = setTimeout(() => map.invalidateSize(), 150);
-    return () => clearTimeout(t);
+    const delays = [150, 500, 1000, 2000];
+    const timers = delays.map((d) => setTimeout(() => map.invalidateSize(), d));
+    return () => timers.forEach(clearTimeout);
   }, [map]);
   return null;
 }
@@ -85,9 +87,13 @@ function GeomanController({ initialGeometry, mode, onUpdate }: GeomanControllerP
         geojsonLayer.addTo(map);
         layerRef.current = geojsonLayer;
 
-        // Fit bounds
+        // Fit bounds — et re-fit à chaque resize (invalidateSize déclenche "resize")
         const bounds = geojsonLayer.getBounds();
-        if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40] });
+        const fitIfValid = () => {
+          if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40] });
+        };
+        fitIfValid();
+        map.once("resize", fitIfValid);
 
         // Active le mode édition global → initialise pm sur tous les layers
         // et permet le drag des vertices immédiatement (sans clic sur bouton équerre)
@@ -240,7 +246,7 @@ export default function ParcelGeometryEditor({
       )}
 
       {/* Carte */}
-      <div className="relative rounded-xl overflow-hidden border border-stone-200" style={{ height: "420px" }}>
+      <div className="relative rounded-xl overflow-hidden border border-stone-200" style={{ height: "min(420px, 55svh)" }}>
         <button
           type="button"
           onClick={() => setSatellite((v) => !v)}
