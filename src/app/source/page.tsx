@@ -272,54 +272,60 @@ export default function SourcePage() {
           }}
         >
           <div
-            className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl max-h-[92dvh] sm:max-h-[90dvh] overflow-y-auto overflow-x-hidden"
+            className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl max-h-[92dvh] sm:max-h-[90dvh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 pt-5 pb-4 border-b border-stone-100 flex items-center justify-between">
+            {/* En-tête fixe */}
+            <div className="px-5 pt-5 pb-4 border-b border-stone-100 flex items-center justify-between shrink-0">
               <h2 className="text-base font-semibold text-stone-900">
                 {editTarget ? "Modifier le relevé" : "Nouveau relevé"}
               </h2>
               <button onClick={closeModal} className="text-stone-400 hover:text-stone-600 cursor-pointer text-xl leading-none">×</button>
             </div>
-            <form onSubmit={handleSubmit} className="p-5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-stone-600 mb-1">Date *</label>
-                  <input type="date" value={form.date} onChange={set("date")} required className={inputClass} />
+            {/* Corps scrollable */}
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-5 space-y-4 overflow-y-auto flex-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-stone-600 mb-1">Date *</label>
+                    <input type="date" value={form.date} onChange={set("date")} required className={inputClass} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-stone-600 mb-1">Débit *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.debit}
+                      onChange={set("debit")}
+                      placeholder="ex: 12.5"
+                      required
+                      className={inputClass}
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-stone-600 mb-1">Débit *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={form.debit}
-                    onChange={set("debit")}
-                    placeholder="ex: 12.5"
-                    required
-                    className={inputClass}
+                  <label className="block text-xs font-medium text-stone-600 mb-1">Unité</label>
+                  <select value={form.unite} onChange={set("unite")} className={inputClass}>
+                    {UNITES.map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-stone-600 mb-1">Remarque</label>
+                  <textarea
+                    value={form.remarque}
+                    onChange={set("remarque")}
+                    rows={2}
+                    placeholder="Conditions de mesure, météo…"
+                    className={inputClass + " resize-none"}
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-stone-600 mb-1">Unité</label>
-                <select value={form.unite} onChange={set("unite")} className={inputClass}>
-                  {UNITES.map((u) => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-stone-600 mb-1">Remarque</label>
-                <textarea
-                  value={form.remarque}
-                  onChange={set("remarque")}
-                  rows={2}
-                  placeholder="Conditions de mesure, météo…"
-                  className={inputClass + " resize-none"}
-                />
-              </div>
-              <div className="flex gap-3 pt-1">
+              {/* Boutons toujours visibles en bas */}
+              <div className="flex gap-3 px-5 py-4 border-t border-stone-100 bg-white shrink-0"
+                style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
                 <button type="button" onClick={closeModal} className="flex-1 py-2.5 rounded-xl border border-stone-200 text-sm text-stone-600 hover:bg-stone-50 cursor-pointer">
                   Annuler
                 </button>
