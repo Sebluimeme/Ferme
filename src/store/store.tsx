@@ -29,6 +29,8 @@ export interface Animal {
   commentaire?: string;
   numeroBouclePere?: string;
   numeroBoucleMere?: string;
+  photoUrl?: string;
+  photoStoragePath?: string;
   dateCreation?: string;
   derniereMAJ?: string;
 }

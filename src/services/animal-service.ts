@@ -1,4 +1,5 @@
 import firebaseService from "@/lib/firebase-service";
+import { uploadFile, deleteFile, compressImage } from "@/lib/firebase-storage";
 import { calculateAge } from "@/lib/utils";
 import type { Animal } from "@/store/store";
 
@@ -59,6 +60,42 @@ export async function updateAnimal(id: string, data: AnimalFormData) {
 
 export async function deleteAnimal(id: string) {
   return firebaseService.delete(PATH, id);
+}
+
+/**
+ * Upload ou remplace la photo principale d'un animal.
+ * Compresse l'image côté client avant envoi (max 800px, JPEG 78%).
+ */
+export async function uploadAnimalPhoto(
+  animalId: string,
+  file: File,
+  oldStoragePath?: string
+) {
+  // Supprime l'ancienne photo si elle existe
+  if (oldStoragePath) await deleteFile(oldStoragePath);
+
+  // Compression canvas
+  const compressed = await compressImage(file, 800, 0.78);
+
+  const path = `animaux/${animalId}/photo_principale/${Date.now()}_${compressed.name}`;
+  const result = await uploadFile(path, compressed);
+  if (!result.success) return result;
+
+  return firebaseService.update(PATH, animalId, {
+    photoUrl: result.url,
+    photoStoragePath: result.storagePath,
+  });
+}
+
+/**
+ * Supprime la photo principale d'un animal et efface les champs en base.
+ */
+export async function deleteAnimalPhoto(animalId: string, storagePath: string) {
+  await deleteFile(storagePath);
+  return firebaseService.update(PATH, animalId, {
+    photoUrl: null,
+    photoStoragePath: null,
+  });
 }
 
 export async function getAnimal(id: string) {

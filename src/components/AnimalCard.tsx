@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { Animal } from "@/store/store";
 import { getAnimalIcon, getAnimalLabel, getAnimalBorderColor, getAnimalBgColor, formatAgeFromBirthDate, formatNumber } from "@/lib/utils";
 
@@ -29,7 +30,19 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
       >
         {/* Header avec infos principales */}
         <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
-          <span className="text-xl sm:text-2xl">{getAnimalIcon(animal.type)}</span>
+          {animal.photoUrl ? (
+            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden border border-stone-200 shrink-0">
+              <Image
+                src={animal.photoUrl}
+                alt={animal.nom || animal.numeroBoucle || "Photo"}
+                fill
+                className="object-cover"
+                sizes="40px"
+              />
+            </div>
+          ) : (
+            <span className="text-xl sm:text-2xl">{getAnimalIcon(animal.type)}</span>
+          )}
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-sm sm:text-base truncate">
               {animal.numeroBoucle || animal.nom || "Animal sans identifiant"}
