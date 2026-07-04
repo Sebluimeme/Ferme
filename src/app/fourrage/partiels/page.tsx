@@ -521,17 +521,35 @@ export default function ParcellairePage() {
         size="small"
       >
         {editPartiel && (
-          <ParcellaireForm
-            initial={{
-              nom: editPartiel.nom,
-              type: editPartiel.type ?? "",
-              surface: editPartiel.surface?.toString() ?? "",
-              description: editPartiel.description ?? "",
-            }}
-            onSubmit={handleUpdate}
-            onCancel={() => setEditPartiel(null)}
-            loading={saving}
-          />
+          <>
+            <ParcellaireForm
+              initial={{
+                nom: editPartiel.nom,
+                type: editPartiel.type ?? "",
+                surface: editPartiel.surface?.toString() ?? "",
+                description: editPartiel.description ?? "",
+              }}
+              onSubmit={handleUpdate}
+              onCancel={() => setEditPartiel(null)}
+              loading={saving}
+            />
+            {editPartiel.geometry && (
+              <div className="mt-3 pt-3 border-t border-stone-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = editPartiel;
+                    setEditPartiel(null);
+                    setPendingGeometry(null);
+                    setEditGeoTarget(target);
+                  }}
+                  className="w-full py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+                >
+                  📐 Modifier le tracé (déplacer les bornes)
+                </button>
+              </div>
+            )}
+          </>
         )}
       </Modal>
 

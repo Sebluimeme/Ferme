@@ -89,11 +89,27 @@ export async function addMaintenance(
   const maintenanceData = formDataToMaintenance(vehicleId, formData, pieces);
   const now = new Date().toISOString();
 
-  return await firebaseService.create(MAINTENANCE_PATH, {
+  const result = await firebaseService.create(MAINTENANCE_PATH, {
     ...maintenanceData,
     dateCreation: now,
     derniereMAJ: now,
   });
+
+  // Mise à jour automatique du compteur général du véhicule
+  if (result.success) {
+    const vehicleUpdate: Record<string, unknown> = {};
+    if (maintenanceData.heuresEffectuees) {
+      vehicleUpdate.heuresUtilisation = maintenanceData.heuresEffectuees;
+    }
+    if (maintenanceData.kilometrageEffectue) {
+      vehicleUpdate.kilometrage = maintenanceData.kilometrageEffectue;
+    }
+    if (Object.keys(vehicleUpdate).length > 0) {
+      await firebaseService.update("vehicules", vehicleId, vehicleUpdate);
+    }
+  }
+
+  return result;
 }
 
 export async function updateMaintenance(
@@ -109,10 +125,26 @@ export async function updateMaintenance(
 
   const maintenanceData = formDataToMaintenance(vehicleId, formData, pieces);
 
-  return await firebaseService.update(MAINTENANCE_PATH, maintenanceId, {
+  const result = await firebaseService.update(MAINTENANCE_PATH, maintenanceId, {
     ...maintenanceData,
     derniereMAJ: new Date().toISOString(),
   });
+
+  // Mise à jour automatique du compteur général du véhicule
+  if (result.success) {
+    const vehicleUpdate: Record<string, unknown> = {};
+    if (maintenanceData.heuresEffectuees) {
+      vehicleUpdate.heuresUtilisation = maintenanceData.heuresEffectuees;
+    }
+    if (maintenanceData.kilometrageEffectue) {
+      vehicleUpdate.kilometrage = maintenanceData.kilometrageEffectue;
+    }
+    if (Object.keys(vehicleUpdate).length > 0) {
+      await firebaseService.update("vehicules", vehicleId, vehicleUpdate);
+    }
+  }
+
+  return result;
 }
 
 export async function deleteMaintenance(maintenanceId: string): Promise<FirebaseResult> {

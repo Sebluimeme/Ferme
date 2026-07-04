@@ -2,6 +2,16 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, WMSTileLayer, useMap } from "react-leaflet";
+
+// Corrige le redimensionnement dans les modals (surtout PWA/mobile)
+function MapResizer() {
+  const map = useMap();
+  useEffect(() => {
+    const t = setTimeout(() => map.invalidateSize(), 150);
+    return () => clearTimeout(t);
+  }, [map]);
+  return null;
+}
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css";
@@ -79,14 +89,11 @@ function GeomanController({ initialGeometry, mode, onUpdate }: GeomanControllerP
         const bounds = geojsonLayer.getBounds();
         if (bounds.isValid()) map.fitBounds(bounds, { padding: [40, 40] });
 
-        // Enable edit on the polygon layer
-        geojsonLayer.eachLayer((layer) => {
-          if ((layer as any).pm) {
-            (layer as any).pm.enable({
-              allowSelfIntersection: false,
-              removeLayerBelowMinVertices: false,
-            });
-          }
+        // Active le mode édition global → initialise pm sur tous les layers
+        // et permet le drag des vertices immédiatement (sans clic sur bouton équerre)
+        (map as any).pm.enableGlobalEditMode({
+          allowSelfIntersection: false,
+          removeLayerBelowMinVertices: false,
         });
 
         // Listen for vertex changes
@@ -268,6 +275,7 @@ export default function ParcelGeometryEditor({
             opacity={satellite ? 0.6 : 0.7}
             attribution='&copy; <a href="https://www.geoportail.gouv.fr/">IGN</a>'
           />
+          <MapResizer />
           <GeomanController
             initialGeometry={initialGeometry}
             mode={mode}
