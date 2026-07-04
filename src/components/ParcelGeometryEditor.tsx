@@ -98,11 +98,23 @@ function GeomanController({ initialGeometry, mode, onUpdate }: GeomanControllerP
         // Active le mode édition global → initialise pm sur tous les layers
         // et permet le drag des vertices immédiatement (sans clic sur bouton équerre)
         (map as any).pm.enableGlobalEditMode({
-          allowSelfIntersection: false,
+          allowSelfIntersection: true,   // false peut causer un snap-back sur mobile
           removeLayerBelowMinVertices: false,
         });
 
-        // Listen for vertex changes
+        // Pendant le drag : bloquer le pan de la carte (conflit touch/drag sur mobile)
+        let dragging = false;
+        const onDragStart = () => {
+          dragging = true;
+          map.dragging.disable();
+        };
+        const onDragEnd = () => {
+          dragging = false;
+          map.dragging.enable();
+          emitUpdate(); // émettre uniquement une fois le drag terminé
+        };
+
+        // Collecte les coordonnées et remonte au parent
         const emitUpdate = () => {
           geojsonLayer.eachLayer((layer) => {
             const latlngs = (layer as L.Polygon).getLatLngs();
@@ -112,10 +124,14 @@ function GeomanController({ initialGeometry, mode, onUpdate }: GeomanControllerP
           });
         };
 
-        map.on("pm:edit", emitUpdate);
+        // pm:edit peut se déclencher pendant le drag → ne mettre à jour que hors drag
+        const onEdit = () => { if (!dragging) emitUpdate(); };
+
+        map.on("pm:markerdragstart", onDragStart);
+        map.on("pm:markerdragend", onDragEnd);
+        map.on("pm:edit", onEdit);
         map.on("pm:vertexadded", emitUpdate);
         map.on("pm:vertexremoved", emitUpdate);
-        map.on("pm:markerdragend", emitUpdate);
       }
 
       // ── Draw mode: free polygon drawing ──
@@ -195,7 +211,9 @@ function GeomanController({ initialGeometry, mode, onUpdate }: GeomanControllerP
       map.off("pm:create");
       map.off("pm:vertexadded");
       map.off("pm:vertexremoved");
+      map.off("pm:markerdragstart");
       map.off("pm:markerdragend");
+      map.dragging.enable(); // s'assurer que le pan est ré-activé
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
