@@ -22,7 +22,7 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
   const lastModified = formatLastModified(animal.derniereMAJ);
 
   return (
-    <div className={`group bg-white rounded-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all border-l-4 ${getAnimalBorderColor(animal.type)} flex overflow-hidden`}>
+    <div className={`group bg-white rounded-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all border-l-4 ${getAnimalBorderColor(animal.type)} flex overflow-hidden h-28 sm:h-32`}>
 
       {/* Photo à gauche — remplit toute la hauteur */}
       <div
@@ -53,7 +53,7 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
       </div>
 
       {/* Infos à droite */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
         {/* Header nom + badge */}
         <div
           onClick={() => onClick?.(animal)}
