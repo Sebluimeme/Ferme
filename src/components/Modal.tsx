@@ -50,7 +50,7 @@ export default function Modal({ isOpen, onClose, title, children, buttons = [], 
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 z-[1050] flex items-end sm:items-center justify-center overflow-hidden fade-in"
+      className="fixed inset-0 bg-black/50 z-[1050] flex items-center justify-center overflow-hidden fade-in"
       style={{
         paddingLeft: "env(safe-area-inset-left, 0px)",
         paddingRight: "env(safe-area-inset-right, 0px)",
@@ -59,8 +59,8 @@ export default function Modal({ isOpen, onClose, title, children, buttons = [], 
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className={`bg-white shadow-xl w-full ${maxW} flex flex-col slide-in-down
-        rounded-t-2xl sm:rounded-2xl
-        max-h-[92dvh] sm:max-h-[90dvh]`}
+        rounded-2xl mx-4
+        max-h-[92dvh]`}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200 shrink-0">
           <h2 className="text-xl font-bold m-0 text-stone-900">{title}</h2>
