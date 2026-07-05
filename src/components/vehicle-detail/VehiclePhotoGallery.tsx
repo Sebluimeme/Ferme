@@ -121,7 +121,7 @@ export default function VehiclePhotoGallery({ vehicleId }: VehiclePhotoGalleryPr
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {photos.map((photo, index) => (
             <div
               key={photo.id}
@@ -133,12 +133,14 @@ export default function VehiclePhotoGallery({ vehicleId }: VehiclePhotoGalleryPr
                 className="w-full h-full object-cover cursor-pointer"
                 onClick={() => setLightboxIndex(index)}
               />
+              {/* Bouton suppression discret — hover uniquement */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setDeleteTarget(photo);
                 }}
-                className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-sm flex items-center justify-center"
+                className="absolute top-2 right-2 w-7 h-7 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-sm flex items-center justify-center hover:bg-red-500/80"
+                title="Supprimer"
               >
                 &times;
               </button>
@@ -160,12 +162,21 @@ export default function VehiclePhotoGallery({ vehicleId }: VehiclePhotoGalleryPr
         size="large"
       >
         {lightboxIndex !== null && photos[lightboxIndex] && (
-          <div className="relative">
+          <div className="relative group/lightbox">
             <img
               src={photos[lightboxIndex].url}
               alt={photos[lightboxIndex].description || ""}
               className="w-full h-auto rounded-lg max-h-[70vh] object-contain"
             />
+
+            {/* Bouton suppression discret — coin haut droit de l'image */}
+            <button
+              onClick={() => setDeleteTarget(photos[lightboxIndex])}
+              className="absolute top-2 right-2 w-9 h-9 bg-black/40 text-white rounded-full flex items-center justify-center opacity-0 group-hover/lightbox:opacity-100 transition-opacity hover:bg-red-500/80 cursor-pointer text-base"
+              title="Supprimer cette photo"
+            >
+              🗑
+            </button>
 
             {/* Navigation */}
             {photos.length > 1 && (
@@ -190,21 +201,13 @@ export default function VehiclePhotoGallery({ vehicleId }: VehiclePhotoGalleryPr
             )}
 
             {/* Info photo */}
-            <div className="mt-3 flex items-center justify-between">
-              <div className="text-sm text-stone-500">
-                {lightboxIndex + 1} / {photos.length}
-                {photos[lightboxIndex].description && (
-                  <span className="ml-2 text-stone-700">
-                    — {photos[lightboxIndex].description}
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={() => setDeleteTarget(photos[lightboxIndex])}
-                className="px-3 py-1.5 text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg cursor-pointer"
-              >
-                Supprimer cette photo
-              </button>
+            <div className="mt-3 text-sm text-stone-500">
+              {lightboxIndex + 1} / {photos.length}
+              {photos[lightboxIndex].description && (
+                <span className="ml-2 text-stone-700">
+                  — {photos[lightboxIndex].description}
+                </span>
+              )}
             </div>
           </div>
         )}
