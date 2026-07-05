@@ -139,16 +139,16 @@ export default function PhotoGallery({ animalId, photos, profilePhotoUrl }: Phot
         </div>
       )}
 
-      {/* Lightbox fullscreen */}
+      {/* Lightbox fullscreen — z-[1100] pour passer au-dessus BottomNav (z-1025) et Sidebar (z-1030) */}
       {lightboxOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          className="fixed inset-0 z-[1100] bg-black/95 flex items-center justify-center"
           onClick={() => setLightboxIndex(null)}
         >
-          {/* Fermer */}
+          {/* Fermer — top-14 pour laisser la place à la barre navigateur mobile */}
           <button
             onClick={() => setLightboxIndex(null)}
-            className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center text-xl cursor-pointer transition-colors z-10"
+            className="absolute top-14 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center text-xl cursor-pointer transition-colors z-10"
           >
             ✕
           </button>
@@ -157,7 +157,7 @@ export default function PhotoGallery({ animalId, photos, profilePhotoUrl }: Phot
           {currentPhoto && (
             <button
               onClick={(e) => { e.stopPropagation(); setDeleteTarget(currentPhoto); }}
-              className="absolute top-4 left-4 w-10 h-10 bg-white/10 hover:bg-red-500/60 text-white rounded-full flex items-center justify-center text-base cursor-pointer transition-colors z-10"
+              className="absolute top-14 left-4 w-10 h-10 bg-white/10 hover:bg-red-500/60 text-white rounded-full flex items-center justify-center text-base cursor-pointer transition-colors z-10"
               title="Supprimer cette photo"
             >
               🗑
@@ -166,7 +166,7 @@ export default function PhotoGallery({ animalId, photos, profilePhotoUrl }: Phot
 
           {/* Badge profil dans lightbox */}
           {isProfileLightbox && (
-            <div className="absolute top-4 left-4 bg-black/50 text-white text-xs font-medium px-3 py-1.5 rounded-full">
+            <div className="absolute top-14 left-4 bg-black/50 text-white text-xs font-medium px-3 py-1.5 rounded-full">
               ⭐ Photo de profil
             </div>
           )}
