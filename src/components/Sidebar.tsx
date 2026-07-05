@@ -65,7 +65,6 @@ const sections = [
     title: "Finances",
     items: [
       { icon: Wallet,     label: "Coûts",    route: "/couts" },
-      { icon: TrendingUp, label: "Profits",  route: "/profits" },
       { icon: BarChart3,  label: "Rapports", route: "/rapports" },
     ],
   },

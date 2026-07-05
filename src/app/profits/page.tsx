@@ -1,4 +1,4 @@
-import PlaceholderPage from "@/components/PlaceholderPage";
+import { redirect } from "next/navigation";
 export default function ProfitsPage() {
-  return <PlaceholderPage icon="📈" title="Module Profits" />;
+  redirect("/rapports");
 }

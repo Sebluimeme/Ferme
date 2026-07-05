@@ -1,4 +1,4 @@
-import PlaceholderPage from "@/components/PlaceholderPage";
+import RapportsPageContent from "@/components/RapportsPageContent";
 export default function RapportsPage() {
-  return <PlaceholderPage icon="📊" title="Module Rapports" />;
+  return <RapportsPageContent />;
 }
