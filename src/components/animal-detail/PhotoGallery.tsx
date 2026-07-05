@@ -73,18 +73,20 @@ export default function PhotoGallery({ animalId, photos }: PhotoGalleryProps) {
           <p>Aucune photo</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {photos.map((photo) => (
-            <div key={photo.id} className="group relative aspect-square rounded-lg overflow-hidden bg-stone-100">
+            <div key={photo.id} className="group relative aspect-square rounded-lg overflow-hidden bg-stone-100 shadow-sm hover:shadow-md transition-shadow">
               <img
                 src={photo.url}
                 alt={photo.nom}
                 className="w-full h-full object-cover cursor-pointer"
                 onClick={() => setLightboxUrl(photo.url)}
               />
+              {/* Bouton suppression discret — hover uniquement */}
               <button
                 onClick={(e) => { e.stopPropagation(); setDeleteTarget(photo); }}
-                className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-sm flex items-center justify-center"
+                className="absolute top-2 right-2 w-7 h-7 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-sm flex items-center justify-center hover:bg-red-500/80"
+                title="Supprimer"
               >
                 &times;
               </button>

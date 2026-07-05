@@ -23,84 +23,96 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
   const lastModified = formatLastModified(animal.derniereMAJ);
 
   return (
-    <div className={`bg-white rounded-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all border-l-4 ${getAnimalBorderColor(animal.type)} relative group`}>
+    <div className={`group bg-white rounded-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all border-l-4 ${getAnimalBorderColor(animal.type)}`}>
+      {/* Photo banner ou placeholder */}
       <div
+        className="relative cursor-pointer"
         onClick={() => onClick?.(animal)}
-        className="cursor-pointer"
       >
-        {/* Header avec infos principales */}
-        <div className="flex items-center gap-2 px-3 pt-2.5 pb-1.5">
-          {animal.photoUrl ? (
-            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden border border-stone-200 shrink-0">
-              <Image
-                src={animal.photoUrl}
-                alt={animal.nom || animal.numeroBoucle || "Photo"}
-                fill
-                className="object-cover"
-                sizes="40px"
-              />
-            </div>
-          ) : (
-            <span className="text-xl sm:text-2xl">{getAnimalIcon(animal.type)}</span>
-          )}
-          <div className="flex-1 min-w-0">
-            <div className="font-semibold text-sm sm:text-base truncate">
-              {animal.numeroBoucle || animal.nom || "Animal sans identifiant"}
-            </div>
-            {animal.nom && (
-              <div className="text-[11px] sm:text-xs text-stone-600 truncate">{animal.nom}</div>
-            )}
+        {animal.photoUrl ? (
+          <Image
+            src={animal.photoUrl}
+            alt={animal.nom || animal.numeroBoucle || "Photo"}
+            width={400}
+            height={144}
+            className="w-full h-36 object-cover rounded-t-lg"
+          />
+        ) : (
+          <div className={`w-full h-36 flex items-center justify-center rounded-t-lg ${getAnimalBgColor(animal.type)}`}>
+            <span className="text-5xl opacity-60">{getAnimalIcon(animal.type)}</span>
           </div>
-          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap ${getAnimalBgColor(animal.type)}`}>
+        )}
+
+        {/* Badge type en overlay */}
+        <div className="absolute top-2 left-2">
+          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full shadow-sm ${getAnimalBgColor(animal.type)}`}>
             {getAnimalLabel(animal.type)}
           </span>
         </div>
 
-        {/* Infos détaillées - 2 colonnes sur mobile, 4 sur desktop */}
-        <div className="px-3 pb-1.5">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-0.5 text-[11px] sm:text-xs">
-            <div>
-              <div className="text-stone-400">Sexe</div>
-              <div className="font-medium">{animal.sexe === "M" ? "♂ Mâle" : "♀ Fem."}</div>
-            </div>
-            <div>
-              <div className="text-stone-400">Race</div>
-              <div className="font-medium truncate">{animal.race || "-"}</div>
-            </div>
-            <div>
-              <div className="text-stone-400">Âge</div>
-              <div className="font-medium">{formatAgeFromBirthDate(animal.dateNaissance)}</div>
-            </div>
-            <div>
-              <div className="text-stone-400">Poids</div>
-              <div className="font-medium">{animal.poids ? formatNumber(animal.poids, 2) + " kg" : "-"}</div>
-            </div>
+        {/* Bouton suppression discret — apparaît au hover */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(animal.id); }}
+          className="absolute top-2 right-2 w-7 h-7 bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-sm flex items-center justify-center hover:bg-red-500/80"
+          title="Supprimer"
+        >
+          🗑
+        </button>
+      </div>
+
+      {/* Infos principales */}
+      <div
+        onClick={() => onClick?.(animal)}
+        className="cursor-pointer px-3 py-2 border-b border-stone-100"
+      >
+        <div className="font-semibold text-sm sm:text-base truncate">
+          {animal.numeroBoucle || animal.nom || "Animal sans identifiant"}
+        </div>
+        {animal.nom && (
+          <div className="text-[11px] sm:text-xs text-stone-600 truncate">{animal.nom}</div>
+        )}
+      </div>
+
+      {/* Infos détaillées */}
+      <div
+        onClick={() => onClick?.(animal)}
+        className="cursor-pointer px-3 py-2"
+      >
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-0.5 text-[11px] sm:text-xs">
+          <div>
+            <div className="text-stone-400">Sexe</div>
+            <div className="font-medium">{animal.sexe === "M" ? "♂ Mâle" : "♀ Fem."}</div>
+          </div>
+          <div>
+            <div className="text-stone-400">Race</div>
+            <div className="font-medium truncate">{animal.race || "-"}</div>
+          </div>
+          <div>
+            <div className="text-stone-400">Âge</div>
+            <div className="font-medium">{formatAgeFromBirthDate(animal.dateNaissance)}</div>
+          </div>
+          <div>
+            <div className="text-stone-400">Poids</div>
+            <div className="font-medium">{animal.poids ? formatNumber(animal.poids, 2) + " kg" : "-"}</div>
           </div>
         </div>
 
         {/* Dernière modification */}
         {lastModified && (
-          <div className="px-3 pb-1 text-[9px] sm:text-[11px] text-stone-400">
+          <div className="mt-1 text-[9px] sm:text-[11px] text-stone-400">
             Modifié le {lastModified}
           </div>
         )}
       </div>
 
-      {/* Boutons d'action - positionnés clairement en bas */}
-      <div className="px-3 py-1.5 border-t border-stone-100 flex gap-1.5 justify-end">
+      {/* Footer — uniquement Modifier */}
+      <div className="px-3 py-1.5 border-t border-stone-200 bg-stone-50 rounded-b-lg flex justify-end">
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(animal.id); }}
-          className="px-2 py-0.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-xs font-medium bg-stone-100 text-stone-600 border border-stone-200 rounded-md hover:bg-stone-200 transition-all cursor-pointer"
+          className="px-2.5 py-1 text-xs font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-md hover:bg-stone-200 transition-all cursor-pointer"
           title="Modifier"
         >
-          ✏️ <span className="hidden sm:inline">Modifier</span>
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(animal.id); }}
-          className="px-2 py-0.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-xs font-medium bg-red-50 text-red-500 border border-red-200 rounded-md hover:bg-red-100 transition-all cursor-pointer"
-          title="Supprimer"
-        >
-          🗑️ <span className="hidden sm:inline">Supprimer</span>
+          ✏️ Modifier
         </button>
       </div>
     </div>
