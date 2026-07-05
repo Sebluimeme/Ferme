@@ -22,11 +22,11 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
   const lastModified = formatLastModified(animal.derniereMAJ);
 
   return (
-    <div className={`group bg-white rounded-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all border-l-4 ${getAnimalBorderColor(animal.type)} flex overflow-hidden h-28 sm:h-32`}>
+    <div className={`group bg-white rounded-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all border-l-4 ${getAnimalBorderColor(animal.type)} flex overflow-hidden`}>
 
       {/* Photo à gauche — remplit toute la hauteur */}
       <div
-        className="relative w-28 sm:w-32 shrink-0 cursor-pointer"
+        className="relative w-36 sm:w-40 shrink-0 cursor-pointer"
         onClick={() => onClick?.(animal)}
       >
         {animal.photoUrl ? (
