@@ -153,10 +153,14 @@ export default function PhotoGallery({ animalId, photos, profilePhotoUrl }: Phot
             ✕
           </button>
 
-          {/* Supprimer — uniquement sur les photos de galerie, pas la photo de profil */}
+          {/* Supprimer — ferme le lightbox avant d'ouvrir la modale de confirmation */}
           {currentPhoto && (
             <button
-              onClick={(e) => { e.stopPropagation(); setDeleteTarget(currentPhoto); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteTarget(currentPhoto);
+                setLightboxIndex(null);
+              }}
               className="absolute top-14 left-4 w-10 h-10 bg-white/10 hover:bg-red-500/60 text-white rounded-full flex items-center justify-center text-base cursor-pointer transition-colors z-10"
               title="Supprimer cette photo"
             >
