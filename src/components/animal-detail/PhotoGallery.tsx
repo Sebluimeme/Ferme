@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/components/Toast";
 import Modal from "@/components/Modal";
 import { addPhoto, deletePhoto, type AnimalPhoto } from "@/services/animal-detail-service";
@@ -14,8 +14,20 @@ export default function PhotoGallery({ animalId, photos }: PhotoGalleryProps) {
   const { showToast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AnimalPhoto | null>(null);
+
+  // Navigation clavier dans le lightbox
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxIndex(null);
+      if (e.key === "ArrowLeft" && lightboxIndex > 0) setLightboxIndex(lightboxIndex - 1);
+      if (e.key === "ArrowRight" && lightboxIndex < photos.length - 1) setLightboxIndex(lightboxIndex + 1);
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [lightboxIndex, photos.length]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -47,7 +59,10 @@ export default function PhotoGallery({ animalId, photos }: PhotoGalleryProps) {
       showToast({ type: "error", title: "Erreur", message: result.error || "Erreur lors de la suppression" });
     }
     setDeleteTarget(null);
+    setLightboxIndex(null);
   };
+
+  const currentPhoto = lightboxIndex !== null ? photos[lightboxIndex] : null;
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
@@ -74,13 +89,13 @@ export default function PhotoGallery({ animalId, photos }: PhotoGalleryProps) {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {photos.map((photo) => (
+          {photos.map((photo, index) => (
             <div key={photo.id} className="group relative aspect-square rounded-lg overflow-hidden bg-stone-100 shadow-sm hover:shadow-md transition-shadow">
               <img
                 src={photo.url}
                 alt={photo.nom}
                 className="w-full h-full object-cover cursor-pointer"
-                onClick={() => setLightboxUrl(photo.url)}
+                onClick={() => setLightboxIndex(index)}
               />
               {/* Bouton suppression discret — hover uniquement */}
               <button
@@ -95,12 +110,63 @@ export default function PhotoGallery({ animalId, photos }: PhotoGalleryProps) {
         </div>
       )}
 
-      {/* Lightbox */}
-      <Modal isOpen={!!lightboxUrl} onClose={() => setLightboxUrl(null)} title="" size="large">
-        {lightboxUrl && (
-          <img src={lightboxUrl} alt="" className="w-full h-auto rounded-lg" />
-        )}
-      </Modal>
+      {/* Lightbox fullscreen */}
+      {currentPhoto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          onClick={() => setLightboxIndex(null)}
+        >
+          {/* Fermer */}
+          <button
+            onClick={() => setLightboxIndex(null)}
+            className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center text-xl cursor-pointer transition-colors z-10"
+          >
+            ✕
+          </button>
+
+          {/* Supprimer */}
+          <button
+            onClick={(e) => { e.stopPropagation(); setDeleteTarget(currentPhoto); }}
+            className="absolute top-4 left-4 w-10 h-10 bg-white/10 hover:bg-red-500/60 text-white rounded-full flex items-center justify-center text-base cursor-pointer transition-colors z-10"
+            title="Supprimer cette photo"
+          >
+            🗑
+          </button>
+
+          {/* Compteur */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-sm">
+            {lightboxIndex! + 1} / {photos.length}
+          </div>
+
+          {/* Navigation gauche */}
+          {lightboxIndex! > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex! - 1); }}
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center text-2xl cursor-pointer transition-colors"
+            >
+              ‹
+            </button>
+          )}
+
+          {/* Image */}
+          <img
+            src={currentPhoto.url}
+            alt={currentPhoto.nom}
+            className="max-w-full max-h-full object-contain p-16 cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {/* Navigation droite */}
+          {lightboxIndex! < photos.length - 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex! + 1); }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center text-2xl cursor-pointer transition-colors"
+            >
+              ›
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Confirm delete */}
       <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Supprimer la photo" size="small">
