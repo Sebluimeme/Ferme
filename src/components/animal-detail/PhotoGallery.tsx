@@ -8,9 +8,10 @@ import { addPhoto, deletePhoto, type AnimalPhoto } from "@/services/animal-detai
 interface PhotoGalleryProps {
   animalId: string;
   photos: AnimalPhoto[];
+  profilePhotoUrl?: string;
 }
 
-export default function PhotoGallery({ animalId, photos }: PhotoGalleryProps) {
+export default function PhotoGallery({ animalId, photos, profilePhotoUrl }: PhotoGalleryProps) {
   const { showToast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -22,12 +23,18 @@ export default function PhotoGallery({ animalId, photos }: PhotoGalleryProps) {
     if (lightboxIndex === null) return;
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setLightboxIndex(null);
-      if (e.key === "ArrowLeft" && lightboxIndex > 0) setLightboxIndex(lightboxIndex - 1);
-      if (e.key === "ArrowRight" && lightboxIndex < photos.length - 1) setLightboxIndex(lightboxIndex + 1);
+      if (e.key === "ArrowLeft") {
+        if (lightboxIndex > 0) setLightboxIndex(lightboxIndex - 1);
+        else if (lightboxIndex === 0 && profilePhotoUrl) setLightboxIndex(-1);
+      }
+      if (e.key === "ArrowRight") {
+        if (lightboxIndex === -1 && photos.length > 0) setLightboxIndex(0);
+        else if (lightboxIndex >= 0 && lightboxIndex < photos.length - 1) setLightboxIndex(lightboxIndex + 1);
+      }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [lightboxIndex, photos.length]);
+  }, [lightboxIndex, photos.length, profilePhotoUrl]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -62,7 +69,11 @@ export default function PhotoGallery({ animalId, photos }: PhotoGalleryProps) {
     setLightboxIndex(null);
   };
 
-  const currentPhoto = lightboxIndex !== null ? photos[lightboxIndex] : null;
+  // -1 = photo de profil, 0+ = galerie
+  const isProfileLightbox = lightboxIndex === -1;
+  const currentPhoto = lightboxIndex !== null && lightboxIndex >= 0 ? photos[lightboxIndex] : null;
+  const lightboxUrl = isProfileLightbox ? profilePhotoUrl : currentPhoto?.url;
+  const lightboxOpen = lightboxIndex !== null && !!lightboxUrl;
 
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
@@ -82,13 +93,31 @@ export default function PhotoGallery({ animalId, photos }: PhotoGalleryProps) {
         </label>
       </div>
 
-      {photos.length === 0 ? (
+      {photos.length === 0 && !profilePhotoUrl ? (
         <div className="text-center py-12 text-stone-400">
           <div className="text-4xl mb-2">📷</div>
           <p>Aucune photo</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {/* Photo de profil en premier */}
+          {profilePhotoUrl && (
+            <div
+              className="group relative aspect-square rounded-lg overflow-hidden bg-stone-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => setLightboxIndex(-1)}
+            >
+              <img
+                src={profilePhotoUrl}
+                alt="Photo de profil"
+                className="w-full h-full object-cover"
+              />
+              {/* Badge profil */}
+              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] font-medium px-2 py-1 text-center">
+                ⭐ Photo de profil
+              </div>
+            </div>
+          )}
+
           {photos.map((photo, index) => (
             <div key={photo.id} className="group relative aspect-square rounded-lg overflow-hidden bg-stone-100 shadow-sm hover:shadow-md transition-shadow">
               <img
@@ -111,7 +140,7 @@ export default function PhotoGallery({ animalId, photos }: PhotoGalleryProps) {
       )}
 
       {/* Lightbox fullscreen */}
-      {currentPhoto && (
+      {lightboxOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
           onClick={() => setLightboxIndex(null)}
@@ -124,24 +153,37 @@ export default function PhotoGallery({ animalId, photos }: PhotoGalleryProps) {
             ✕
           </button>
 
-          {/* Supprimer */}
-          <button
-            onClick={(e) => { e.stopPropagation(); setDeleteTarget(currentPhoto); }}
-            className="absolute top-4 left-4 w-10 h-10 bg-white/10 hover:bg-red-500/60 text-white rounded-full flex items-center justify-center text-base cursor-pointer transition-colors z-10"
-            title="Supprimer cette photo"
-          >
-            🗑
-          </button>
+          {/* Supprimer — uniquement sur les photos de galerie, pas la photo de profil */}
+          {currentPhoto && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setDeleteTarget(currentPhoto); }}
+              className="absolute top-4 left-4 w-10 h-10 bg-white/10 hover:bg-red-500/60 text-white rounded-full flex items-center justify-center text-base cursor-pointer transition-colors z-10"
+              title="Supprimer cette photo"
+            >
+              🗑
+            </button>
+          )}
+
+          {/* Badge profil dans lightbox */}
+          {isProfileLightbox && (
+            <div className="absolute top-4 left-4 bg-black/50 text-white text-xs font-medium px-3 py-1.5 rounded-full">
+              ⭐ Photo de profil
+            </div>
+          )}
 
           {/* Compteur */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-sm">
-            {lightboxIndex! + 1} / {photos.length}
+            {profilePhotoUrl ? (lightboxIndex! + 2) : (lightboxIndex! + 1)} / {photos.length + (profilePhotoUrl ? 1 : 0)}
           </div>
 
           {/* Navigation gauche */}
-          {lightboxIndex! > 0 && (
+          {(lightboxIndex! > 0 || (lightboxIndex === 0 && profilePhotoUrl)) && (
             <button
-              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex! - 1); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (lightboxIndex === 0 && profilePhotoUrl) setLightboxIndex(-1);
+                else setLightboxIndex(lightboxIndex! - 1);
+              }}
               className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center text-2xl cursor-pointer transition-colors"
             >
               ‹
@@ -150,16 +192,20 @@ export default function PhotoGallery({ animalId, photos }: PhotoGalleryProps) {
 
           {/* Image */}
           <img
-            src={currentPhoto.url}
-            alt={currentPhoto.nom}
+            src={lightboxUrl}
+            alt={currentPhoto?.nom || "Photo de profil"}
             className="max-w-full max-h-full object-contain p-16 cursor-default"
             onClick={(e) => e.stopPropagation()}
           />
 
           {/* Navigation droite */}
-          {lightboxIndex! < photos.length - 1 && (
+          {((isProfileLightbox && photos.length > 0) || (lightboxIndex !== null && lightboxIndex >= 0 && lightboxIndex < photos.length - 1)) && (
             <button
-              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex! + 1); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isProfileLightbox) setLightboxIndex(0);
+                else setLightboxIndex(lightboxIndex! + 1);
+              }}
               className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center text-2xl cursor-pointer transition-colors"
             >
               ›

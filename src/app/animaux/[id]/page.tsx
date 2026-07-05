@@ -161,7 +161,7 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
           <ParentCards animal={animal} animaux={state.animaux} />
         </div>
       )}
-      {activeTab === "photos" && <PhotoGallery animalId={id} photos={photos} />}
+      {activeTab === "photos" && <PhotoGallery animalId={id} photos={photos} profilePhotoUrl={animal.photoUrl} />}
       {activeTab === "poids" && <WeightChart animalId={id} animalType={animal.type} weights={weights} />}
       {activeTab === "soins" && <CareRecords animalId={id} soins={soins} />}
       {activeTab === "historique" && <HistoryTimeline animalId={id} history={history} />}
