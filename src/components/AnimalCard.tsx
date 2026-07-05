@@ -24,9 +24,9 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
   return (
     <div className={`group bg-white rounded-lg shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all border-l-4 ${getAnimalBorderColor(animal.type)} flex overflow-hidden`}>
 
-      {/* Photo à gauche */}
+      {/* Photo à gauche — format carré */}
       <div
-        className="relative w-28 sm:w-32 shrink-0 cursor-pointer"
+        className="relative w-28 sm:w-32 shrink-0 self-start cursor-pointer"
         onClick={() => onClick?.(animal)}
       >
         {animal.photoUrl ? (
@@ -34,10 +34,10 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
           <img
             src={animal.photoUrl}
             alt={animal.nom || animal.numeroBoucle || "Photo"}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="w-full aspect-square object-cover"
           />
         ) : (
-          <div className={`absolute inset-0 flex items-center justify-center ${getAnimalBgColor(animal.type)}`}>
+          <div className={`w-full aspect-square flex items-center justify-center ${getAnimalBgColor(animal.type)}`}>
             <span className="text-4xl opacity-60">{getAnimalIcon(animal.type)}</span>
           </div>
         )}
