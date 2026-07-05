@@ -21,7 +21,7 @@ function fmtMois(iso: string): string {
   return new Date(iso + "-01").toLocaleDateString("fr-FR", { month: "short", year: "2-digit" });
 }
 
-const COULEURS = ["#78716c", "#a8a29e", "#57534e", "#d6d3d1", "#44403c", "#e7e5e4", "#292524"];
+const COULEURS = ["#2563eb", "#16a34a", "#dc2626", "#d97706", "#7c3aed", "#0891b2", "#db2777", "#65a30d", "#ea580c", "#0f766e"];
 const COULEUR_DEPENSES = "#dc2626";
 const COULEUR_REVENUS  = "#16a34a";
 
