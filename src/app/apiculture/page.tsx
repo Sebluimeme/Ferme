@@ -413,7 +413,7 @@ export default function ApiculturePage() {
   [coutsApiculture]);
 
   const revenusTransacApiculture = useMemo(() =>
-    coutsApiculture.filter((t) => t.operation === "Revenus").reduce((s, t) => s + t.montant, 0),
+    coutsApiculture.filter((t) => t.operation === "Revenus" && !(t.categorie === "Ventes" && t.sousCategorie === "Miel")).reduce((s, t) => s + t.montant, 0),
   [coutsApiculture]);
 
   // Revenus totaux apiculture = ventes miel + revenus transactions taguées
