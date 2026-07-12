@@ -87,6 +87,7 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
           <InfoItem label="Modèle" value={vehicle.modele} />
           <InfoItem label="Mise en circulation" value={formatDate(vehicle.dateMiseEnCirculation)} />
           <InfoItem label="Plaque d'immatriculation" value={vehicle.plaqueImmatriculation} />
+          <InfoItem label="Numéro de série (VIN)" value={vehicle.numeroSerie} />
         </InfoCard>
 
         {/* Caractéristiques techniques */}

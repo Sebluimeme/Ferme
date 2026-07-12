@@ -22,6 +22,7 @@ export interface Vehicle {
 
   // Immatriculation
   plaqueImmatriculation?: string;      // Plaque d'immatriculation
+  numeroSerie?: string;                // Numéro de série (VIN / châssis)
 
   // État et statut
   statut: VehicleStatus;               // État actuel
@@ -244,6 +245,7 @@ export interface VehicleFormData {
   dateMiseEnCirculation?: string;
 
   plaqueImmatriculation?: string;
+  numeroSerie?: string;
 
   statut: VehicleStatus;
   heuresUtilisation?: string;

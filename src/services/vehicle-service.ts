@@ -80,6 +80,7 @@ function formDataToVehicle(formData: VehicleFormData): Partial<Omit<Vehicle, "id
     dateMiseEnCirculation: formData.dateMiseEnCirculation || undefined,
 
     plaqueImmatriculation: formData.plaqueImmatriculation?.trim().toUpperCase() || undefined,
+    numeroSerie: formData.numeroSerie?.trim() || undefined,
 
     statut: formData.statut,
     heuresUtilisation: formData.heuresUtilisation ? Number(formData.heuresUtilisation) : undefined,

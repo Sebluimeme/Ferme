@@ -144,7 +144,7 @@ export default function VehicleForm({ vehicle, formRef }: VehicleFormProps) {
         </div>
       </div>
 
-      {/* Plaque et Date mise en circulation */}
+      {/* Plaque, Numéro de série et Date mise en circulation */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block mb-1 text-sm font-medium text-stone-700">Plaque d&apos;immatriculation</label>
@@ -156,6 +156,18 @@ export default function VehicleForm({ vehicle, formRef }: VehicleFormProps) {
             className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
           />
         </div>
+        <div>
+          <label className="block mb-1 text-sm font-medium text-stone-700">Numéro de série (VIN / châssis)</label>
+          <input
+            type="text"
+            name="numeroSerie"
+            defaultValue={vehicle?.numeroSerie || ""}
+            placeholder="VF1XXXXXXXXXXXXXX"
+            className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block mb-1 text-sm font-medium text-stone-700">Date de mise en circulation</label>
           <input
