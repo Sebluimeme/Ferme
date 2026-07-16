@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Footprints,
   Fuel,
+  CloudSun,
 } from "lucide-react";
 
 const sections = [
@@ -46,6 +47,7 @@ const sections = [
       { icon: Flower,      label: "Apiculture",  route: "/apiculture" },
       { icon: Map,   label: "Parcellaire", route: "/fourrage/partiels" },
       { icon: Droplets, label: "Source", route: "/source" },
+      { icon: CloudSun, label: "Météo", route: "/meteo" },
     ],
   },
   {

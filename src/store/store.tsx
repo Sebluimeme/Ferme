@@ -13,6 +13,7 @@ import type { Transaction } from "@/types/comptabilite";
 import type { ReleverSource } from "@/types/source";
 import type { SejourPaturage } from "@/types/paturage";
 import type { PleinCarburant } from "@/types/carburant";
+import type { WeatherReading } from "@/types/weather";
 import { calculateMaintenanceAlerts } from "@/services/vehicle-detail-service";
 
 export interface Animal {
@@ -94,6 +95,7 @@ interface AppState {
   relevesSource: ReleverSource[];
   sejoursPaturage: SejourPaturage[];
   carburant: PleinCarburant[];
+  weatherReadings: WeatherReading[];
   stats: Stats;
   loading: boolean;
   sidebarOpen: boolean;
@@ -120,6 +122,7 @@ type Action =
   | { type: "SET_RELEVES_SOURCE"; payload: ReleverSource[] }
   | { type: "SET_SEJOURS_PATURAGE"; payload: SejourPaturage[] }
   | { type: "SET_CARBURANT"; payload: PleinCarburant[] }
+  | { type: "SET_WEATHER_READINGS"; payload: WeatherReading[] }
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "TOGGLE_SIDEBAR" }
   | { type: "CLOSE_SIDEBAR" }
@@ -165,6 +168,7 @@ const initialState: AppState = {
   relevesSource: [],
   sejoursPaturage: [],
   carburant: [],
+  weatherReadings: [],
   stats: { totalAnimaux: 0, ovins: 0, bovins: 0, caprins: 0, porcins: 0, profitGlobal: 0 },
   loading: true,
   sidebarOpen: false,
@@ -224,6 +228,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, sejoursPaturage: action.payload };
     case "SET_CARBURANT":
       return { ...state, carburant: action.payload };
+    case "SET_WEATHER_READINGS":
+      return { ...state, weatherReadings: action.payload };
     case "UPDATE_MAINTENANCE_ALERTS": {
       const alerts = calculateMaintenanceAlerts(state.vehicles, state.maintenanceEntries, state.meterReadings);
       return { ...state, maintenanceAlerts: alerts };
@@ -351,6 +357,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     listeners.push(
       firebaseService.listen<PleinCarburant>("carburant-pleins", (data) =>
         dispatch({ type: "SET_CARBURANT", payload: data })
+      )
+    );
+    listeners.push(
+      firebaseService.listen<WeatherReading>("weather-readings", (data) =>
+        dispatch({ type: "SET_WEATHER_READINGS", payload: data })
       )
     );
 
