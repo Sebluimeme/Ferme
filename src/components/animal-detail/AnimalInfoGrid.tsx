@@ -36,6 +36,18 @@ export default function AnimalInfoGrid({ animal }: AnimalInfoGridProps) {
           <div className="text-stone-500 mb-0.5">Poids</div>
           <div className="font-medium">{animal.poids ? formatNumber(animal.poids, 2) + " kg" : "-"}</div>
         </div>
+        {animal.statut === "vendu" && (
+          <>
+            <div>
+              <div className="text-stone-500 mb-0.5">Poids de sortie</div>
+              <div className="font-medium">{animal.poidsSortieKg != null ? formatNumber(animal.poidsSortieKg, 2) + " kg" : "-"}</div>
+            </div>
+            <div>
+              <div className="text-stone-500 mb-0.5">Poids carcasse</div>
+              <div className="font-medium">{animal.poidsCarcasseKg != null ? formatNumber(animal.poidsCarcasseKg, 2) + " kg" : "-"}</div>
+            </div>
+          </>
+        )}
         {animal.commentaire && (
           <div className="col-span-full">
             <div className="text-stone-500 mb-0.5">Commentaire</div>

@@ -12,7 +12,7 @@ import {
   isApproaching,
   daysUntil,
 } from "@/lib/vehicle-utils";
-import { addMeterReading, listenMeterReadings } from "@/services/vehicle-detail-service";
+import { addMeterReading, deleteMeterReading, listenMeterReadings } from "@/services/vehicle-detail-service";
 import { useToast } from "../Toast";
 import Modal from "../Modal";
 
@@ -30,6 +30,7 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
   const [meterLoading, setMeterLoading] = useState(false);
   const [readings, setReadings] = useState<MeterReading[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<MeterReading | null>(null);
 
   useEffect(() => {
     const unsub = listenMeterReadings(vehicle.id, (data) => {
@@ -69,6 +70,20 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
       setShowMeterModal(false);
     } else {
       showToast({ type: "error", title: "Erreur", message: result.error || "Impossible d'enregistrer" });
+    }
+    setMeterLoading(false);
+  };
+
+  const handleDeleteReading = async () => {
+    if (!deleteTarget) return;
+
+    setMeterLoading(true);
+    const result = await deleteMeterReading(deleteTarget.id);
+    if (result.success) {
+      showToast({ type: "success", title: "Relevé supprimé", message: "Le compteur a été recalculé avec le dernier relevé restant" });
+      setDeleteTarget(null);
+    } else {
+      showToast({ type: "error", title: "Erreur", message: result.error || "Impossible de supprimer le relevé" });
     }
     setMeterLoading(false);
   };
@@ -126,8 +141,42 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
               onClick={() => setShowHistory(!showHistory)}
               className="text-xs text-brand-600 hover:underline mt-1"
             >
-              {showHistory ? "Masquer l'historique" : `Voir l'historique (${readings.length} relevés)`}
+              {showHistory ? "Masquer l'historique" : `Voir plus (${readings.length} relevés)`}
             </button>
+          )}
+
+          {showHistory && readings.length > 0 && (
+            <div className="mt-3 border-t border-stone-100 pt-3">
+              <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Historique des relevés</h4>
+              <div className="space-y-2">
+                {kmReadings.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold text-stone-600 mb-1">Kilométrage</div>
+                    {kmReadings.map((r) => (
+                      <MeterReadingRow
+                        key={r.id}
+                        reading={r}
+                        value={formatKilometrage(r.valeur)}
+                        onDelete={() => setDeleteTarget(r)}
+                      />
+                    ))}
+                  </div>
+                )}
+                {heuresReadings.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold text-stone-600 mt-2 mb-1">Heures d&apos;utilisation</div>
+                    {heuresReadings.map((r) => (
+                      <MeterReadingRow
+                        key={r.id}
+                        reading={r}
+                        value={formatHeures(r.valeur)}
+                        onDelete={() => setDeleteTarget(r)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </InfoCard>
 
@@ -156,45 +205,6 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
           </div>
         )}
       </div>
-
-      {/* Historique des relevés */}
-      {showHistory && readings.length > 0 && (
-        <div className="mt-4 bg-white border border-stone-200 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-stone-500 uppercase tracking-wide mb-3">Historique des relevés</h3>
-          <div className="space-y-1">
-            {/* En-tête km */}
-            {kmReadings.length > 0 && (
-              <>
-                <div className="text-xs font-semibold text-stone-600 mt-2 mb-1">Kilométrage</div>
-                {kmReadings.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between text-sm py-1 border-b border-stone-100 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-stone-500">{formatDate(r.date)}</span>
-                      <span className="font-medium">{formatKilometrage(r.valeur)}</span>
-                    </div>
-                    {r.commentaire && <span className="text-xs text-stone-400">{r.commentaire}</span>}
-                  </div>
-                ))}
-              </>
-            )}
-            {/* En-tête heures */}
-            {heuresReadings.length > 0 && (
-              <>
-                <div className="text-xs font-semibold text-stone-600 mt-3 mb-1">Heures d&apos;utilisation</div>
-                {heuresReadings.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between text-sm py-1 border-b border-stone-100 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-stone-500">{formatDate(r.date)}</span>
-                      <span className="font-medium">{formatHeures(r.valeur)}</span>
-                    </div>
-                    {r.commentaire && <span className="text-xs text-stone-400">{r.commentaire}</span>}
-                  </div>
-                ))}
-              </>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Modal de relevé */}
       <Modal
@@ -259,6 +269,54 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
           </button>
         </div>
       </Modal>
+
+      <Modal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Supprimer le relevé"
+        size="small"
+      >
+        <p className="text-sm text-stone-600">
+          Supprimer le relevé du {deleteTarget ? formatDate(deleteTarget.date) : ""} ?
+          Le compteur du véhicule sera recalculé avec le dernier relevé restant.
+        </p>
+        <div className="flex gap-2 justify-end mt-6">
+          <button
+            onClick={() => setDeleteTarget(null)}
+            className="px-4 py-2 bg-stone-100 text-stone-700 rounded-lg hover:bg-stone-200 transition-colors"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={handleDeleteReading}
+            disabled={meterLoading}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+          >
+            {meterLoading ? "Suppression..." : "Supprimer"}
+          </button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function MeterReadingRow({ reading, value, onDelete }: { reading: MeterReading; value: string; onDelete: () => void }) {
+  return (
+    <div className="flex items-start justify-between gap-2 rounded-lg border border-stone-100 bg-stone-50 px-2.5 py-2 text-sm">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-stone-500">{formatDate(reading.date)}</span>
+          <span className="font-medium text-stone-900">{value}</span>
+        </div>
+        {reading.commentaire && <div className="mt-0.5 truncate text-xs text-stone-400">{reading.commentaire}</div>}
+      </div>
+      <button
+        onClick={onDelete}
+        className="shrink-0 rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-100"
+        title="Supprimer ce relevé"
+      >
+        Supprimer
+      </button>
     </div>
   );
 }

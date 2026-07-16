@@ -5,6 +5,7 @@ import LoginPage from "./LoginPage";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 import BottomNav from "./BottomNav";
+import PullToRefresh from "./PullToRefresh";
 import { Wheat } from "lucide-react";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
@@ -38,6 +39,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex bg-stone-100 w-screen overflow-hidden" style={{ minHeight: "100dvh" }}>
+      <PullToRefresh />
+
       {/* Sidebar desktop fixe */}
       <Sidebar />
 

@@ -3,6 +3,8 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useAppStore, type Animal } from "@/store/store";
 
+type AnimalStatus = Animal["statut"];
+
 interface AnimalFormProps {
   animal?: Animal | null;
   formRef: React.RefObject<HTMLFormElement | null>;
@@ -11,6 +13,7 @@ interface AnimalFormProps {
 export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
   const { state } = useAppStore();
   const [selectedType, setSelectedType] = useState(animal?.type || "");
+  const [selectedStatus, setSelectedStatus] = useState<AnimalStatus>(animal?.statut || "actif");
   const [raceValue, setRaceValue] = useState(animal?.race || "");
   const [raceDropdownOpen, setRaceDropdownOpen] = useState(false);
   const [raceSearchQuery, setRaceSearchQuery] = useState("");
@@ -90,8 +93,7 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
             name="numeroBoucle"
             defaultValue={animal?.numeroBoucle || ""}
             placeholder="FR123456789"
-            readOnly={!!animal}
-            className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 read-only:bg-stone-100 read-only:cursor-not-allowed"
+            className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
           />
         </div>
       </div>
@@ -252,7 +254,8 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
           <label className="block mb-1 text-sm font-medium text-stone-700">Statut</label>
           <select
             name="statut"
-            defaultValue={animal?.statut || "actif"}
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value as AnimalStatus)}
             className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
           >
             <option value="actif">Actif</option>
@@ -262,6 +265,43 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
           </select>
         </div>
       </div>
+
+      {selectedStatus === "vendu" && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold text-amber-900">Informations de vente / sortie</h3>
+            <p className="text-xs text-amber-800/80">Le poids de sortie est utile pour les statistiques. Le poids carcasse reste optionnel.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block mb-1 text-sm font-medium text-stone-700">Poids de sortie (kg)</label>
+              <input
+                type="number"
+                name="poidsSortieKg"
+                defaultValue={animal?.poidsSortieKg ?? ""}
+                min="0"
+                step="0.1"
+                inputMode="decimal"
+                placeholder="Ex : 145"
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 bg-white"
+              />
+            </div>
+            <div>
+              <label className="block mb-1 text-sm font-medium text-stone-700">Poids carcasse (kg) <span className="text-xs text-stone-400 font-normal">optionnel</span></label>
+              <input
+                type="number"
+                name="poidsCarcasseKg"
+                defaultValue={animal?.poidsCarcasseKg ?? ""}
+                min="0"
+                step="0.1"
+                inputMode="decimal"
+                placeholder="Ex : 78"
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="block mb-1 text-sm font-medium text-stone-700">Commentaire</label>

@@ -50,6 +50,9 @@ export default function Modal({ isOpen, onClose, title, children, buttons = [], 
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      data-modal-root="true"
       className="fixed inset-0 bg-black/50 z-[1050] flex items-center justify-center overflow-hidden fade-in"
       style={{
         paddingLeft: "env(safe-area-inset-left, 0px)",

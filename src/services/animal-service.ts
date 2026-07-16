@@ -16,6 +16,41 @@ export interface AnimalFormData {
   commentaire?: string;
   numeroBouclePere?: string;
   numeroBoucleMere?: string;
+  poidsSortieKg?: string | number;
+  poidsCarcasseKg?: string | number;
+}
+
+type NormalizedAnimalData = Omit<AnimalFormData, "poidsSortieKg" | "poidsCarcasseKg"> & {
+  poidsSortieKg?: number | null;
+  poidsCarcasseKg?: number | null;
+};
+
+function parseOptionalWeight(value: string | number | undefined): number | null | undefined {
+  if (value === undefined || value === null || value === "") return null;
+  const normalized = typeof value === "string" ? value.replace(",", ".").trim() : value;
+  if (normalized === "") return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function normalizeAnimalData(data: AnimalFormData): NormalizedAnimalData {
+  const statut = data.statut || "actif";
+  const normalized: NormalizedAnimalData = {
+    type: data.type,
+    sexe: data.sexe,
+    numeroBoucle: data.numeroBoucle?.trim() || undefined,
+    nom: data.nom?.trim() || undefined,
+    race: data.race?.trim() || undefined,
+    dateNaissance: data.dateNaissance || undefined,
+    statut,
+    commentaire: data.commentaire?.trim() || undefined,
+    numeroBouclePere: data.numeroBouclePere || undefined,
+    numeroBoucleMere: data.numeroBoucleMere || undefined,
+  };
+
+  normalized.poidsSortieKg = statut === "vendu" ? parseOptionalWeight(data.poidsSortieKg) ?? null : null;
+  normalized.poidsCarcasseKg = statut === "vendu" ? parseOptionalWeight(data.poidsCarcasseKg) ?? null : null;
+  return normalized;
 }
 
 export function validateAnimalData(data: AnimalFormData): { valid: boolean; errors: string[] } {
@@ -31,6 +66,12 @@ export function validateAnimalData(data: AnimalFormData): { valid: boolean; erro
     if (isNaN(date.getTime())) errors.push("Date de naissance invalide");
     if (date > new Date()) errors.push("La date de naissance ne peut pas être dans le futur");
   }
+  const poidsSortie = parseOptionalWeight(data.poidsSortieKg);
+  const poidsCarcasse = parseOptionalWeight(data.poidsCarcasseKg);
+  if (poidsSortie === undefined) errors.push("Le poids de sortie doit être un nombre valide");
+  if (poidsCarcasse === undefined) errors.push("Le poids carcasse doit être un nombre valide");
+  if (typeof poidsSortie === "number" && poidsSortie < 0) errors.push("Le poids de sortie ne peut pas être négatif");
+  if (typeof poidsCarcasse === "number" && poidsCarcasse < 0) errors.push("Le poids carcasse ne peut pas être négatif");
   return { valid: errors.length === 0, errors };
 }
 
@@ -38,23 +79,40 @@ export async function createAnimal(data: AnimalFormData) {
   const validation = validateAnimalData(data);
   if (!validation.valid) return { success: false, error: validation.errors.join(", ") };
 
-  if (data.numeroBoucle && data.numeroBoucle.trim() !== "") {
-    const existing = await firebaseService.getWhere<Animal>(PATH, "numeroBoucle", data.numeroBoucle);
+  const normalized = normalizeAnimalData(data);
+  if (normalized.numeroBoucle && normalized.numeroBoucle.trim() !== "") {
+    const existing = await firebaseService.getWhere<Animal>(PATH, "numeroBoucle", normalized.numeroBoucle);
     if (existing.success && existing.data && existing.data.length > 0) {
       return { success: false, error: "Ce numéro de boucle existe déjà" };
     }
   }
 
-  const animalData: Record<string, unknown> = { ...data };
-  if (data.dateNaissance) animalData.ageMois = calculateAge(data.dateNaissance);
-  if (!data.statut) animalData.statut = "actif";
+  const animalData: Record<string, unknown> = { ...normalized };
+  if (normalized.dateNaissance) animalData.ageMois = calculateAge(normalized.dateNaissance);
+  if (!normalized.statut) animalData.statut = "actif";
 
   return firebaseService.create(PATH, animalData);
 }
 
 export async function updateAnimal(id: string, data: AnimalFormData) {
-  const updates: Record<string, unknown> = { ...data };
-  if (data.dateNaissance) updates.ageMois = calculateAge(data.dateNaissance);
+  const validation = validateAnimalData(data);
+  if (!validation.valid) return { success: false, error: validation.errors.join(", ") };
+
+  const normalized = normalizeAnimalData(data);
+  if (normalized.numeroBoucle && normalized.numeroBoucle.trim() !== "") {
+    const existing = await firebaseService.getWhere<Animal>(PATH, "numeroBoucle", normalized.numeroBoucle);
+    const duplicate = existing.data?.find((animal) => animal.id !== id);
+    if (existing.success && duplicate) {
+      return { success: false, error: "Ce numéro de boucle existe déjà sur un autre animal" };
+    }
+  }
+
+  const updates: Record<string, unknown> = { ...normalized };
+  if (normalized.dateNaissance) {
+    updates.ageMois = calculateAge(normalized.dateNaissance);
+  } else {
+    updates.ageMois = null;
+  }
   return firebaseService.update(PATH, id, updates);
 }
 

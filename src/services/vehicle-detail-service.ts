@@ -617,7 +617,51 @@ export async function addMeterReading(
 }
 
 export async function deleteMeterReading(readingId: string): Promise<FirebaseResult> {
-  return await firebaseService.delete(METER_READINGS_PATH, readingId);
+  try {
+    const existingResult = await firebaseService.getById<MeterReading>(METER_READINGS_PATH, readingId);
+    if (!existingResult.success || !existingResult.data) {
+      return { success: false, error: existingResult.error || "Relevé introuvable" };
+    }
+
+    const reading = existingResult.data;
+    const [readingsResult, maintenanceResult] = await Promise.all([
+      firebaseService.getWhere<MeterReading>(METER_READINGS_PATH, "vehicleId", reading.vehicleId),
+      firebaseService.getWhere<MaintenanceEntry>(MAINTENANCE_PATH, "vehicleId", reading.vehicleId),
+    ]);
+
+    if (!readingsResult.success) return { success: false, error: readingsResult.error };
+    if (!maintenanceResult.success) return { success: false, error: maintenanceResult.error };
+
+    const candidates = [
+      ...((readingsResult.data || [])
+        .filter((r) => r.id !== readingId && r.type === reading.type)
+        .map((r) => ({ date: r.date || r.dateCreation || "", value: finiteNumber(r.valeur) }))),
+      ...((maintenanceResult.data || [])
+        .map((entry) => ({
+          date: entry.dateEffectuee || entry.datePlanifiee || entry.dateCreation || "",
+          value: reading.type === "kilometrage" ? finiteNumber(entry.kilometrageEffectue) : finiteNumber(entry.heuresEffectuees),
+        }))),
+    ].filter((candidate): candidate is { date: string; value: number } => candidate.value !== undefined);
+
+    candidates.sort((a, b) => {
+      const dateCompare = b.date.localeCompare(a.date);
+      if (dateCompare !== 0) return dateCompare;
+      return b.value - a.value;
+    });
+
+    const counterField = reading.type === "kilometrage" ? "kilometrage" : "heuresUtilisation";
+    const now = new Date().toISOString();
+    const updates: Record<string, unknown> = {
+      [`${METER_READINGS_PATH}/${readingId}`]: null,
+      [`vehicules/${reading.vehicleId}/${counterField}`]: candidates[0]?.value ?? null,
+      [`vehicules/${reading.vehicleId}/derniereMAJ`]: now,
+    };
+
+    await updateDb(ref(database), updates);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
 }
 
 export function listenMeterReadings(

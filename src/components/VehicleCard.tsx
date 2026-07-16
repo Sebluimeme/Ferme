@@ -74,9 +74,6 @@ export default function VehicleCard({ vehicle, onEdit, onDelete, onClick }: Vehi
         className="cursor-pointer px-3 py-2.5 border-b border-stone-200"
       >
         <div className="font-semibold text-sm sm:text-base">{displayName}</div>
-        {vehicle.plaqueImmatriculation && (
-          <div className="text-xs text-stone-600">{vehicle.plaqueImmatriculation}</div>
-        )}
         {vehicle.marque && vehicle.modele && (
           <div className="text-[11px] text-stone-500">
             {vehicle.marque} {vehicle.modele}
@@ -86,23 +83,13 @@ export default function VehicleCard({ vehicle, onEdit, onDelete, onClick }: Vehi
 
       <div onClick={() => onClick?.(vehicle)} className="cursor-pointer px-3 py-2">
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div>
-            <div className="text-stone-500">Mise en circulation</div>
-            <div className="font-medium">
-              {vehicle.dateMiseEnCirculation
-                ? new Date(vehicle.dateMiseEnCirculation).toLocaleDateString("fr-FR")
-                : "-"}
-            </div>
+          <div className="rounded-lg bg-stone-50 border border-stone-100 p-2">
+            <div className="text-stone-500">Kilométrage</div>
+            <div className="font-semibold text-stone-900">{formatKilometrage(vehicle.kilometrage)}</div>
           </div>
-          <div>
-            <div className="text-stone-500">
-              {vehicle.type === "tracteur" ? "Heures" : "Kilométrage"}
-            </div>
-            <div className="font-medium">
-              {vehicle.type === "tracteur"
-                ? formatHeures(vehicle.heuresUtilisation)
-                : formatKilometrage(vehicle.kilometrage)}
-            </div>
+          <div className="rounded-lg bg-stone-50 border border-stone-100 p-2">
+            <div className="text-stone-500">Heures</div>
+            <div className="font-semibold text-stone-900">{formatHeures(vehicle.heuresUtilisation)}</div>
           </div>
         </div>
       </div>

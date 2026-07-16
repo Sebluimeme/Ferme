@@ -26,6 +26,8 @@ export interface Animal {
   dateNaissance?: string;
   ageMois?: number;
   poids?: number;
+  poidsSortieKg?: number;
+  poidsCarcasseKg?: number;
   statut: "actif" | "vendu" | "mort" | "reforme";
   commentaire?: string;
   numeroBouclePere?: string;
