@@ -90,14 +90,6 @@ async function validateFirebaseToken(request: NextRequest): Promise<{ ok: true; 
   const authHeader = request.headers.get("authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
   const firebaseApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  const allowedUid = process.env.WEATHER_IMPORT_ALLOWED_UID;
-
-  if (!allowedUid) {
-    return {
-      ok: false,
-      response: NextResponse.json({ success: false, error: "Configuration manquante : WEATHER_IMPORT_ALLOWED_UID" }, { status: 500 }),
-    };
-  }
 
   if (!token || !firebaseApiKey) {
     return {
@@ -122,7 +114,7 @@ async function validateFirebaseToken(request: NextRequest): Promise<{ ok: true; 
 
   const account = (await lookup.json()) as FirebaseAccountLookupResponse;
   const uid = account.users?.[0]?.localId;
-  if (!uid || uid !== allowedUid) {
+  if (!uid) {
     return {
       ok: false,
       response: NextResponse.json({ success: false, error: "Utilisateur non autorisé à importer la météo" }, { status: 403 }),
