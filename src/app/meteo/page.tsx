@@ -137,43 +137,61 @@ function WindCompass({ reading }: { reading: WeatherReading | null }) {
   const deg = numberValue(reading?.windDirectionDeg);
   const speed = reading?.windSpeedKmh;
   const gust = reading?.windGustKmh;
+  const direction = getWindDirectionLabel(deg);
+  const rotation = deg ?? 0;
 
   return (
-    <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+    <div className="bg-white border border-stone-200 rounded-3xl p-5 shadow-sm overflow-hidden">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-[15px] font-semibold text-stone-900">Direction du vent</h2>
           <p className="text-[12px] text-stone-400">boussole station</p>
         </div>
-        <Compass className="w-5 h-5 text-sky-600" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-50 text-sky-600 ring-1 ring-sky-100">
+          <Compass className="w-5 h-5" />
+        </div>
       </div>
+
       <div className="mt-5 flex items-center justify-center">
-        <div className="relative h-44 w-44 rounded-full border border-stone-200 bg-gradient-to-br from-sky-50 to-white shadow-inner">
-          <span className="absolute left-1/2 top-2 -translate-x-1/2 text-[11px] font-bold text-stone-500">N</span>
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-stone-400">E</span>
-          <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[11px] font-bold text-stone-400">S</span>
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-stone-400">O</span>
-          <div className="absolute inset-8 rounded-full border border-dashed border-sky-200" />
-          <div
-            className="absolute left-1/2 top-1/2 h-[70px] w-2 origin-bottom -translate-x-1/2 -translate-y-full rounded-full bg-sky-600 shadow-md"
-            style={{ transform: `translate(-50%, -100%) rotate(${deg ?? 0}deg)` }}
-          >
-            <div className="absolute -top-2 left-1/2 h-0 w-0 -translate-x-1/2 border-x-[8px] border-b-[14px] border-x-transparent border-b-sky-600" />
-          </div>
-          <div className="absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full bg-white shadow-sm border border-stone-100">
-            <span className="text-xl font-bold text-stone-900">{getWindDirectionLabel(deg)}</span>
-            <span className="text-[10px] text-stone-400">{deg !== null ? `${Math.round(deg)}°` : "—"}</span>
+        <div className="relative h-52 w-52 max-w-full rounded-full bg-[radial-gradient(circle_at_center,#ffffff_0%,#ffffff_31%,#eff8ff_32%,#f8fbff_68%,#ffffff_69%)] shadow-[inset_0_0_0_1px_rgba(14,165,233,0.12),inset_0_14px_34px_rgba(14,165,233,0.10)]">
+          <div className="absolute inset-4 rounded-full border border-sky-100/80" />
+          <div className="absolute inset-10 rounded-full border border-dashed border-sky-200/90" />
+          <span className="absolute left-1/2 top-3 -translate-x-1/2 text-[11px] font-bold text-sky-700">N</span>
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-stone-400">E</span>
+          <span className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11px] font-bold text-stone-400">S</span>
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-stone-400">O</span>
+
+          <svg className="absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 208 208" aria-hidden="true">
+            <defs>
+              <linearGradient id="windNeedle" x1="104" y1="22" x2="104" y2="104" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#0EA5E9" />
+                <stop offset="1" stopColor="#2563EB" />
+              </linearGradient>
+              <filter id="windNeedleShadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="6" stdDeviation="4" floodColor="#2563EB" floodOpacity="0.22" />
+              </filter>
+            </defs>
+            <g style={{ transform: `rotate(${rotation}deg)`, transformOrigin: "104px 104px" }}>
+              <path d="M104 25 L119 95 Q104 88 89 95 Z" fill="url(#windNeedle)" filter="url(#windNeedleShadow)" />
+              <circle cx="104" cy="104" r="4" fill="#2563EB" />
+            </g>
+          </svg>
+
+          <div className="absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border border-stone-100 bg-white/95 shadow-[0_10px_24px_rgba(15,23,42,0.10)]">
+            <span className="text-2xl font-bold text-stone-950">{direction}</span>
+            <span className="mt-0.5 text-[11px] font-medium text-stone-400">{deg !== null ? `${Math.round(deg)}°` : "—"}</span>
           </div>
         </div>
       </div>
+
       <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-        <div className="rounded-xl bg-stone-50 p-3">
+        <div className="rounded-2xl bg-stone-50 p-3">
           <p className="text-[11px] uppercase tracking-wide text-stone-400">Vent</p>
-          <p className="text-lg font-semibold text-stone-900">{formatWeatherValue(speed, "km/h")}</p>
+          <p className="text-xl font-semibold text-stone-900">{formatWeatherValue(speed, "km/h")}</p>
         </div>
-        <div className="rounded-xl bg-stone-50 p-3">
+        <div className="rounded-2xl bg-stone-50 p-3">
           <p className="text-[11px] uppercase tracking-wide text-stone-400">Rafale</p>
-          <p className="text-lg font-semibold text-stone-900">{formatWeatherValue(gust, "km/h")}</p>
+          <p className="text-xl font-semibold text-stone-900">{formatWeatherValue(gust, "km/h")}</p>
         </div>
       </div>
     </div>
