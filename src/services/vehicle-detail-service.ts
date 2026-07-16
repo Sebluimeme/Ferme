@@ -4,6 +4,7 @@
  */
 
 import { firebaseService, FirebaseResult } from "@/lib/firebase-service";
+import { database } from "@/lib/firebase";
 import { uploadFile, deleteFile, StorageResult } from "@/lib/firebase-storage";
 import type {
   MaintenanceEntry,
@@ -18,7 +19,7 @@ import type {
   MeterReading,
   MeterReadingFormData,
 } from "@/types/vehicle";
-import type { Unsubscribe } from "firebase/database";
+import { push, ref, update as updateDb, type Unsubscribe } from "firebase/database";
 
 // ==================== MAINTENANCE / ENTRETIEN ====================
 
@@ -28,23 +29,90 @@ export function validateMaintenanceData(data: MaintenanceFormData): { valid: boo
   const errors: string[] = [];
 
   // Validation numérique (aucun champ n'est obligatoire)
-  if (data.kilometrageEffectue && isNaN(Number(data.kilometrageEffectue))) {
-    errors.push("Le kilométrage doit être un nombre valide");
-  }
-  if (data.heuresEffectuees && isNaN(Number(data.heuresEffectuees))) {
-    errors.push("Les heures doivent être un nombre valide");
-  }
-  if (data.prochainKm && isNaN(Number(data.prochainKm))) {
-    errors.push("Le prochain kilométrage doit être un nombre valide");
-  }
-  if (data.prochainesHeures && isNaN(Number(data.prochainesHeures))) {
-    errors.push("Les prochaines heures doivent être un nombre valide");
-  }
-  if (data.coutTotal && isNaN(Number(data.coutTotal))) {
-    errors.push("Le coût doit être un nombre valide");
-  }
+  const validatePositiveOptional = (value: string | undefined, label: string) => {
+    if (value === undefined || value === "") return;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      errors.push(`${label} doit être un nombre valide`);
+    } else if (numeric < 0) {
+      errors.push(`${label} ne peut pas être négatif`);
+    }
+  };
+
+  validatePositiveOptional(data.kilometrageEffectue, "Le kilométrage");
+  validatePositiveOptional(data.heuresEffectuees, "Les heures");
+  validatePositiveOptional(data.prochainKm, "Le prochain kilométrage");
+  validatePositiveOptional(data.prochainesHeures, "Les prochaines heures");
+  validatePositiveOptional(data.coutTotal, "Le coût");
 
   return { valid: errors.length === 0, errors };
+}
+
+function optionalNumber(value: string | undefined): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+function stripUndefined<T>(obj: T): T {
+  if (obj === null || obj === undefined || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map(stripUndefined) as T;
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    if (value !== undefined) cleaned[key] = typeof value === "object" && value !== null ? stripUndefined(value) : value;
+  }
+  return cleaned as T;
+}
+
+async function createWithVehicleUpdate<T extends Record<string, unknown>>(
+  path: string,
+  data: T,
+  vehicleId: string,
+  vehicleUpdate: Record<string, unknown>
+): Promise<FirebaseResult<T & { id: string }>> {
+  try {
+    const newRef = push(ref(database, path));
+    const id = newRef.key!;
+    const now = new Date().toISOString();
+    const dataWithMetadata = stripUndefined({ ...data, id, dateCreation: now, derniereMAJ: now }) as T & { id: string };
+    const updates: Record<string, unknown> = {
+      [`${path}/${id}`]: dataWithMetadata,
+    };
+    if (Object.keys(vehicleUpdate).length > 0) {
+      updates[`vehicules/${vehicleId}`] = stripUndefined({ ...vehicleUpdate, derniereMAJ: now });
+    }
+    await updateDb(ref(database), updates);
+    return { success: true, id, data: dataWithMetadata };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+}
+
+async function updateWithVehicleUpdate(
+  path: string,
+  id: string,
+  data: Record<string, unknown>,
+  vehicleId: string,
+  vehicleUpdate: Record<string, unknown>
+): Promise<FirebaseResult> {
+  try {
+    const now = new Date().toISOString();
+    const updates: Record<string, unknown> = {
+      [`${path}/${id}`]: stripUndefined({ ...data, derniereMAJ: now }),
+    };
+    if (Object.keys(vehicleUpdate).length > 0) {
+      updates[`vehicules/${vehicleId}`] = stripUndefined({ ...vehicleUpdate, derniereMAJ: now });
+    }
+    await updateDb(ref(database), updates);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
 }
 
 function formDataToMaintenance(
@@ -52,7 +120,7 @@ function formDataToMaintenance(
   formData: MaintenanceFormData,
   pieces?: PartUsed[]
 ): Omit<MaintenanceEntry, "id" | "dateCreation" | "derniereMAJ"> {
-  const coutTotal = formData.coutTotal ? Number(formData.coutTotal) : undefined;
+  const coutTotal = optionalNumber(formData.coutTotal);
 
   return {
     vehicleId,
@@ -62,18 +130,80 @@ function formDataToMaintenance(
     statut: formData.statut || "termine",
 
     dateEffectuee: formData.dateEffectuee || undefined,
-    kilometrageEffectue: formData.kilometrageEffectue ? Number(formData.kilometrageEffectue) : undefined,
-    heuresEffectuees: formData.heuresEffectuees ? Number(formData.heuresEffectuees) : undefined,
+    kilometrageEffectue: optionalNumber(formData.kilometrageEffectue),
+    heuresEffectuees: optionalNumber(formData.heuresEffectuees),
 
-    prochainKm: formData.prochainKm ? Number(formData.prochainKm) : undefined,
+    prochainKm: optionalNumber(formData.prochainKm),
     prochaineDate: formData.prochaineDate || undefined,
-    prochainesHeures: formData.prochainesHeures ? Number(formData.prochainesHeures) : undefined,
+    prochainesHeures: optionalNumber(formData.prochainesHeures),
 
     garage: formData.garage?.trim() || undefined,
 
     pieces: pieces || undefined,
     coutTotal,
   };
+}
+
+async function buildVehicleCounterUpdate(
+  vehicleId: string,
+  nextKm?: number,
+  nextHours?: number
+): Promise<FirebaseResult<Record<string, unknown>>> {
+  if (nextKm === undefined && nextHours === undefined) return { success: true, data: {} };
+
+  const vehicleResult = await firebaseService.getById<Vehicle>("vehicules", vehicleId);
+  if (!vehicleResult.success || !vehicleResult.data) {
+    return { success: false, error: vehicleResult.error || "Véhicule introuvable" };
+  }
+
+  const vehicle = vehicleResult.data;
+  const updates: Record<string, unknown> = {};
+
+  if (nextKm !== undefined) {
+    const currentKm = finiteNumber(vehicle.kilometrage);
+    if (currentKm !== undefined && nextKm < currentKm) {
+      return {
+        success: false,
+        error: `Kilométrage incohérent : ${nextKm.toLocaleString("fr-FR")} km est inférieur au compteur actuel (${currentKm.toLocaleString("fr-FR")} km).`,
+      };
+    }
+    updates.kilometrage = nextKm;
+  }
+
+  if (nextHours !== undefined) {
+    const currentHours = finiteNumber(vehicle.heuresUtilisation);
+    if (currentHours !== undefined && nextHours < currentHours) {
+      return {
+        success: false,
+        error: `Heures incohérentes : ${nextHours.toLocaleString("fr-FR")} h est inférieur au compteur actuel (${currentHours.toLocaleString("fr-FR")} h).`,
+      };
+    }
+    updates.heuresUtilisation = nextHours;
+  }
+
+  return { success: true, data: updates };
+}
+
+async function buildMaintenanceEditCounterUpdate(
+  maintenanceId: string,
+  vehicleId: string,
+  maintenanceData: Omit<MaintenanceEntry, "id" | "dateCreation" | "derniereMAJ">
+): Promise<FirebaseResult<Record<string, unknown>>> {
+  const existingResult = await firebaseService.getById<MaintenanceEntry>(MAINTENANCE_PATH, maintenanceId);
+  if (!existingResult.success || !existingResult.data) {
+    return { success: false, error: existingResult.error || "Entretien introuvable" };
+  }
+
+  const previousKm = finiteNumber(existingResult.data.kilometrageEffectue);
+  const previousHours = finiteNumber(existingResult.data.heuresEffectuees);
+  const nextKm = maintenanceData.kilometrageEffectue;
+  const nextHours = maintenanceData.heuresEffectuees;
+
+  return buildVehicleCounterUpdate(
+    vehicleId,
+    nextKm !== previousKm ? nextKm : undefined,
+    nextHours !== previousHours ? nextHours : undefined
+  );
 }
 
 export async function addMaintenance(
@@ -87,29 +217,14 @@ export async function addMaintenance(
   }
 
   const maintenanceData = formDataToMaintenance(vehicleId, formData, pieces);
-  const now = new Date().toISOString();
+  const vehicleUpdate = await buildVehicleCounterUpdate(
+    vehicleId,
+    maintenanceData.kilometrageEffectue,
+    maintenanceData.heuresEffectuees
+  );
+  if (!vehicleUpdate.success) return vehicleUpdate;
 
-  const result = await firebaseService.create(MAINTENANCE_PATH, {
-    ...maintenanceData,
-    dateCreation: now,
-    derniereMAJ: now,
-  });
-
-  // Mise à jour automatique du compteur général du véhicule
-  if (result.success) {
-    const vehicleUpdate: Record<string, unknown> = {};
-    if (maintenanceData.heuresEffectuees) {
-      vehicleUpdate.heuresUtilisation = maintenanceData.heuresEffectuees;
-    }
-    if (maintenanceData.kilometrageEffectue) {
-      vehicleUpdate.kilometrage = maintenanceData.kilometrageEffectue;
-    }
-    if (Object.keys(vehicleUpdate).length > 0) {
-      await firebaseService.update("vehicules", vehicleId, vehicleUpdate);
-    }
-  }
-
-  return result;
+  return createWithVehicleUpdate(MAINTENANCE_PATH, maintenanceData, vehicleId, vehicleUpdate.data || {});
 }
 
 export async function updateMaintenance(
@@ -124,27 +239,10 @@ export async function updateMaintenance(
   }
 
   const maintenanceData = formDataToMaintenance(vehicleId, formData, pieces);
+  const vehicleUpdate = await buildMaintenanceEditCounterUpdate(maintenanceId, vehicleId, maintenanceData);
+  if (!vehicleUpdate.success) return vehicleUpdate;
 
-  const result = await firebaseService.update(MAINTENANCE_PATH, maintenanceId, {
-    ...maintenanceData,
-    derniereMAJ: new Date().toISOString(),
-  });
-
-  // Mise à jour automatique du compteur général du véhicule
-  if (result.success) {
-    const vehicleUpdate: Record<string, unknown> = {};
-    if (maintenanceData.heuresEffectuees) {
-      vehicleUpdate.heuresUtilisation = maintenanceData.heuresEffectuees;
-    }
-    if (maintenanceData.kilometrageEffectue) {
-      vehicleUpdate.kilometrage = maintenanceData.kilometrageEffectue;
-    }
-    if (Object.keys(vehicleUpdate).length > 0) {
-      await firebaseService.update("vehicules", vehicleId, vehicleUpdate);
-    }
-  }
-
-  return result;
+  return updateWithVehicleUpdate(MAINTENANCE_PATH, maintenanceId, maintenanceData, vehicleId, vehicleUpdate.data || {});
 }
 
 export async function deleteMaintenance(maintenanceId: string): Promise<FirebaseResult> {
@@ -476,7 +574,7 @@ const METER_READINGS_PATH = "vehicules-releves";
 export function validateMeterReadingData(data: MeterReadingFormData): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!data.type) errors.push("Le type de relevé est obligatoire");
-  if (!data.valeur || isNaN(Number(data.valeur)) || Number(data.valeur) < 0) {
+  if (data.valeur === undefined || data.valeur === "" || !Number.isFinite(Number(data.valeur)) || Number(data.valeur) < 0) {
     errors.push("La valeur doit être un nombre positif");
   }
   if (!data.date) errors.push("La date est obligatoire");
@@ -493,6 +591,12 @@ export async function addMeterReading(
   }
 
   const valeur = Number(formData.valeur);
+  const vehicleUpdate = await buildVehicleCounterUpdate(
+    vehicleId,
+    formData.type === "kilometrage" ? valeur : undefined,
+    formData.type === "heures" ? valeur : undefined
+  );
+  if (!vehicleUpdate.success) return vehicleUpdate;
 
   const readingData: Omit<MeterReading, "id" | "dateCreation"> = {
     vehicleId,
@@ -502,21 +606,8 @@ export async function addMeterReading(
     commentaire: formData.commentaire?.trim() || undefined,
   };
 
-  // Créer le relevé
-  const result = await firebaseService.create(METER_READINGS_PATH, readingData);
-
-  if (result.success) {
-    // Mettre à jour le compteur du véhicule
-    const vehicleUpdate: Record<string, unknown> = {};
-    if (formData.type === "kilometrage") {
-      vehicleUpdate.kilometrage = valeur;
-    } else {
-      vehicleUpdate.heuresUtilisation = valeur;
-    }
-    await firebaseService.update("vehicules", vehicleId, vehicleUpdate);
-  }
-
-  return result;
+  // Créer le relevé et mettre à jour le compteur du véhicule dans la même écriture multi-chemins.
+  return createWithVehicleUpdate(METER_READINGS_PATH, readingData, vehicleId, vehicleUpdate.data || {});
 }
 
 export async function deleteMeterReading(readingId: string): Promise<FirebaseResult> {
