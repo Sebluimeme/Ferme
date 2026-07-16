@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -88,6 +88,8 @@ export default function MeteoPage() {
   const { state } = useAppStore();
   const [importing, setImporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [lastAutoImportAt, setLastAutoImportAt] = useState<string | null>(null);
+  const importInFlightRef = useRef(false);
 
   const readings = useMemo(
     () => keepLastWeatherDays(state.weatherReadings ?? [], 370).sort((a, b) => a.timestamp.localeCompare(b.timestamp)),
@@ -97,31 +99,62 @@ export default function MeteoPage() {
   const daily = useMemo(() => aggregateWeatherByDay(readings).slice(-45), [readings]);
   const latest = stats.latest;
 
-  async function importNow() {
-    setImporting(true);
-    setMessage(null);
-    try {
-      const token = await state.user?.getIdToken();
-      if (!token) {
-        setMessage("Connexion requise pour importer les données météo.");
-        return;
+  const importNow = useCallback(
+    async (mode: "manual" | "auto" = "manual") => {
+      if (importInFlightRef.current) return;
+      importInFlightRef.current = true;
+      setImporting(true);
+      if (mode === "manual") setMessage(null);
+
+      try {
+        const token = await state.user?.getIdToken();
+        if (!token) {
+          if (mode === "manual") setMessage("Connexion requise pour importer les données météo.");
+          return;
+        }
+        const response = await fetch("/api/weather/import", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const result = (await response.json()) as WeatherImportResult;
+        if (!response.ok || !result.success) {
+          setMessage(result.error ?? "Import météo impossible");
+          return;
+        }
+
+        const importedAt = new Date().toISOString();
+        setLastAutoImportAt(importedAt);
+        if (mode === "manual") {
+          setMessage(`Dernière mesure importée : ${formatTime(result.reading?.timestamp)}`);
+        }
+      } catch (error) {
+        setMessage((error as Error).message);
+      } finally {
+        importInFlightRef.current = false;
+        setImporting(false);
       }
-      const response = await fetch("/api/weather/import", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = (await response.json()) as WeatherImportResult;
-      if (!response.ok || !result.success) {
-        setMessage(result.error ?? "Import météo impossible");
-        return;
+    },
+    [state.user]
+  );
+
+  useEffect(() => {
+    if (!state.user) return;
+
+    const runIfVisible = () => {
+      if (document.visibilityState === "visible") {
+        void importNow("auto");
       }
-      setMessage(`Dernière mesure importée : ${formatTime(result.reading?.timestamp)}`);
-    } catch (error) {
-      setMessage((error as Error).message);
-    } finally {
-      setImporting(false);
-    }
-  }
+    };
+
+    runIfVisible();
+    const intervalId = window.setInterval(runIfVisible, 30_000);
+    document.addEventListener("visibilitychange", runIfVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", runIfVisible);
+    };
+  }, [importNow, state.user]);
 
   return (
     <div className="space-y-6 fade-in pb-6">
@@ -144,13 +177,17 @@ export default function MeteoPage() {
             <p className="mt-1 text-xl font-semibold text-stone-900">{formatWeatherValue(latest?.temperatureC, "°C")}</p>
             <p className="mt-1 text-[12px] text-stone-500">{formatTime(latest?.timestamp)}</p>
             <button
-              onClick={importNow}
+              onClick={() => importNow("manual")}
               disabled={importing}
               className="mt-3 inline-flex items-center gap-2 rounded-xl bg-stone-950 px-3 py-2 text-[12px] font-semibold text-white hover:bg-stone-800 disabled:opacity-60 cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${importing ? "animate-spin" : ""}`} />
               Importer maintenant
             </button>
+            <div className="mt-3 flex items-center gap-2 text-[11px] text-emerald-700">
+              <span className={`h-2 w-2 rounded-full ${importing ? "bg-amber-400 animate-pulse" : "bg-emerald-500"}`} />
+              <span>Auto-refresh toutes les 30 sec{lastAutoImportAt ? ` · ${formatTime(lastAutoImportAt)}` : ""}</span>
+            </div>
           </div>
         </div>
       </div>
