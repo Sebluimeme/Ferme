@@ -84,7 +84,10 @@ async function createWithVehicleUpdate<T extends Record<string, unknown>>(
       [`${path}/${id}`]: dataWithMetadata,
     };
     if (Object.keys(vehicleUpdate).length > 0) {
-      updates[`vehicules/${vehicleId}`] = stripUndefined({ ...vehicleUpdate, derniereMAJ: now });
+      const cleanedVehicleUpdate = stripUndefined({ ...vehicleUpdate, derniereMAJ: now });
+      for (const [key, value] of Object.entries(cleanedVehicleUpdate)) {
+        updates[`vehicules/${vehicleId}/${key}`] = value;
+      }
     }
     await updateDb(ref(database), updates);
     return { success: true, id, data: dataWithMetadata };
@@ -106,7 +109,10 @@ async function updateWithVehicleUpdate(
       [`${path}/${id}`]: stripUndefined({ ...data, derniereMAJ: now }),
     };
     if (Object.keys(vehicleUpdate).length > 0) {
-      updates[`vehicules/${vehicleId}`] = stripUndefined({ ...vehicleUpdate, derniereMAJ: now });
+      const cleanedVehicleUpdate = stripUndefined({ ...vehicleUpdate, derniereMAJ: now });
+      for (const [key, value] of Object.entries(cleanedVehicleUpdate)) {
+        updates[`vehicules/${vehicleId}/${key}`] = value;
+      }
     }
     await updateDb(ref(database), updates);
     return { success: true };
