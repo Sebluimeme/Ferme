@@ -16,15 +16,21 @@ import { addMeterReading, deleteMeterReading, listenMeterReadings } from "@/serv
 import { useToast } from "../Toast";
 import Modal from "../Modal";
 
+type MeterModalType = MeterReadingType | "both";
+
 interface VehicleInfoGridProps {
   vehicle: Vehicle;
+  autoOpenMeterType?: MeterModalType | null;
+  onAutoOpenConsumed?: () => void;
 }
 
-export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
+export default function VehicleInfoGrid({ vehicle, autoOpenMeterType, onAutoOpenConsumed }: VehicleInfoGridProps) {
   const { showToast } = useToast();
   const [showMeterModal, setShowMeterModal] = useState(false);
-  const [meterType, setMeterType] = useState<MeterReadingType>("kilometrage");
+  const [meterType, setMeterType] = useState<MeterModalType>("kilometrage");
   const [meterValue, setMeterValue] = useState("");
+  const [meterKmValue, setMeterKmValue] = useState("");
+  const [meterHoursValue, setMeterHoursValue] = useState("");
   const [meterDate, setMeterDate] = useState(new Date().toISOString().split("T")[0]);
   const [meterComment, setMeterComment] = useState("");
   const [meterLoading, setMeterLoading] = useState(false);
@@ -39,15 +45,53 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
     return () => unsub();
   }, [vehicle.id]);
 
-  const openMeterModal = (type: MeterReadingType) => {
+  const openMeterModal = (type: MeterModalType) => {
     setMeterType(type);
     setMeterValue("");
+    setMeterKmValue("");
+    setMeterHoursValue("");
     setMeterDate(new Date().toISOString().split("T")[0]);
     setMeterComment("");
     setShowMeterModal(true);
   };
 
+  useEffect(() => {
+    if (!autoOpenMeterType) return;
+    openMeterModal(autoOpenMeterType);
+    onAutoOpenConsumed?.();
+  }, [autoOpenMeterType, onAutoOpenConsumed]);
+
   const handleMeterSubmit = async () => {
+    if (meterType === "both") {
+      const values = [
+        { type: "kilometrage" as const, value: meterKmValue },
+        { type: "heures" as const, value: meterHoursValue },
+      ].filter((item) => item.value.trim() !== "");
+
+      if (values.length === 0 || values.some((item) => isNaN(Number(item.value)))) {
+        showToast({ type: "error", title: "Erreur", message: "Veuillez saisir au moins une valeur valide" });
+        return;
+      }
+
+      setMeterLoading(true);
+      const results = await Promise.all(values.map((item) => addMeterReading(vehicle.id, {
+        type: item.type,
+        valeur: item.value,
+        date: meterDate,
+        commentaire: meterComment || undefined,
+      })));
+      const failed = results.find((result) => !result.success);
+
+      if (!failed) {
+        showToast({ type: "success", title: "Relevés enregistrés", message: "Kilométrage / heures mis à jour" });
+        setShowMeterModal(false);
+      } else {
+        showToast({ type: "error", title: "Erreur", message: failed.error || "Impossible d'enregistrer" });
+      }
+      setMeterLoading(false);
+      return;
+    }
+
     if (!meterValue || isNaN(Number(meterValue))) {
       showToast({ type: "error", title: "Erreur", message: "Veuillez saisir une valeur valide" });
       return;
@@ -210,29 +254,59 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
       <Modal
         isOpen={showMeterModal}
         onClose={() => setShowMeterModal(false)}
-        title={`Relevé ${meterType === "kilometrage" ? "kilométrage" : "d'heures"}`}
+        title={`Relevé ${meterType === "both" ? "km / heures" : meterType === "kilometrage" ? "kilométrage" : "d'heures"}`}
         size="small"
       >
         <div className="space-y-4">
-          <div>
-            <label className="block mb-1 text-sm font-medium text-stone-700">
-              {meterType === "kilometrage" ? "Kilométrage actuel (km)" : "Heures actuelles (h)"}
-            </label>
-            <input
-              type="number"
-              value={meterValue}
-              onChange={(e) => setMeterValue(e.target.value)}
-              placeholder={meterType === "kilometrage" ? "Ex: 52000" : "Ex: 1250"}
-              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
-              min="0"
-              autoFocus
-            />
-            {vehicle[meterType === "kilometrage" ? "kilometrage" : "heuresUtilisation"] !== undefined && (
-              <p className="text-xs text-stone-400 mt-1">
-                Valeur actuelle : {meterType === "kilometrage" ? formatKilometrage(vehicle.kilometrage) : formatHeures(vehicle.heuresUtilisation)}
-              </p>
-            )}
-          </div>
+          {meterType === "both" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block mb-1 text-sm font-medium text-stone-700">Kilométrage actuel (km)</label>
+                <input
+                  type="number"
+                  value={meterKmValue}
+                  onChange={(e) => setMeterKmValue(e.target.value)}
+                  placeholder="Ex: 52000"
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
+                  min="0"
+                  autoFocus
+                />
+                <p className="text-xs text-stone-400 mt-1">Valeur actuelle : {formatKilometrage(vehicle.kilometrage)}</p>
+              </div>
+              <div>
+                <label className="block mb-1 text-sm font-medium text-stone-700">Heures actuelles (h)</label>
+                <input
+                  type="number"
+                  value={meterHoursValue}
+                  onChange={(e) => setMeterHoursValue(e.target.value)}
+                  placeholder="Ex: 1250"
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
+                  min="0"
+                />
+                <p className="text-xs text-stone-400 mt-1">Valeur actuelle : {formatHeures(vehicle.heuresUtilisation)}</p>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block mb-1 text-sm font-medium text-stone-700">
+                {meterType === "kilometrage" ? "Kilométrage actuel (km)" : "Heures actuelles (h)"}
+              </label>
+              <input
+                type="number"
+                value={meterValue}
+                onChange={(e) => setMeterValue(e.target.value)}
+                placeholder={meterType === "kilometrage" ? "Ex: 52000" : "Ex: 1250"}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
+                min="0"
+                autoFocus
+              />
+              {vehicle[meterType === "kilometrage" ? "kilometrage" : "heuresUtilisation"] !== undefined && (
+                <p className="text-xs text-stone-400 mt-1">
+                  Valeur actuelle : {meterType === "kilometrage" ? formatKilometrage(vehicle.kilometrage) : formatHeures(vehicle.heuresUtilisation)}
+                </p>
+              )}
+            </div>
+          )}
           <div>
             <label className="block mb-1 text-sm font-medium text-stone-700">Date du relevé</label>
             <input
@@ -262,7 +336,7 @@ export default function VehicleInfoGrid({ vehicle }: VehicleInfoGridProps) {
           </button>
           <button
             onClick={handleMeterSubmit}
-            disabled={meterLoading || !meterValue}
+            disabled={meterLoading || (meterType === "both" ? (!meterKmValue && !meterHoursValue) : !meterValue)}
             className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-50"
           >
             {meterLoading ? "Enregistrement..." : "Enregistrer"}

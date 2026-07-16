@@ -65,6 +65,24 @@ export default function EntretiensPage() {
     return v?.type;
   };
 
+  const openAlert = (alert: (typeof sortedAlerts)[number]) => {
+    const title = (alert.titre || "").toLowerCase();
+    const isMeterReadingReminder = !alert.maintenanceId && (title.includes("relevé") || title.includes("releve"));
+
+    if (isMeterReadingReminder) {
+      const meter = title.includes("km") && title.includes("heure")
+        ? "both"
+        : title.includes("heure") && !title.includes("km") && !title.includes("kilom")
+          ? "heures"
+          : "kilometrage";
+      router.push(`/vehicules/${alert.vehicleId}?tab=info&meter=${meter}`);
+      return;
+    }
+
+    const maintenanceParam = alert.maintenanceId ? `&maintenanceId=${alert.maintenanceId}` : "";
+    router.push(`/vehicules/${alert.vehicleId}?tab=entretien&maintenanceAction=complete${maintenanceParam}`);
+  };
+
   if (state.loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -121,7 +139,7 @@ export default function EntretiensPage() {
                   return (
                     <div
                       key={`${alert.maintenanceId || alert.vehicleId}-${index}`}
-                      onClick={() => router.push(`/vehicules/${alert.vehicleId}?tab=entretien`)}
+                      onClick={() => openAlert(alert)}
                       className={`px-4 py-3 rounded-lg border-l-4 cursor-pointer transition-colors hover:opacity-90 ${
                         alert.urgent
                           ? "bg-red-50 border-l-red-500"

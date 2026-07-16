@@ -27,9 +27,12 @@ import {
 
 interface MaintenanceTimelineProps {
   vehicleId: string;
+  autoOpenForm?: boolean;
+  autoOpenMaintenanceId?: string | null;
+  onAutoOpenConsumed?: () => void;
 }
 
-export default function MaintenanceTimeline({ vehicleId }: MaintenanceTimelineProps) {
+export default function MaintenanceTimeline({ vehicleId, autoOpenForm, autoOpenMaintenanceId, onAutoOpenConsumed }: MaintenanceTimelineProps) {
   const { showToast } = useToast();
   const { state } = useAppStore();
   const [entries, setEntries] = useState<MaintenanceEntry[]>([]);
@@ -57,6 +60,18 @@ export default function MaintenanceTimeline({ vehicleId }: MaintenanceTimelinePr
     });
     return () => unsubscribe();
   }, [vehicleId]);
+
+  useEffect(() => {
+    if (!autoOpenForm) return;
+    const entryToComplete = autoOpenMaintenanceId
+      ? state.maintenanceEntries.find((entry) => entry.id === autoOpenMaintenanceId)
+        ?? entries.find((entry) => entry.id === autoOpenMaintenanceId)
+        ?? null
+      : null;
+    setEditEntry(entryToComplete);
+    setShowForm(!entryToComplete);
+    onAutoOpenConsumed?.();
+  }, [autoOpenForm, autoOpenMaintenanceId, entries, state.maintenanceEntries, onAutoOpenConsumed]);
 
   const toggleExpand = (id: string) => {
     const newExpanded = new Set(expanded);

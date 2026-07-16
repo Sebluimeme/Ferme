@@ -3,13 +3,15 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useAppStore } from "@/store/store";
-import type { Vehicle } from "@/types/vehicle";
+import type { MeterReadingType, Vehicle } from "@/types/vehicle";
 import VehicleHeader from "@/components/vehicle-detail/VehicleHeader";
 import VehicleInfoGrid from "@/components/vehicle-detail/VehicleInfoGrid";
 import MaintenanceTimeline from "@/components/vehicle-detail/MaintenanceTimeline";
 import VehiclePhotoGallery from "@/components/vehicle-detail/VehiclePhotoGallery";
 import VehicleDocuments from "@/components/vehicle-detail/VehicleDocuments";
 import VehicleComposantsTab from "@/components/vehicle-detail/VehicleComposantsTab";
+
+type MeterModalType = MeterReadingType | "both";
 
 const TABS = [
   { id: "info", label: "Informations" },
@@ -26,6 +28,9 @@ export default function VehicleDetailPage() {
 
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [activeTab, setActiveTab] = useState("info");
+  const [autoOpenMeterType, setAutoOpenMeterType] = useState<MeterModalType | null>(null);
+  const [autoOpenMaintenanceForm, setAutoOpenMaintenanceForm] = useState(false);
+  const [autoOpenMaintenanceId, setAutoOpenMaintenanceId] = useState<string | null>(null);
 
   useEffect(() => {
     const found = state.vehicles.find((v) => v.id === vehicleId);
@@ -33,6 +38,30 @@ export default function VehicleDetailPage() {
       setVehicle(found);
     }
   }, [vehicleId, state.vehicles]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    const meter = params.get("meter");
+
+    if (tab && TABS.some((item) => item.id === tab)) {
+      setActiveTab(tab);
+    }
+
+    if (meter === "kilometrage" || meter === "heures" || meter === "both") {
+      setActiveTab("info");
+      setAutoOpenMeterType(meter);
+      window.history.replaceState(null, "", window.location.pathname);
+      return;
+    }
+
+    if (params.get("maintenanceAction") === "complete" || params.get("maintenanceAction") === "add") {
+      setActiveTab("entretien");
+      setAutoOpenMaintenanceId(params.get("maintenanceId"));
+      setAutoOpenMaintenanceForm(true);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
   if (!vehicle) {
     return (
@@ -66,14 +95,14 @@ export default function VehicleDetailPage() {
         </div>
 
         <div className="p-6">
-          {activeTab === "info" && <VehicleInfoGrid vehicle={vehicle} />}
+          {activeTab === "info" && <VehicleInfoGrid vehicle={vehicle} autoOpenMeterType={autoOpenMeterType} onAutoOpenConsumed={() => setAutoOpenMeterType(null)} />}
           {activeTab === "composants" && (
             <VehicleComposantsTab
               vehicleId={vehicle.id}
               initialComposants={vehicle.composants || []}
             />
           )}
-          {activeTab === "entretien" && <MaintenanceTimeline vehicleId={vehicle.id} />}
+          {activeTab === "entretien" && <MaintenanceTimeline vehicleId={vehicle.id} autoOpenForm={autoOpenMaintenanceForm} autoOpenMaintenanceId={autoOpenMaintenanceId} onAutoOpenConsumed={() => { setAutoOpenMaintenanceForm(false); setAutoOpenMaintenanceId(null); }} />}
           {activeTab === "photos" && <VehiclePhotoGallery vehicleId={vehicle.id} />}
           {activeTab === "documents" && <VehicleDocuments vehicleId={vehicle.id} />}
         </div>
