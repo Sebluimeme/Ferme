@@ -46,6 +46,7 @@ const sections = [
       { icon: Footprints,  label: "Pâturage",    route: "/paturage" },
       { icon: Flower,      label: "Apiculture",  route: "/apiculture" },
       { icon: Map,   label: "Parcellaire", route: "/fourrage/partiels" },
+      { icon: Droplets, label: "Eau", route: "/eau" },
       { icon: Droplets, label: "Source", route: "/source" },
       { icon: CloudSun, label: "Météo", route: "/meteo" },
     ],
