@@ -91,7 +91,7 @@ function requireEnv(env, key) {
 const env = readEnv();
 const haBaseUrl = requireEnv(env, "HOME_ASSISTANT_URL").replace(/\/$/, "");
 const haToken = requireEnv(env, "HOME_ASSISTANT_TOKEN");
-const pollMs = Number(env.HA_BRIDGE_POLL_MS || 15000);
+const pollMs = Number(env.HA_BRIDGE_POLL_MS || 10000);
 
 const firebaseConfig = {
   apiKey: requireEnv(env, "NEXT_PUBLIC_FIREBASE_API_KEY"),

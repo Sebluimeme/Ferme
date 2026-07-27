@@ -10,7 +10,6 @@ import {
   Loader2,
   Plus,
   Power,
-  RefreshCw,
   ShieldCheck,
   Waves,
   Zap,
@@ -54,6 +53,20 @@ function stateOf(entities: Record<string, HaEntity> | undefined, id: string) {
   return entities?.[id]?.state ?? entities?.[id.replaceAll(".", "__dot__")]?.state ?? "unavailable";
 }
 
+function entityOf(entities: Record<string, HaEntity> | undefined, id: string) {
+  return entities?.[id] ?? entities?.[id.replaceAll(".", "__dot__")];
+}
+
+function elapsedLabel(since: string | undefined, now: Date) {
+  if (!since) return "—";
+  const startedAt = new Date(since).getTime();
+  const seconds = Math.max(0, Math.floor((now.getTime() - startedAt) / 1000));
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  if (minutes <= 0) return `${rest}s`;
+  return `${minutes}min ${rest.toString().padStart(2, "0")}s`;
+}
+
 function isOn(entities: Record<string, HaEntity> | undefined, id: string) {
   return stateOf(entities, id) === "on";
 }
@@ -93,6 +106,7 @@ function ZoneCard({
   entities,
   refreshing,
   onRun,
+  now,
 }: {
   zone: 1 | 2;
   title: string;
@@ -100,12 +114,15 @@ function ZoneCard({
   entities?: Record<string, HaEntity>;
   refreshing: boolean;
   onRun: (zone: 1 | 2, duration: number) => void;
+  now: Date;
 }) {
   const valveId = `switch.sous_station_bat_a_electrovanne_${zone}`;
   const activeId = `input_boolean.arrosage_vanne_${zone}_actif`;
   const timeId = `input_datetime.arrosage_vanne_${zone}_heure`;
   const durationId = `input_number.arrosage_vanne_${zone}_duree`;
   const mmId = `sensor.arrosage_vanne_${zone}_mm_aujourd_hui`;
+  const valve = entityOf(entities, valveId);
+  const valveOn = valve?.state === "on";
   const duration = Math.max(1, Math.round(Number(stateOf(entities, durationId)) || 1));
 
   return (
@@ -162,9 +179,9 @@ function ZoneCard({
         <div className="flex items-center gap-2 text-sm font-semibold text-stone-500">
           <span className={[
             "h-2.5 w-2.5 rounded-full",
-            isOn(entities, valveId) ? "bg-brand-500 shadow-[0_0_0_6px_rgba(51,147,94,.12)]" : "bg-stone-300",
+            valveOn ? "bg-brand-500 shadow-[0_0_0_6px_rgba(51,147,94,.12)]" : "bg-stone-300",
           ].join(" ")} />
-          {isOn(entities, valveId) ? "Vanne ouverte" : "Vanne fermée"}
+          {valveOn ? `En cours depuis ${elapsedLabel(valve.last_changed, now)}` : "Vanne fermée"}
         </div>
         <button
           disabled={refreshing}
@@ -184,6 +201,12 @@ export default function EauPage() {
   const [data, setData] = useState<IrrigationResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 10000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const statusRef = ref(database, "irrigation-ha/status/current");
@@ -247,13 +270,6 @@ export default function EauPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => { setRefreshing(true); window.setTimeout(() => setRefreshing(false), 1200); }}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 text-sm font-black text-stone-800 shadow-sm transition hover:border-brand-200"
-            >
-              <RefreshCw className={refreshing || loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-              Actualiser
-            </button>
-            <button
               onClick={() => action({ action: "stop_all" }, "Arrêt total envoyé")}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 text-sm font-black text-white shadow-lg shadow-red-200 transition hover:bg-red-700"
             >
@@ -294,8 +310,8 @@ export default function EauPage() {
               </div>
               <span className="hidden rounded-full bg-white px-3 py-1.5 text-xs font-black text-stone-600 ring-1 ring-stone-200 sm:inline-flex">4h = 20mm</span>
             </div>
-            <ZoneCard zone={1} title="Vanne 1 — Zone source" subtitle="Zone indépendante. La pompe démarre avant l’ouverture de la vanne." entities={entities} refreshing={refreshing} onRun={(zone, duration) => action({ action: "run_zone", zone, durationMinutes: duration }, `Vanne ${zone} lancée`)} />
-            <ZoneCard zone={2} title="Vanne 2 — Zone pâture" subtitle="Ne peut pas tourner en même temps que la vanne 1." entities={entities} refreshing={refreshing} onRun={(zone, duration) => action({ action: "run_zone", zone, durationMinutes: duration }, `Vanne ${zone} lancée`)} />
+            <ZoneCard zone={1} title="Vanne 1 — Zone source" subtitle="Zone indépendante. La pompe démarre avant l’ouverture de la vanne." entities={entities} refreshing={refreshing} now={now} onRun={(zone, duration) => action({ action: "run_zone", zone, durationMinutes: duration }, `Vanne ${zone} lancée`)} />
+            <ZoneCard zone={2} title="Vanne 2 — Zone pâture" subtitle="Ne peut pas tourner en même temps que la vanne 1." entities={entities} refreshing={refreshing} now={now} onRun={(zone, duration) => action({ action: "run_zone", zone, durationMinutes: duration }, `Vanne ${zone} lancée`)} />
           </div>
 
           <aside className="space-y-5">
