@@ -2,8 +2,10 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  CalendarClock,
   CircleStop,
   Clock3,
+  CloudRain,
   Droplets,
   Gauge,
   Leaf,
@@ -11,12 +13,16 @@ import {
   Plus,
   Power,
   ShieldCheck,
+  ToggleLeft,
+  ToggleRight,
   Waves,
   Zap,
 } from "lucide-react";
-import { ref, onValue, push, set, serverTimestamp } from "firebase/database";
+import { ref, onValue, push, set, update, serverTimestamp } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { useToast } from "@/components/Toast";
+import type { AutoIrrigationConfig, IrrigationPlan } from "@/lib/irrigationScheduler";
+import { DEFAULT_AUTO_IRRIGATION_CONFIG, formatPlanStatus, formatLocalTime } from "@/lib/irrigationScheduler";
 
 type HaEntity = {
   entity_id: string;
@@ -196,6 +202,155 @@ function ZoneCard({
   );
 }
 
+// ── Firebase paths ──────────────────────────────────────────────────────────
+const AUTO_SCHEDULE_CONFIG_PATH = "irrigation-ha/auto-schedule/config";
+const AUTO_SCHEDULE_PLANS_PATH  = "irrigation-ha/auto-schedule/plans";
+
+// ── Auto-schedule UI component ───────────────────────────────────────────────
+
+type PlanStatusTone = "blue" | "green" | "amber" | "red" | "stone";
+
+function planStatusTone(status: string | undefined): PlanStatusTone {
+  switch (status) {
+    case "scheduled": return "blue";
+    case "executing": return "green";
+    case "done":      return "green";
+    case "skipped":   return "amber";
+    case "error":     return "red";
+    default:          return "stone";
+  }
+}
+
+const toneClasses: Record<PlanStatusTone, string> = {
+  blue:  "bg-sky-50 text-sky-700 ring-sky-100",
+  green: "bg-brand-50 text-brand-700 ring-brand-100",
+  amber: "bg-amber-50 text-amber-700 ring-amber-100",
+  red:   "bg-red-50 text-red-700 ring-red-100",
+  stone: "bg-stone-100 text-stone-500 ring-stone-200",
+};
+
+function AutoScheduleCard({
+  config,
+  plan,
+  onToggle,
+  toggling,
+}: {
+  config: AutoIrrigationConfig | null;
+  plan: IrrigationPlan | null;
+  onToggle: () => void;
+  toggling: boolean;
+}) {
+  const cfg = config ?? DEFAULT_AUTO_IRRIGATION_CONFIG;
+  const tone = planStatusTone(plan?.status);
+  const toneClass = toneClasses[tone];
+
+  return (
+    <div className="rounded-[2rem] border border-stone-200 bg-white p-5 shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-sky-50 ring-1 ring-sky-100">
+            <CalendarClock className="h-5 w-5 text-sky-600" />
+          </div>
+          <div>
+            <h2 className="text-lg font-black tracking-tight text-stone-950">Arrosage automatique</h2>
+            <p className="text-xs text-stone-500">Fenêtre nocturne {cfg.windowStartHour}h→{cfg.windowEndHour}h, départ au plus proche du matin</p>
+          </div>
+        </div>
+        <button
+          onClick={onToggle}
+          disabled={toggling}
+          title={cfg.enabled ? "Désactiver l'arrosage auto" : "Activer l'arrosage auto"}
+          className="flex items-center gap-1.5 rounded-2xl px-3 py-2 text-xs font-black transition-colors disabled:opacity-50"
+          style={{ background: cfg.enabled ? "rgb(var(--color-brand-700, 51 147 94) / 0.1)" : "#f3f4f6" }}
+        >
+          {cfg.enabled
+            ? <><ToggleRight className="h-5 w-5 text-brand-700" /><span className="text-brand-700">Activé</span></>
+            : <><ToggleLeft className="h-5 w-5 text-stone-400" /><span className="text-stone-500">Désactivé</span></>
+          }
+        </button>
+      </div>
+
+      {/* Config résumé */}
+      <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-stone-50 p-3 ring-1 ring-stone-200/70 text-center text-xs">
+        <div>
+          <p className="font-bold uppercase tracking-wide text-stone-400">Seuil pluie</p>
+          <p className="mt-1 text-base font-black text-stone-950">{cfg.rainThresholdMm} mm</p>
+        </div>
+        <div>
+          <p className="font-bold uppercase tracking-wide text-stone-400">Cible</p>
+          <p className="mt-1 text-base font-black text-stone-950">{cfg.targetMm} mm</p>
+        </div>
+        <div>
+          <p className="font-bold uppercase tracking-wide text-stone-400">Débit ref.</p>
+          <p className="mt-1 text-base font-black text-stone-950">{cfg.mmPerHour} mm/h</p>
+        </div>
+      </div>
+
+      {/* Plan du jour */}
+      <div className="mt-4">
+        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-stone-400">Plan ce soir / cette nuit</p>
+        {cfg.lastError && (
+          <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 p-3 text-xs leading-relaxed text-red-800">
+            <strong>Planification bloquée.</strong>
+            <span className="mt-1 block font-mono">{cfg.lastError}</span>
+          </div>
+        )}
+        {!plan ? (
+          <div className="rounded-2xl border border-dashed border-stone-200 py-4 text-center text-xs text-stone-400">
+            {cfg.enabled
+              ? "Le bridge calcule le plan au prochain cycle (≤ 5 min)."
+              : "Activer l'arrosage auto pour générer un plan."}
+          </div>
+        ) : (
+          <div className={`rounded-2xl p-3 ring-1 ${toneClass}`}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-black uppercase tracking-wide">
+                {formatPlanStatus(plan.status)}
+              </span>
+              <span className="text-xs opacity-70">{plan.date}</span>
+            </div>
+            <p className="mt-1 text-xs leading-relaxed opacity-90">{plan.reason}</p>
+
+            {plan.status === "scheduled" && plan.startAt && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide opacity-60">Départ</p>
+                  <p className="mt-0.5 text-base font-black">{formatLocalTime(plan.startAt)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wide opacity-60">Fin prévue</p>
+                  <p className="mt-0.5 text-base font-black">{formatLocalTime(plan.endAt)}</p>
+                </div>
+              </div>
+            )}
+
+            {plan.zones && plan.zones.length > 0 && (
+              <div className="mt-3 space-y-1">
+                {plan.zones.map((z, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-xl bg-white/40 px-2.5 py-1.5 text-xs">
+                    <span className="font-semibold">Zone {z.zone}</span>
+                    <span>{z.durationMinutes} min</span>
+                    <span className="opacity-70">{formatLocalTime(z.startAt)} → {formatLocalTime(z.endAt)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-2 flex items-center gap-1.5 text-[11px] opacity-60">
+              <CloudRain className="h-3 w-3" />
+              Pluie mesurée : {plan.rainMeasuredMm.toFixed(1)} mm
+              {" · "}Seuil : {plan.rainThresholdMm} mm
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════════
+
 export default function EauPage() {
   const { showToast } = useToast();
   const [data, setData] = useState<IrrigationResponse | null>(null);
@@ -203,10 +358,59 @@ export default function EauPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
 
+  // Auto-schedule state
+  const [autoConfig, setAutoConfig] = useState<AutoIrrigationConfig | null>(null);
+  const [todayPlan, setTodayPlan] = useState<IrrigationPlan | null>(null);
+  const [toggling, setToggling] = useState(false);
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 10000);
     return () => window.clearInterval(timer);
   }, []);
+
+  // ── Auto-schedule: config ──────────────────────────────────────────────────
+  useEffect(() => {
+    const cfgRef = ref(database, AUTO_SCHEDULE_CONFIG_PATH);
+    return onValue(cfgRef, (snap) => {
+      setAutoConfig(snap.val() as AutoIrrigationConfig | null);
+    });
+  }, []);
+
+  // ── Auto-schedule: plan du jour/lendemain ────────────────────────────────
+  useEffect(() => {
+    const endHour = autoConfig?.windowEndHour ?? 6;
+    const h = now.getHours();
+    const morningDate = h < endHour
+      ? now.toLocaleDateString("fr-CA")   // YYYY-MM-DD today
+      : new Date(now.getTime() + 86400000).toLocaleDateString("fr-CA"); // tomorrow
+    const planRef = ref(database, `${AUTO_SCHEDULE_PLANS_PATH}/${morningDate}`);
+    return onValue(planRef, (snap) => {
+      setTodayPlan(snap.val() as IrrigationPlan | null);
+    });
+  }, [autoConfig?.windowEndHour, now]);
+
+  // ── Toggle enabled/disabled ────────────────────────────────────────────────
+  async function handleToggleAutoSchedule() {
+    setToggling(true);
+    try {
+      const current = autoConfig ?? DEFAULT_AUTO_IRRIGATION_CONFIG;
+      await update(ref(database, AUTO_SCHEDULE_CONFIG_PATH), {
+        ...current,
+        enabled: !current.enabled,
+      });
+      showToast({
+        type: "success",
+        title: current.enabled ? "Arrosage auto désactivé" : "Arrosage auto activé",
+        message: current.enabled
+          ? "Le bridge ne programmera plus d'arrosage nocturne automatique."
+          : "Le bridge calculera le prochain plan selon la pluie mesurée.",
+      });
+    } catch (err) {
+      showToast({ type: "error", title: "Impossible de modifier la config", message: (err as Error).message });
+    } finally {
+      setToggling(false);
+    }
+  }
 
   useEffect(() => {
     const statusRef = ref(database, "irrigation-ha/status/current");
@@ -347,6 +551,13 @@ export default function EauPage() {
                 <MetricSmall label="Prix électricité" value={`${fmtNumber(stateOf(entities, "input_number.arrosage_prix_kwh"), 3)} €/kWh`} />
               </div>
             </div>
+
+            <AutoScheduleCard
+              config={autoConfig}
+              plan={todayPlan}
+              onToggle={handleToggleAutoSchedule}
+              toggling={toggling}
+            />
           </aside>
         </section>
       </div>

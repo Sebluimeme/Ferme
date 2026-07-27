@@ -7,7 +7,13 @@
  * - publie l'état dans Firebase Realtime Database : irrigation-ha/status/current ;
  * - écoute les commandes Firebase : irrigation-ha/commands ;
  * - exécute uniquement une allowlist d'actions Home Assistant ;
- * - marque chaque commande done/error.
+ * - marque chaque commande done/error ;
+ * - planifie et exécute l'arrosage automatique nocturne (22h→6h) selon les précipitations.
+ *
+ * Auto-schedule :
+ * - Configuration : irrigation-ha/auto-schedule/config
+ * - Plans :         irrigation-ha/auto-schedule/plans/{YYYY-MM-DD}
+ * - Fenêtre :       22:00 → 06:00 (heure locale), départ au plus près du matin
  *
  * Usage : npm run ha:bridge
  */
@@ -17,6 +23,7 @@ import {
   getDatabase,
   ref,
   set,
+  get,
   update,
   onValue,
   serverTimestamp,
@@ -63,6 +70,27 @@ const ALLOWED_SWITCHES = new Set([
   "switch.sous_station_bat_a_electrovanne_1",
   "switch.sous_station_bat_a_electrovanne_2",
 ]);
+
+// ── Firebase paths ────────────────────────────────────────────────────────────
+const AUTO_SCHEDULE_CONFIG_PATH = "irrigation-ha/auto-schedule/config";
+const AUTO_SCHEDULE_PLANS_PATH  = "irrigation-ha/auto-schedule/plans";
+const WEATHER_READINGS_PATH     = "weather-readings";
+
+// ── Default auto-schedule config ─────────────────────────────────────────────
+const DEFAULT_AUTO_CONFIG = {
+  enabled: false,          // Désactivé par défaut — activer depuis l'UI
+  rainThresholdMm: 15,     // Si pluie du jour ≥ 15 mm, pas d'arrosage
+  targetMm: 20,            // Besoin journalier cible en mm
+  mmPerHour: 5,            // Débit de référence mm/h (informatif)
+  zones: [
+    { zone: 1, enabled: true, maxDurationMinutes: 120 },
+    { zone: 2, enabled: true, maxDurationMinutes: 120 },
+  ],
+  windowStartHour: 22,     // Début fenêtre nocturne
+  windowEndHour: 6,        // Fin fenêtre nocturne (06:00)
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function firebaseKey(entityId) {
   return entityId.replaceAll(".", "__dot__");
@@ -241,13 +269,335 @@ function watchCommands() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Auto-schedule — logique pure (miroir de src/lib/irrigationScheduler.ts)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** YYYY-MM-DD en heure locale */
+function localDateStr(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+/**
+ * Retourne la date YYYY-MM-DD du "matin" (fin de fenêtre 06:00) suivant.
+ * Si heure < windowEndHour → ce matin ; sinon → demain matin.
+ */
+function getNextMorningDate(now, windowEndHour) {
+  if (now.getHours() < windowEndHour) return localDateStr(now);
+  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  return localDateStr(tomorrow);
+}
+
+/** Calcule la pluie du jour (mm) depuis les readings Firebase. */
+function computeTodayRain(readings, todayStr) {
+  let max = 0;
+  const values = Array.isArray(readings) ? readings : Object.values(readings || {});
+  for (const r of values) {
+    const date = r.date ?? r.timestamp?.slice(0, 10);
+    if (date === todayStr && r.rainTotalMm != null && Number.isFinite(r.rainTotalMm)) {
+      max = Math.max(max, r.rainTotalMm);
+    }
+  }
+  return max;
+}
+
+/**
+ * Calcule le plan d'arrosage pour un matin donné.
+ * Retourne un objet plan à écrire dans Firebase.
+ */
+function computePlan(config, rainMm, morningDate, now) {
+  const base = {
+    planId: morningDate,
+    date: morningDate,
+    rainMeasuredMm: rainMm,
+    rainThresholdMm: config.rainThresholdMm,
+    createdAt: now.toISOString(),
+  };
+
+  // ── Skip: pluie suffisante ──────────────────────────────────────────────────
+  if (rainMm >= config.rainThresholdMm) {
+    return {
+      ...base,
+      status: "skipped",
+      reason: `Pluie suffisante (${rainMm.toFixed(1)} mm ≥ seuil ${config.rainThresholdMm} mm)`,
+      startAt: "", endAt: "", totalDurationMinutes: 0, zones: [],
+    };
+  }
+
+  const enabledZones = (config.zones || []).filter((z) => z.enabled);
+  if (enabledZones.length === 0) {
+    return {
+      ...base,
+      status: "skipped",
+      reason: "Aucune zone activée dans la configuration",
+      startAt: "", endAt: "", totalDurationMinutes: 0, zones: [],
+    };
+  }
+
+  // ── Durées proportionnelles au déficit ─────────────────────────────────────
+  const deficit = Math.max(0, config.targetMm - rainMm);
+  const scale = config.targetMm > 0 ? Math.min(1, deficit / config.targetMm) : 1;
+
+  const zoneDurations = enabledZones.map((z) => ({
+    zone: z.zone,
+    durationMinutes: Math.max(1, Math.round(z.maxDurationMinutes * scale)),
+  }));
+  const totalMinutes = zoneDurations.reduce((s, z) => s + z.durationMinutes, 0);
+
+  const windowMax = (config.windowEndHour + 24 - config.windowStartHour) * 60; // 480 min
+  if (totalMinutes > windowMax) {
+    return {
+      ...base,
+      status: "error",
+      reason: `Durée totale (${totalMinutes} min) dépasse la fenêtre ${config.windowStartHour}h–${config.windowEndHour}h (max ${windowMax} min)`,
+      startAt: "", endAt: "", totalDurationMinutes: totalMinutes, zones: [],
+    };
+  }
+
+  // ── Calcul heure de démarrage (à rebours depuis 06:00) ─────────────────────
+  const hEnd = String(config.windowEndHour).padStart(2, "0");
+  // Parsed as LOCAL time (no Z suffix) — correct on a bridge running in France
+  const endLocal = new Date(`${morningDate}T${hEnd}:00:00`);
+  const startLocal = new Date(endLocal.getTime() - totalMinutes * 60 * 1000);
+
+  // Borne inférieure : veille à 22:00
+  const dayBefore = new Date(endLocal.getTime() - 24 * 60 * 60 * 1000);
+  dayBefore.setHours(config.windowStartHour, 0, 0, 0);
+
+  if (startLocal < dayBefore) {
+    return {
+      ...base,
+      status: "error",
+      reason: `Heure de démarrage (${startLocal.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}) antérieure à ${config.windowStartHour}h00`,
+      startAt: "", endAt: "", totalDurationMinutes: totalMinutes, zones: [],
+    };
+  }
+
+  // ── Plan séquentiel par zone ────────────────────────────────────────────────
+  let cursor = startLocal.getTime();
+  const scheduledZones = zoneDurations.map((z) => {
+    const zStart = new Date(cursor);
+    cursor += z.durationMinutes * 60 * 1000;
+    return {
+      zone: z.zone,
+      durationMinutes: z.durationMinutes,
+      startAt: zStart.toISOString(),
+      endAt: new Date(cursor).toISOString(),
+      status: "pending",
+    };
+  });
+
+  return {
+    ...base,
+    status: "scheduled",
+    reason: `Déficit: ${deficit.toFixed(1)} mm (${rainMm.toFixed(1)} mm mesuré, cible ${config.targetMm} mm)`,
+    startAt: startLocal.toISOString(),
+    endAt: endLocal.toISOString(),
+    totalDurationMinutes: totalMinutes,
+    zones: scheduledZones,
+  };
+}
+
+// ─── État auto-schedule ───────────────────────────────────────────────────────
+
+let autoConfig = null;
+let executingAutoZone = false;
+
+/**
+ * Vérifie si un plan doit être créé/mis à jour et l'écrit dans Firebase.
+ * N'écrase jamais un plan en cours d'exécution ou terminé.
+ */
+async function checkAndPlanSchedule() {
+  if (!autoConfig?.enabled) return;
+
+  try {
+    const now = new Date();
+    const morningDate = getNextMorningDate(now, autoConfig.windowEndHour ?? 6);
+    const planRef = ref(db, `${AUTO_SCHEDULE_PLANS_PATH}/${morningDate}`);
+
+    // Lire le plan existant
+    const existingSnap = await get(planRef);
+    const existing = existingSnap.val();
+
+    // Ne pas écraser un plan en cours ou terminé
+    if (existing && ["executing", "done"].includes(existing.status)) return;
+
+    // Lire les données météo (pluie du jour)
+    const weatherSnap = await get(ref(db, WEATHER_READINGS_PATH));
+    const weatherData = weatherSnap.val() || {};
+    const todayStr = localDateStr(now);
+    const rainMm = computeTodayRain(weatherData, todayStr);
+
+    const plan = computePlan(autoConfig, rainMm, morningDate, now);
+
+    // Écrire uniquement si pas de plan existant (scheduled), ou si rain a changé
+    if (!existing || existing.status === "scheduled") {
+      await set(planRef, plan);
+      await update(ref(db, AUTO_SCHEDULE_CONFIG_PATH), { lastError: null, lastErrorAt: null });
+      console.log(`[auto-schedule] plan ${morningDate} → ${plan.status}: ${plan.reason}`);
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await update(ref(db, AUTO_SCHEDULE_CONFIG_PATH), {
+      lastError: message,
+      lastErrorAt: new Date().toISOString(),
+    }).catch(() => {});
+    console.error("[auto-schedule] checkAndPlanSchedule:", message);
+  }
+}
+
+/**
+ * Vérifie si c'est l'heure d'exécuter le plan et lance les zones séquentiellement.
+ * Protégé par un flag pour éviter le double déclenchement.
+ */
+async function checkAndExecuteSchedule() {
+  if (!autoConfig?.enabled || executingAutoZone) return;
+
+  try {
+    const now = new Date();
+    const morningDate = getNextMorningDate(now, autoConfig.windowEndHour ?? 6);
+    const planRef = ref(db, `${AUTO_SCHEDULE_PLANS_PATH}/${morningDate}`);
+    const planSnap = await get(planRef);
+    const plan = planSnap.val();
+
+    if (!plan || plan.status !== "scheduled") return;
+
+    // Pas encore l'heure
+    if (plan.startAt && now < new Date(plan.startAt)) return;
+
+    // Fenêtre expirée
+    if (plan.endAt && now > new Date(plan.endAt)) {
+      await update(planRef, {
+        status: "skipped",
+        reason: "Fenêtre expirée (après 06h00) — plan non exécuté",
+        updatedAt: now.toISOString(),
+      });
+      console.log(`[auto-schedule] plan ${morningDate} expiré`);
+      return;
+    }
+
+    // ── Exécution ───────────────────────────────────────────────────────────
+    executingAutoZone = true;
+    await update(planRef, {
+      status: "executing",
+      startedAt: now.toISOString(),
+    });
+    console.log(`[auto-schedule] démarrage plan ${morningDate} (${plan.totalDurationMinutes} min total)`);
+
+    try {
+      const zones = Array.isArray(plan.zones) ? plan.zones : Object.values(plan.zones || {});
+
+      for (let i = 0; i < zones.length; i++) {
+        const zone = zones[i];
+        const zonePathPrefix = `${AUTO_SCHEDULE_PLANS_PATH}/${morningDate}/zones/${i}`;
+
+        // Marquer la zone en cours
+        await update(ref(db, zonePathPrefix), {
+          status: "executing",
+          startedAt: new Date().toISOString(),
+        });
+
+        // Lancer la zone dans Home Assistant
+        const vanne = `switch.sous_station_bat_a_electrovanne_${zone.zone}`;
+        await haFetch("/api/services/script/turn_on", {
+          method: "POST",
+          body: JSON.stringify({
+            entity_id: "script.arrosage_lancer_zone",
+            variables: { vanne, duree_minutes: zone.durationMinutes },
+          }),
+        });
+        console.log(`[auto-schedule] zone ${zone.zone} démarrée (${zone.durationMinutes} min)`);
+
+        // Attendre la durée prévue. Pas de marge ajoutée : la fenêtre doit rester au plus proche de 06h.
+        await new Promise((resolve) =>
+          setTimeout(resolve, zone.durationMinutes * 60 * 1000)
+        );
+
+        await update(ref(db, zonePathPrefix), {
+          status: "done",
+          doneAt: new Date().toISOString(),
+        });
+        console.log(`[auto-schedule] zone ${zone.zone} terminée`);
+      }
+
+      await update(planRef, {
+        status: "done",
+        completedAt: new Date().toISOString(),
+      });
+      console.log(`[auto-schedule] plan ${morningDate} terminé avec succès`);
+    } catch (execErr) {
+      const msg = execErr instanceof Error ? execErr.message : String(execErr);
+      await update(planRef, {
+        status: "error",
+        error: msg,
+        errorAt: new Date().toISOString(),
+      });
+      console.error(`[auto-schedule] plan ${morningDate} erreur:`, msg);
+    } finally {
+      executingAutoZone = false;
+    }
+
+    await publishStatus({ lastAutoSchedule: morningDate });
+  } catch (err) {
+    console.error("[auto-schedule] checkAndExecuteSchedule:", err instanceof Error ? err.message : err);
+    executingAutoZone = false;
+  }
+}
+
+/**
+ * Initialise l'auto-schedule :
+ * - Crée la config par défaut si absente
+ * - Surveille la config en temps réel
+ * - Lance la vérification/planification toutes les 5 min
+ * - Lance la vérification d'exécution toutes les 5 s
+ */
+async function initAutoSchedule() {
+  const configRef = ref(db, AUTO_SCHEDULE_CONFIG_PATH);
+
+  // Créer la config par défaut si absente
+  const snap = await get(configRef);
+  if (!snap.val()) {
+    await set(configRef, DEFAULT_AUTO_CONFIG);
+    console.log("[auto-schedule] config par défaut créée (désactivée — activer depuis l'UI /eau)");
+  }
+
+  // Surveiller la config en temps réel
+  onValue(configRef, (snapshot) => {
+    autoConfig = snapshot.val() || DEFAULT_AUTO_CONFIG;
+    console.log(
+      `[auto-schedule] config chargée: enabled=${autoConfig.enabled}, ` +
+      `seuil=${autoConfig.rainThresholdMm}mm, cible=${autoConfig.targetMm}mm`
+    );
+  });
+
+  // Planification : au démarrage + toutes les 5 min
+  await checkAndPlanSchedule();
+  setInterval(() => checkAndPlanSchedule(), 5 * 60 * 1000);
+
+  // Exécution : toutes les 5 secondes pour démarrer au plus près de l'heure calculée.
+  setInterval(() => checkAndExecuteSchedule(), 5 * 1000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Main
+// ═══════════════════════════════════════════════════════════════════════════════
+
 async function main() {
   console.log("[bridge] connexion Firebase...");
   await signInWithEmailAndPassword(auth, firebaseEmail, firebasePassword);
   console.log(`[bridge] Firebase connecté. HA=${haBaseUrl}`);
+
   watchCommands();
   await publishStatus();
   setInterval(() => publishStatus(), pollMs);
+
+  // Auto-schedule
+  await initAutoSchedule();
+  console.log("[bridge] auto-schedule initialisé");
 }
 
 main().catch((error) => {
