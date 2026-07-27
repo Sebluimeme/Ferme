@@ -337,13 +337,13 @@ function computeTodayRain(readings, todayStr) {
   return max;
 }
 
-/** Pluie récente sur 48h (aujourd'hui + hier). */
+/** Pluie utile récente sur 7 jours, pondérée: plus la pluie est ancienne, moins elle compte. */
 function computeRecentRainMm(readings, nowMs) {
-  const now = new Date(nowMs);
-  const todayStr = localDateStr(now);
-  const yesterday = new Date(nowMs - 24 * 60 * 60 * 1000);
-  const yestStr = localDateStr(yesterday);
-  return computeTodayRain(readings, todayStr) + computeTodayRain(readings, yestStr);
+  const weights = [1, 0.85, 0.7, 0.5, 0.35, 0.2, 0.1];
+  return Number(weights.reduce((sum, weight, daysAgo) => {
+    const day = new Date(nowMs - daysAgo * 24 * 60 * 60 * 1000);
+    return sum + computeTodayRain(readings, localDateStr(day)) * weight;
+  }, 0).toFixed(2));
 }
 
 /** Estime l'humidité du sol (0–100%) d'une zone. Valeur estimée, pas mesurée. */
@@ -567,7 +567,7 @@ async function checkAndPlanSchedule() {
     // Ne pas écraser un plan en cours ou terminé
     if (existing && ["executing", "done"].includes(existing.status)) return;
 
-    // Lire les données météo (pluie récente 48h) + état hydrique estimé par zone
+    // Lire les données météo (pluie utile récente sur 7 jours) + état hydrique estimé par zone
     const weatherSnap = await get(ref(db, WEATHER_READINGS_PATH));
     const weatherData = Object.values(weatherSnap.val() || {});
     const rainMm = computeRecentRainMm(weatherData, now.getTime());
@@ -585,12 +585,11 @@ async function checkAndPlanSchedule() {
 
     const plan = computeIrrigationPlanV2({ ...autoConfig, zones }, zoneStates, rainMm, morningDate, now);
 
-    // Écrire uniquement si pas de plan existant (scheduled), ou si rain/état a changé
-    if (!existing || existing.status === "scheduled") {
-      await set(planRef, plan);
-      await update(ref(db, AUTO_SCHEDULE_CONFIG_PATH), { lastError: null, lastErrorAt: null });
-      console.log(`[auto-schedule] plan ${morningDate} → ${plan.status}: ${plan.reason}`);
-    }
+    // Réécrire tout plan non verrouillé. Les plans skipped/error doivent pouvoir
+    // évoluer si la qualité, la pluie ou l'état estimé changent.
+    await set(planRef, plan);
+    await update(ref(db, AUTO_SCHEDULE_CONFIG_PATH), { lastError: null, lastErrorAt: null });
+    console.log(`[auto-schedule] plan ${morningDate} → ${plan.status}: ${plan.reason}`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await update(ref(db, AUTO_SCHEDULE_CONFIG_PATH), {
@@ -724,17 +723,19 @@ async function initAutoSchedule() {
     console.log("[auto-schedule] config par défaut créée (désactivée — activer depuis l'UI /eau)");
   }
 
-  // Surveiller la config en temps réel
+  // Surveiller la config en temps réel. Recalcule immédiatement quand la config change.
   onValue(configRef, (snapshot) => {
     autoConfig = snapshot.val() || DEFAULT_AUTO_CONFIG;
     console.log(
       `[auto-schedule] config chargée: enabled=${autoConfig.enabled}, ` +
-      `seuil=${autoConfig.rainThresholdMm}mm, cible=${autoConfig.targetMm}mm`
+      `seuil=${autoConfig.rainThresholdMm}mm`
+    );
+    checkAndPlanSchedule().catch((err) =>
+      console.error("[auto-schedule] recalcul config:", err instanceof Error ? err.message : err)
     );
   });
 
-  // Planification : au démarrage + toutes les 5 min
-  await checkAndPlanSchedule();
+  // Planification : toutes les 5 min
   setInterval(() => checkAndPlanSchedule(), 5 * 60 * 1000);
 
   // Exécution : toutes les 5 secondes pour démarrer au plus près de l'heure calculée.

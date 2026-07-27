@@ -192,7 +192,6 @@ function MoistureBar({ state }: { state?: ZoneMoistureState }) {
           <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Humidité estimée</p>
           <p className="mt-1 text-3xl font-black tracking-tight text-stone-950">{state ? `${pct}%` : "—"}</p>
         </div>
-        {state && <p className="pb-1 text-xs font-semibold text-stone-500">Seuil {state.triggerPct}% · cible {state.targetPct}%</p>}
       </div>
       <div className="mt-3 h-3 overflow-hidden rounded-full bg-stone-100 ring-1 ring-stone-200">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
@@ -247,7 +246,7 @@ function AutomaticIrrigationPanel({
 
       <div className="mt-6 grid gap-3 md:grid-cols-4">
         <MetricSmall label="Fenêtre" value={`${config.windowStartHour}h → ${config.windowEndHour}h`} />
-        <MetricSmall label="Pluie blocante" value={`${config.rainThresholdMm ?? 15} mm / 48h`} />
+        <MetricSmall label="Pluie blocante" value={`${config.rainThresholdMm ?? 15} mm utiles / 7j`} />
         <MetricSmall label="Cycle minimum" value={`${Math.min(...config.zones.map((z) => z.minRunMinutes ?? 45))} min / zone`} />
         <MetricSmall label="Pompe estimée" value="1 200 W · 0,20 €/kWh" />
       </div>
@@ -302,7 +301,7 @@ function AutomaticIrrigationPanel({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Zone {zone.zone}</p>
-                  <h3 className="mt-1 text-xl font-black tracking-tight text-stone-950">{zone.zone === 1 ? "Zone source" : "Zone pâture"}</h3>
+                  <h3 className="mt-1 text-xl font-black tracking-tight text-stone-950">{zone.zone === 1 ? "Terrain de volley" : "La butte"}</h3>
                   <p className="mt-1 text-sm text-stone-500">Mode {QUALITY_LABELS[mode]} · seuil {thresholds.triggerPct}% → cible {thresholds.targetPct}%</p>
                 </div>
                 <span className={[

@@ -71,11 +71,11 @@ function computeTodayRain(readings, todayStr) {
 }
 
 function computeRecentRainMm(readings, nowMs) {
-  const now = new Date(nowMs);
-  const todayStr = localDateStr(now);
-  const yesterday = new Date(nowMs - 24 * 60 * 60 * 1000);
-  const yestStr = localDateStr(yesterday);
-  return computeTodayRain(readings, todayStr) + computeTodayRain(readings, yestStr);
+  const weights = [1, 0.85, 0.7, 0.5, 0.35, 0.2, 0.1];
+  return Number(weights.reduce((sum, weight, daysAgo) => {
+    const day = new Date(nowMs - daysAgo * 24 * 60 * 60 * 1000);
+    return sum + computeTodayRain(readings, localDateStr(day)) * weight;
+  }, 0).toFixed(2));
 }
 
 // ─── V2: humidité estimée ─────────────────────────────────────────────────────
@@ -623,15 +623,16 @@ test("Pluie ≥ seuil (rainThreshold) → skip toutes zones même si sèches", (
   assertEqual(plan.status, "skipped");
 });
 
-test("computeRecentRainMm somme aujourd'hui + hier", () => {
+test("computeRecentRainMm calcule une pluie utile pondérée sur 7 jours", () => {
   const readings = [
     { date: "2026-07-28", rainTotalMm: 5.0 },
     { date: "2026-07-27", rainTotalMm: 3.0 },
-    { date: "2026-07-26", rainTotalMm: 10.0 }, // trop vieux
+    { date: "2026-07-26", rainTotalMm: 10.0 },
+    { date: "2026-07-21", rainTotalMm: 100.0 }, // J-7 hors fenêtre pondérée
   ];
   const nowMs = new Date("2026-07-28T12:00:00").getTime();
   const rain = computeRecentRainMm(readings, nowMs);
-  assertEqual(rain, 8.0, "5+3=8mm sur 48h");
+  assertEqual(rain, 14.55, "5 + 3×0.85 + 10×0.7 = 14.55mm utiles");
 });
 
 // ─── Résumé ─────────────────────────────────────────────────────────────────

@@ -190,18 +190,18 @@ export function computeTodayRain(
 }
 
 /**
- * Compute recent rain over 48h (today + yesterday) from weather readings.
- * Used for moisture estimation to account for recent precipitation.
+ * Compute useful recent rain over 7 days with decay.
+ * This is still an estimate: older rain has less remaining value in the root zone.
  */
 export function computeRecentRainMm(
   readings: WeatherReading[],
   nowMs: number,
 ): number {
-  const now = new Date(nowMs);
-  const todayStr = localDateString(now);
-  const yesterday = new Date(nowMs - 24 * 60 * 60 * 1000);
-  const yestStr = localDateString(yesterday);
-  return computeTodayRain(readings, todayStr) + computeTodayRain(readings, yestStr);
+  const weights = [1, 0.85, 0.7, 0.5, 0.35, 0.2, 0.1];
+  return Number(weights.reduce((sum, weight, daysAgo) => {
+    const day = new Date(nowMs - daysAgo * 24 * 60 * 60 * 1000);
+    return sum + computeTodayRain(readings, localDateString(day)) * weight;
+  }, 0).toFixed(2));
 }
 
 // ── V2: moisture estimation ───────────────────────────────────────────────────
