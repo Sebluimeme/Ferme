@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  CalendarDays,
   CircleStop,
   Clock3,
   Droplets,
@@ -16,6 +15,8 @@ import {
   Waves,
   Zap,
 } from "lucide-react";
+import { ref, onValue, push, set, serverTimestamp } from "firebase/database";
+import { database } from "@/lib/firebase";
 import { useToast } from "@/components/Toast";
 
 type HaEntity = {
@@ -184,39 +185,38 @@ export default function EauPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  async function load(silent = false) {
-    if (!silent) setLoading(true);
-    try {
-      const response = await fetch("/api/home-assistant/irrigation", { cache: "no-store" });
-      const json = await response.json() as IrrigationResponse;
-      setData(json);
-      if (!json.ok && !silent) showToast({ type: "error", title: "Home Assistant indisponible", message: json.error });
-    } catch (error) {
-      setData({ ok: false, error: error instanceof Error ? error.message : "Erreur réseau" });
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }
-
   useEffect(() => {
-    load();
-    const timer = window.setInterval(() => load(true), 30000);
-    return () => window.clearInterval(timer);
+    const statusRef = ref(database, "irrigation-ha/status/current");
+    const unsubscribe = onValue(
+      statusRef,
+      (snapshot) => {
+        const value = snapshot.val() as IrrigationResponse | null;
+        setData(value ?? { ok: false, error: "Aucun statut bridge reçu" });
+        setLoading(false);
+        setRefreshing(false);
+      },
+      (error) => {
+        setData({ ok: false, error: error.message });
+        setLoading(false);
+        setRefreshing(false);
+      },
+    );
+
+    return () => unsubscribe();
   }, []);
 
   async function action(body: Record<string, unknown>, success: string) {
     setRefreshing(true);
     try {
-      const response = await fetch("/api/home-assistant/irrigation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+      const commandRef = push(ref(database, "irrigation-ha/commands"));
+      await set(commandRef, {
+        ...body,
+        status: "pending",
+        requestedAt: new Date().toISOString(),
+        requestedAtServer: serverTimestamp(),
       });
-      const json = await response.json() as IrrigationResponse;
-      if (!response.ok || !json.ok) throw new Error(json.error || "Action refusée");
-      showToast({ type: "success", title: success });
-      await load(true);
+      showToast({ type: "success", title: success, message: "Commande envoyée au bridge local" });
+      window.setTimeout(() => setRefreshing(false), 3000);
     } catch (error) {
       showToast({ type: "error", title: "Action impossible", message: error instanceof Error ? error.message : undefined });
       setRefreshing(false);
@@ -247,7 +247,7 @@ export default function EauPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => { setRefreshing(true); load(true); }}
+              onClick={() => { setRefreshing(true); window.setTimeout(() => setRefreshing(false), 1200); }}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white px-4 text-sm font-black text-stone-800 shadow-sm transition hover:border-brand-200"
             >
               <RefreshCw className={refreshing || loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
@@ -272,8 +272,8 @@ export default function EauPage() {
 
         {!data?.ok && !loading && (
           <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            <strong>Connexion Home Assistant indisponible depuis ce serveur.</strong>
-            <p className="mt-1">Si l’app Ferme tourne sur Vercel, il faudra un tunnel/VPN/URL distante Home Assistant côté serveur. Depuis Hermes local, l’API Home Assistant fonctionne déjà.</p>
+            <strong>Bridge local Home Assistant indisponible.</strong>
+            <p className="mt-1">L’app Ferme reste gratuite et privée : elle lit Firebase. Il faut que le bridge local tourne chez toi pour synchroniser Home Assistant.</p>
             {data?.error && <p className="mt-2 font-mono text-xs">{data.error}</p>}
           </div>
         )}
