@@ -64,6 +64,10 @@ const ALLOWED_SWITCHES = new Set([
   "switch.sous_station_bat_a_electrovanne_2",
 ]);
 
+function firebaseKey(entityId) {
+  return entityId.replaceAll(".", "__dot__");
+}
+
 function readEnv() {
   const env = {};
   const content = readFileSync(envPath, "utf8");
@@ -131,7 +135,7 @@ async function publishStatus(extra = {}) {
     const entities = states
       .filter((item) => wanted.has(item.entity_id))
       .reduce((acc, item) => {
-        acc[item.entity_id] = {
+        acc[firebaseKey(item.entity_id)] = {
           entity_id: item.entity_id,
           state: item.state,
           attributes: item.attributes || {},

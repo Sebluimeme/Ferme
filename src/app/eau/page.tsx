@@ -51,7 +51,7 @@ const fmtNumber = (value: unknown, digits = 1) => {
 };
 
 function stateOf(entities: Record<string, HaEntity> | undefined, id: string) {
-  return entities?.[id]?.state ?? "unavailable";
+  return entities?.[id]?.state ?? entities?.[id.replaceAll(".", "__dot__")]?.state ?? "unavailable";
 }
 
 function isOn(entities: Record<string, HaEntity> | undefined, id: string) {
