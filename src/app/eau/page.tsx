@@ -8,9 +8,7 @@ import {
   CloudRain,
   Droplets,
   Gauge,
-  Leaf,
   Loader2,
-  Plus,
   Power,
   ShieldCheck,
   ToggleLeft,
@@ -21,8 +19,8 @@ import {
 import { ref, onValue, push, set, update, serverTimestamp } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { useToast } from "@/components/Toast";
-import type { AutoIrrigationConfig, IrrigationPlan } from "@/lib/irrigationScheduler";
-import { DEFAULT_AUTO_IRRIGATION_CONFIG, formatPlanStatus, formatLocalTime } from "@/lib/irrigationScheduler";
+import type { AutoIrrigationConfig, IrrigationPlan, QualityMode, ZoneConfig, ZoneMoistureState } from "@/lib/irrigationScheduler";
+import { DEFAULT_AUTO_IRRIGATION_CONFIG, QUALITY_THRESHOLDS, formatPlanStatus, formatLocalTime } from "@/lib/irrigationScheduler";
 
 type HaEntity = {
   entity_id: string;
@@ -39,15 +37,34 @@ type IrrigationResponse = {
   entities?: Record<string, HaEntity>;
 };
 
-const DAYS = [
-  ["lundi", "L"],
-  ["mardi", "M"],
-  ["mercredi", "M"],
-  ["jeudi", "J"],
-  ["vendredi", "V"],
-  ["samedi", "S"],
-  ["dimanche", "D"],
-] as const;
+type PlanStatusTone = "blue" | "green" | "amber" | "red" | "stone";
+
+const AUTO_SCHEDULE_CONFIG_PATH = "irrigation-ha/auto-schedule/config";
+const AUTO_SCHEDULE_PLANS_PATH = "irrigation-ha/auto-schedule/plans";
+
+const QUALITY_LABELS: Record<QualityMode, string> = {
+  eco: "Éco",
+  passable: "Passable",
+  correct: "Correct",
+  green: "Vert",
+  manual: "Manuel",
+};
+
+const QUALITY_HELP: Record<QualityMode, string> = {
+  eco: "gazon vivant, peu d’eau",
+  passable: "jaunissement accepté",
+  correct: "plus régulier",
+  green: "plus vert, plus gourmand",
+  manual: "seuil/cible personnalisés",
+};
+
+const toneClasses: Record<PlanStatusTone, string> = {
+  blue: "bg-sky-50 text-sky-700 ring-sky-100",
+  green: "bg-brand-50 text-brand-700 ring-brand-100",
+  amber: "bg-amber-50 text-amber-700 ring-amber-100",
+  red: "bg-red-50 text-red-700 ring-red-100",
+  stone: "bg-stone-100 text-stone-600 ring-stone-200",
+};
 
 const fmtNumber = (value: unknown, digits = 1) => {
   const num = Number(value);
@@ -63,6 +80,10 @@ function entityOf(entities: Record<string, HaEntity> | undefined, id: string) {
   return entities?.[id] ?? entities?.[id.replaceAll(".", "__dot__")];
 }
 
+function isOn(entities: Record<string, HaEntity> | undefined, id: string) {
+  return stateOf(entities, id) === "on";
+}
+
 function elapsedLabel(since: string | undefined, now: Date) {
   if (!since) return "—";
   const startedAt = new Date(since).getTime();
@@ -73,8 +94,27 @@ function elapsedLabel(since: string | undefined, now: Date) {
   return `${minutes}min ${rest.toString().padStart(2, "0")}s`;
 }
 
-function isOn(entities: Record<string, HaEntity> | undefined, id: string) {
-  return stateOf(entities, id) === "on";
+function planStatusTone(status: string | undefined): PlanStatusTone {
+  switch (status) {
+    case "scheduled": return "blue";
+    case "executing":
+    case "done": return "green";
+    case "skipped": return "amber";
+    case "error": return "red";
+    default: return "stone";
+  }
+}
+
+function mergeConfig(config: AutoIrrigationConfig | null): AutoIrrigationConfig {
+  const zones = DEFAULT_AUTO_IRRIGATION_CONFIG.zones.map((fallback) => ({
+    ...fallback,
+    ...(config?.zones?.find((z) => z.zone === fallback.zone) ?? {}),
+  }));
+  return {
+    ...DEFAULT_AUTO_IRRIGATION_CONFIG,
+    ...(config ?? {}),
+    zones,
+  };
 }
 
 function MetricCard({ label, value, suffix, icon: Icon, tone = "green" }: {
@@ -92,264 +132,345 @@ function MetricCard({ label, value, suffix, icon: Icon, tone = "green" }: {
   }[tone];
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-stone-200/80 bg-white p-5 shadow-sm">
-      <div className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ring-1 ${toneClass}`}>
+    <div className="rounded-3xl border border-stone-200/80 bg-white p-4 shadow-sm sm:p-5">
+      <div className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ring-1 ${toneClass}`}>
         <Icon className="h-5 w-5" />
       </div>
-      <p className="mt-5 text-sm font-semibold text-stone-500">{label}</p>
-      <p className="mt-1 text-3xl font-black tracking-tight text-stone-950">
-        {value}{suffix && <span className="ml-1 text-base font-bold text-stone-500">{suffix}</span>}
+      <p className="mt-4 text-sm font-semibold text-stone-500">{label}</p>
+      <p className="mt-1 text-2xl font-black tracking-tight text-stone-950">
+        {value}{suffix && <span className="ml-1 text-sm font-bold text-stone-500">{suffix}</span>}
       </p>
-      <div className="absolute -bottom-10 -right-8 h-28 w-28 rounded-full bg-brand-50" />
     </div>
   );
 }
 
-function ZoneCard({
-  zone,
-  title,
-  subtitle,
-  entities,
-  refreshing,
-  onRun,
-  now,
-}: {
-  zone: 1 | 2;
-  title: string;
-  subtitle: string;
-  entities?: Record<string, HaEntity>;
-  refreshing: boolean;
-  onRun: (zone: 1 | 2, duration: number) => void;
-  now: Date;
-}) {
-  const valveId = `switch.sous_station_bat_a_electrovanne_${zone}`;
-  const activeId = `input_boolean.arrosage_vanne_${zone}_actif`;
-  const timeId = `input_datetime.arrosage_vanne_${zone}_heure`;
-  const durationId = `input_number.arrosage_vanne_${zone}_duree`;
-  const mmId = `sensor.arrosage_vanne_${zone}_mm_aujourd_hui`;
-  const valve = entityOf(entities, valveId);
-  const valveOn = valve?.state === "on";
-  const duration = Math.max(1, Math.round(Number(stateOf(entities, durationId)) || 1));
-
+function MetricSmall({ label, value }: { label: string; value: string }) {
   return (
-    <article className="rounded-[2rem] border border-stone-200 bg-white p-5 shadow-sm transition-all hover:border-brand-200 hover:shadow-md">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div className={[
-            "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-white shadow-lg",
-            zone === 1 ? "bg-gradient-to-br from-sky-500 to-blue-700 shadow-sky-200" : "bg-gradient-to-br from-brand-400 to-brand-700 shadow-brand-200",
-          ].join(" ")}>
-            {zone === 1 ? <Droplets className="h-7 w-7" /> : <Leaf className="h-7 w-7" />}
-          </div>
-          <div>
-            <h2 className="text-xl font-black tracking-tight text-stone-950">{title}</h2>
-            <p className="mt-1 text-sm leading-relaxed text-stone-500">{subtitle}</p>
-          </div>
-        </div>
-        <span className={[
-          "rounded-full px-3 py-1.5 text-xs font-black",
-          isOn(entities, activeId) ? "bg-brand-50 text-brand-700" : "bg-stone-100 text-stone-500",
-        ].join(" ")}>{isOn(entities, activeId) ? "Programmée" : "Inactive"}</span>
-      </div>
-
-      <div className="mt-5 rounded-3xl bg-stone-50 p-4 ring-1 ring-stone-200/70">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Départ</p>
-            <p className="mt-1 text-lg font-black text-stone-950">{stateOf(entities, timeId).slice(0, 5)}</p>
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Durée</p>
-            <p className="mt-1 text-lg font-black text-stone-950">{duration} min</p>
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Aujourd’hui</p>
-            <p className="mt-1 text-lg font-black text-sky-700">{fmtNumber(stateOf(entities, mmId))} mm</p>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {DAYS.map(([day, label]) => {
-            const on = isOn(entities, `input_boolean.arrosage_vanne_${zone}_${day}`);
-            return (
-              <span key={day} className={[
-                "grid h-8 w-8 place-items-center rounded-xl text-xs font-black ring-1",
-                on ? "bg-brand-700 text-white ring-brand-700" : "bg-white text-stone-400 ring-stone-200",
-              ].join(" ")}>{label}</span>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2 text-sm font-semibold text-stone-500">
-          <span className={[
-            "h-2.5 w-2.5 rounded-full",
-            valveOn ? "bg-brand-500 shadow-[0_0_0_6px_rgba(51,147,94,.12)]" : "bg-stone-300",
-          ].join(" ")} />
-          {valveOn ? `En cours depuis ${elapsedLabel(valve.last_changed, now)}` : "Vanne fermée"}
-        </div>
-        <button
-          disabled={refreshing}
-          onClick={() => onRun(zone, duration)}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-stone-950 px-4 text-sm font-black text-white transition-all hover:bg-brand-800 active:scale-[0.98] disabled:cursor-wait disabled:bg-stone-300"
-        >
-          {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
-          Lancer {duration} min
-        </button>
-      </div>
-    </article>
+    <div className="rounded-2xl bg-stone-50 p-4 ring-1 ring-stone-200/70">
+      <p className="text-xs font-bold uppercase tracking-wide text-stone-400">{label}</p>
+      <p className="mt-1 text-lg font-black tracking-tight text-stone-950">{value}</p>
+    </div>
   );
 }
 
-// ── Firebase paths ──────────────────────────────────────────────────────────
-const AUTO_SCHEDULE_CONFIG_PATH = "irrigation-ha/auto-schedule/config";
-const AUTO_SCHEDULE_PLANS_PATH  = "irrigation-ha/auto-schedule/plans";
-
-// ── Auto-schedule UI component ───────────────────────────────────────────────
-
-type PlanStatusTone = "blue" | "green" | "amber" | "red" | "stone";
-
-function planStatusTone(status: string | undefined): PlanStatusTone {
-  switch (status) {
-    case "scheduled": return "blue";
-    case "executing": return "green";
-    case "done":      return "green";
-    case "skipped":   return "amber";
-    case "error":     return "red";
-    default:          return "stone";
-  }
+function QualityModeSelector({ zone, disabled, onChange }: {
+  zone: ZoneConfig;
+  disabled: boolean;
+  onChange: (mode: QualityMode) => void;
+}) {
+  const mode = zone.qualityMode ?? "passable";
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+      {(Object.keys(QUALITY_LABELS) as QualityMode[]).map((key) => (
+        <button
+          key={key}
+          disabled={disabled}
+          onClick={() => onChange(key)}
+          className={[
+            "min-h-11 rounded-2xl px-3 py-2 text-left text-xs font-black ring-1 transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60",
+            mode === key
+              ? "bg-stone-950 text-white ring-stone-950"
+              : "bg-white text-stone-600 ring-stone-200 hover:bg-stone-50",
+          ].join(" ")}
+        >
+          <span className="block">{QUALITY_LABELS[key]}</span>
+          <span className="mt-0.5 block text-[10px] font-semibold opacity-70">{QUALITY_HELP[key]}</span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
-const toneClasses: Record<PlanStatusTone, string> = {
-  blue:  "bg-sky-50 text-sky-700 ring-sky-100",
-  green: "bg-brand-50 text-brand-700 ring-brand-100",
-  amber: "bg-amber-50 text-amber-700 ring-amber-100",
-  red:   "bg-red-50 text-red-700 ring-red-100",
-  stone: "bg-stone-100 text-stone-500 ring-stone-200",
-};
+function MoistureBar({ state }: { state?: ZoneMoistureState }) {
+  const pct = Math.max(0, Math.min(100, state?.estimatedHumidityPct ?? 0));
+  const decision = state?.decision;
+  const color = decision === "irrigate" ? "bg-amber-500" : decision === "wait" ? "bg-brand-600" : "bg-stone-300";
+  return (
+    <div>
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Humidité estimée</p>
+          <p className="mt-1 text-3xl font-black tracking-tight text-stone-950">{state ? `${pct}%` : "—"}</p>
+        </div>
+        {state && <p className="pb-1 text-xs font-semibold text-stone-500">Seuil {state.triggerPct}% · cible {state.targetPct}%</p>}
+      </div>
+      <div className="mt-3 h-3 overflow-hidden rounded-full bg-stone-100 ring-1 ring-stone-200">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
 
-function AutoScheduleCard({
+function AutomaticIrrigationPanel({
   config,
   plan,
   onToggle,
+  onQualityChange,
   toggling,
+  updatingZone,
 }: {
-  config: AutoIrrigationConfig | null;
+  config: AutoIrrigationConfig;
   plan: IrrigationPlan | null;
   onToggle: () => void;
+  onQualityChange: (zone: 1 | 2, mode: QualityMode) => void;
   toggling: boolean;
+  updatingZone: number | null;
 }) {
-  const cfg = config ?? DEFAULT_AUTO_IRRIGATION_CONFIG;
-  const tone = planStatusTone(plan?.status);
-  const toneClass = toneClasses[tone];
+  const tone = toneClasses[planStatusTone(plan?.status)];
+  const zoneStates = new Map((plan?.zoneStates ?? []).map((z) => [z.zone, z]));
 
   return (
-    <div className="rounded-[2rem] border border-stone-200 bg-white p-5 shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-sky-50 ring-1 ring-sky-100">
-            <CalendarClock className="h-5 w-5 text-sky-600" />
+    <section className="rounded-[2rem] border border-stone-200 bg-white p-5 shadow-sm sm:p-6 xl:p-7">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="max-w-3xl">
+          <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1.5 text-xs font-black text-sky-700 ring-1 ring-sky-100">
+            <CalendarClock className="h-4 w-4" />
+            Module principal
           </div>
-          <div>
-            <h2 className="text-lg font-black tracking-tight text-stone-950">Arrosage automatique</h2>
-            <p className="text-xs text-stone-500">Fenêtre nocturne {cfg.windowStartHour}h→{cfg.windowEndHour}h, départ au plus proche du matin</p>
-          </div>
+          <h2 className="mt-4 text-2xl font-black tracking-tight text-stone-950 sm:text-4xl">Arrosage automatique intelligent</h2>
+          <p className="mt-3 text-base leading-relaxed text-stone-600">
+            Décision par zone avec <strong>humidité estimée</strong>, pluie réelle mesurée, seuil de qualité gazon et cycles longs. Pas d’arrosage systématique : on attend un vrai déficit, puis on termine au plus tard à 06h00.
+          </p>
         </div>
         <button
           onClick={onToggle}
           disabled={toggling}
-          title={cfg.enabled ? "Désactiver l'arrosage auto" : "Activer l'arrosage auto"}
-          className="flex items-center gap-1.5 rounded-2xl px-3 py-2 text-xs font-black transition-colors disabled:opacity-50"
-          style={{ background: cfg.enabled ? "rgb(var(--color-brand-700, 51 147 94) / 0.1)" : "#f3f4f6" }}
+          className={[
+            "inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60",
+            config.enabled ? "bg-brand-700 text-white hover:bg-brand-800" : "bg-stone-950 text-white hover:bg-stone-800",
+          ].join(" ")}
         >
-          {cfg.enabled
-            ? <><ToggleRight className="h-5 w-5 text-brand-700" /><span className="text-brand-700">Activé</span></>
-            : <><ToggleLeft className="h-5 w-5 text-stone-400" /><span className="text-stone-500">Désactivé</span></>
-          }
+          {toggling ? <Loader2 className="h-4 w-4 animate-spin" /> : config.enabled ? <ToggleRight className="h-5 w-5" /> : <ToggleLeft className="h-5 w-5" />}
+          {config.enabled ? "Automatique activé" : "Activer l’automatique"}
         </button>
       </div>
 
-      {/* Config résumé */}
-      <div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-stone-50 p-3 ring-1 ring-stone-200/70 text-center text-xs">
-        <div>
-          <p className="font-bold uppercase tracking-wide text-stone-400">Seuil pluie</p>
-          <p className="mt-1 text-base font-black text-stone-950">{cfg.rainThresholdMm} mm</p>
+      <div className="mt-6 grid gap-3 md:grid-cols-4">
+        <MetricSmall label="Fenêtre" value={`${config.windowStartHour}h → ${config.windowEndHour}h`} />
+        <MetricSmall label="Pluie blocante" value={`${config.rainThresholdMm ?? 15} mm / 48h`} />
+        <MetricSmall label="Cycle minimum" value={`${Math.min(...config.zones.map((z) => z.minRunMinutes ?? 45))} min / zone`} />
+        <MetricSmall label="Pompe estimée" value="1 200 W · 0,20 €/kWh" />
+      </div>
+
+      {config.lastError && (
+        <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm leading-relaxed text-red-800">
+          <strong>Planification bloquée.</strong>
+          <span className="mt-1 block font-mono text-xs">{config.lastError}</span>
         </div>
-        <div>
-          <p className="font-bold uppercase tracking-wide text-stone-400">Cible</p>
-          <p className="mt-1 text-base font-black text-stone-950">{cfg.targetMm} mm</p>
+      )}
+
+      <div className={`mt-5 rounded-3xl p-4 ring-1 ${tone}`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wide opacity-70">Plan ce soir / cette nuit</p>
+            <p className="mt-1 text-lg font-black">{plan ? formatPlanStatus(plan.status) : config.enabled ? "Calcul en attente" : "Désactivé"}</p>
+            <p className="mt-1 text-sm leading-relaxed opacity-90">
+              {plan?.reason ?? (config.enabled ? "Le bridge recalculera le prochain plan au prochain cycle." : "Active l’automatique pour générer un plan depuis les mesures météo.")}
+            </p>
+          </div>
+          {plan?.startAt && (
+            <div className="grid grid-cols-2 gap-3 text-sm sm:min-w-64">
+              <div className="rounded-2xl bg-white/50 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide opacity-60">Départ</p>
+                <p className="mt-1 text-xl font-black">{formatLocalTime(plan.startAt)}</p>
+              </div>
+              <div className="rounded-2xl bg-white/50 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide opacity-60">Fin max</p>
+                <p className="mt-1 text-xl font-black">{formatLocalTime(plan.endAt)}</p>
+              </div>
+            </div>
+          )}
         </div>
+        {plan && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold opacity-70">
+            <CloudRain className="h-4 w-4" />
+            Pluie récente mesurée : {plan.rainMeasuredMm.toFixed(1)} mm · Durée totale : {plan.totalDurationMinutes} min
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6 grid gap-4 xl:grid-cols-2">
+        {config.zones.map((zone) => {
+          const state = zoneStates.get(zone.zone);
+          const mode = zone.qualityMode ?? "passable";
+          const thresholds = mode === "manual"
+            ? { triggerPct: zone.triggerPct ?? QUALITY_THRESHOLDS.manual.triggerPct, targetPct: zone.targetPct ?? QUALITY_THRESHOLDS.manual.targetPct }
+            : QUALITY_THRESHOLDS[mode];
+          const plannedZone = plan?.zones?.find((z) => z.zone === zone.zone);
+          return (
+            <article key={zone.zone} className="rounded-3xl border border-stone-200 bg-stone-50 p-4 ring-1 ring-white">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Zone {zone.zone}</p>
+                  <h3 className="mt-1 text-xl font-black tracking-tight text-stone-950">{zone.zone === 1 ? "Zone source" : "Zone pâture"}</h3>
+                  <p className="mt-1 text-sm text-stone-500">Mode {QUALITY_LABELS[mode]} · seuil {thresholds.triggerPct}% → cible {thresholds.targetPct}%</p>
+                </div>
+                <span className={[
+                  "rounded-full px-3 py-1.5 text-xs font-black",
+                  state?.decision === "irrigate" ? "bg-amber-100 text-amber-800" : state?.decision === "wait" ? "bg-brand-100 text-brand-800" : "bg-stone-200 text-stone-600",
+                ].join(" ")}>{state?.decision === "irrigate" ? "À arroser" : state?.decision === "wait" ? "Attendre" : "Estimée"}</span>
+              </div>
+
+              <div className="mt-4">
+                <MoistureBar state={state} />
+              </div>
+
+              <div className="mt-4">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-stone-400">Qualité souhaitée</p>
+                <QualityModeSelector
+                  zone={zone}
+                  disabled={updatingZone === zone.zone}
+                  onChange={(next) => onQualityChange(zone.zone, next)}
+                />
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <MetricSmall label="Débit estimé" value={`${zone.irrigationDepthMmPerHour ?? 5} mm/h`} />
+                <MetricSmall label="Réserve sol" value={`${zone.soilCapacityMm ?? 35} mm`} />
+                <MetricSmall label="Cycle prévu" value={plannedZone ? `${plannedZone.durationMinutes} min` : state?.plannedDurationMinutes ? `${state.plannedDurationMinutes} min` : "0 min"} />
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ManualIrrigationCard({
+  entities,
+  refreshing,
+  now,
+  duration,
+  zone,
+  onDurationChange,
+  onZoneChange,
+  onRun,
+  onStop,
+}: {
+  entities?: Record<string, HaEntity>;
+  refreshing: boolean;
+  now: Date;
+  duration: number;
+  zone: 1 | 2;
+  onDurationChange: (duration: number) => void;
+  onZoneChange: (zone: 1 | 2) => void;
+  onRun: () => void;
+  onStop: () => void;
+}) {
+  const valve1 = entityOf(entities, "switch.sous_station_bat_a_electrovanne_1");
+  const valve2 = entityOf(entities, "switch.sous_station_bat_a_electrovanne_2");
+  const activeValve = valve1?.state === "on" ? { zone: 1, valve: valve1 } : valve2?.state === "on" ? { zone: 2, valve: valve2 } : null;
+
+  return (
+    <aside className="rounded-[2rem] border border-stone-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-bold uppercase tracking-wide text-stone-400">Débit ref.</p>
-          <p className="mt-1 text-base font-black text-stone-950">{cfg.mmPerHour} mm/h</p>
+          <h2 className="text-xl font-black tracking-tight text-stone-950">Manuel rapide</h2>
+          <p className="mt-1 text-sm text-stone-500">Secondaire : lancer un cycle ponctuel avec timer réglable.</p>
+        </div>
+        <Power className="h-5 w-5 text-stone-400" />
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-2">
+        {[1, 2].map((z) => (
+          <button
+            key={z}
+            onClick={() => onZoneChange(z as 1 | 2)}
+            className={[
+              "min-h-11 rounded-2xl px-4 text-sm font-black ring-1 transition active:scale-[0.98]",
+              zone === z ? "bg-stone-950 text-white ring-stone-950" : "bg-stone-50 text-stone-600 ring-stone-200 hover:bg-stone-100",
+            ].join(" ")}
+          >
+            Zone {z}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-5 rounded-3xl bg-stone-50 p-4 ring-1 ring-stone-200/70">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-stone-400">Durée manuelle</p>
+            <p className="mt-1 text-3xl font-black tracking-tight text-stone-950">{duration} min</p>
+          </div>
+          <p className="pb-1 text-xs font-semibold text-stone-500">5 → 240 min</p>
+        </div>
+        <input
+          type="range"
+          min={5}
+          max={240}
+          step={5}
+          value={duration}
+          onChange={(event) => onDurationChange(Number(event.target.value))}
+          className="mt-4 w-full accent-stone-950"
+          aria-label="Durée d'arrosage manuel"
+        />
+        <div className="mt-3 grid grid-cols-4 gap-2">
+          {[30, 60, 120, 180].map((preset) => (
+            <button key={preset} onClick={() => onDurationChange(preset)} className="min-h-10 rounded-xl bg-white text-xs font-black text-stone-600 ring-1 ring-stone-200 active:scale-[0.98]">
+              {preset}m
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Plan du jour */}
-      <div className="mt-4">
-        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-stone-400">Plan ce soir / cette nuit</p>
-        {cfg.lastError && (
-          <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 p-3 text-xs leading-relaxed text-red-800">
-            <strong>Planification bloquée.</strong>
-            <span className="mt-1 block font-mono">{cfg.lastError}</span>
-          </div>
-        )}
-        {!plan ? (
-          <div className="rounded-2xl border border-dashed border-stone-200 py-4 text-center text-xs text-stone-400">
-            {cfg.enabled
-              ? "Le bridge calcule le plan au prochain cycle (≤ 5 min)."
-              : "Activer l'arrosage auto pour générer un plan."}
-          </div>
-        ) : (
-          <div className={`rounded-2xl p-3 ring-1 ${toneClass}`}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-black uppercase tracking-wide">
-                {formatPlanStatus(plan.status)}
-              </span>
-              <span className="text-xs opacity-70">{plan.date}</span>
-            </div>
-            <p className="mt-1 text-xs leading-relaxed opacity-90">{plan.reason}</p>
+      <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+        <button
+          disabled={refreshing}
+          onClick={onRun}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-brand-700 px-4 text-sm font-black text-white shadow-lg shadow-brand-200 transition hover:bg-brand-800 active:scale-[0.98] disabled:cursor-wait disabled:bg-stone-300"
+        >
+          {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
+          Lancer zone {zone}
+        </button>
+        <button
+          onClick={onStop}
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 text-sm font-black text-white shadow-lg shadow-red-200 transition hover:bg-red-700 active:scale-[0.98]"
+        >
+          <CircleStop className="h-4 w-4" />
+          Arrêt total
+        </button>
+      </div>
 
-            {plan.status === "scheduled" && plan.startAt && (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide opacity-60">Départ</p>
-                  <p className="mt-0.5 text-base font-black">{formatLocalTime(plan.startAt)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wide opacity-60">Fin prévue</p>
-                  <p className="mt-0.5 text-base font-black">{formatLocalTime(plan.endAt)}</p>
-                </div>
-              </div>
-            )}
+      <div className="mt-5 rounded-2xl bg-stone-950 p-4 text-sm text-white">
+        <div className="flex items-center gap-2 font-black"><ShieldCheck className="h-4 w-4" /> Sécurité HA active</div>
+        <p className="mt-2 text-stone-300">Une seule vanne à la fois. Pompe coupée automatiquement si aucune vanne n’est ouverte.</p>
+        <p className="mt-3 font-semibold text-stone-200">
+          {activeValve ? `Zone ${activeValve.zone} en cours depuis ${elapsedLabel(activeValve.valve.last_changed, now)}` : "Aucune vanne ouverte"}
+        </p>
+      </div>
+    </aside>
+  );
+}
 
-            {plan.zones && plan.zones.length > 0 && (
-              <div className="mt-3 space-y-1">
-                {plan.zones.map((z, i) => (
-                  <div key={i} className="flex items-center justify-between rounded-xl bg-white/40 px-2.5 py-1.5 text-xs">
-                    <span className="font-semibold">Zone {z.zone}</span>
-                    <span>{z.durationMinutes} min</span>
-                    <span className="opacity-70">{formatLocalTime(z.startAt)} → {formatLocalTime(z.endAt)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="mt-2 flex items-center gap-1.5 text-[11px] opacity-60">
-              <CloudRain className="h-3 w-3" />
-              Pluie mesurée : {plan.rainMeasuredMm.toFixed(1)} mm
-              {" · "}Seuil : {plan.rainThresholdMm} mm
-            </div>
-          </div>
-        )}
+function SourceAndCostCard({ entities }: { entities?: Record<string, HaEntity> }) {
+  return (
+    <div className="grid gap-5 lg:grid-cols-2">
+      <div className="rounded-[2rem] border border-stone-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-black tracking-tight text-stone-950">Source & cuve</h2>
+          <Waves className="h-5 w-5 text-sky-600" />
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <MetricSmall label="Pression réseau" value={`${fmtNumber(stateOf(entities, "sensor.sous_station_bat_a_pression_reseau"), 2)} bar`} />
+          <MetricSmall label="Cuve" value={`${fmtNumber(stateOf(entities, "sensor.sous_station_bat_a_remplissage_cuve"), 0)} %`} />
+          <MetricSmall label="Volume" value={`${fmtNumber(stateOf(entities, "sensor.sous_station_bat_a_volume_cuve"), 0)} L`} />
+          <MetricSmall label="Température" value={`${fmtNumber(stateOf(entities, "sensor.sous_station_bat_a_temperature_cuve"), 1)} °C`} />
+        </div>
+      </div>
+      <div className="rounded-[2rem] border border-stone-200 bg-white p-5 shadow-sm">
+        <h2 className="text-xl font-black tracking-tight text-stone-950">Coût pompe</h2>
+        <p className="mt-1 text-sm text-stone-500">Kärcher BP 7 : estimation 1 200 W, prix prudent 0,20 €/kWh.</p>
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <MetricSmall label="Puissance pompe HA" value={`${fmtNumber(stateOf(entities, "input_number.arrosage_pompe_puissance_w"), 0)} W`} />
+          <MetricSmall label="Prix électricité HA" value={`${fmtNumber(stateOf(entities, "input_number.arrosage_prix_kwh"), 3)} €/kWh`} />
+          <MetricSmall label="1h pompe" value="≈ 0,24 €" />
+          <MetricSmall label="4h pompe" value="≈ 0,96 €" />
+        </div>
       </div>
     </div>
   );
 }
-
-// ════════════════════════════════════════════════════════════════════════════════
 
 export default function EauPage() {
   const { showToast } = useToast();
@@ -357,60 +478,34 @@ export default function EauPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [now, setNow] = useState(() => new Date());
-
-  // Auto-schedule state
   const [autoConfig, setAutoConfig] = useState<AutoIrrigationConfig | null>(null);
   const [todayPlan, setTodayPlan] = useState<IrrigationPlan | null>(null);
   const [toggling, setToggling] = useState(false);
+  const [updatingZone, setUpdatingZone] = useState<number | null>(null);
+  const [manualZone, setManualZone] = useState<1 | 2>(1);
+  const [manualDuration, setManualDuration] = useState(60);
+
+  const config = useMemo(() => mergeConfig(autoConfig), [autoConfig]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 10000);
     return () => window.clearInterval(timer);
   }, []);
 
-  // ── Auto-schedule: config ──────────────────────────────────────────────────
   useEffect(() => {
     const cfgRef = ref(database, AUTO_SCHEDULE_CONFIG_PATH);
-    return onValue(cfgRef, (snap) => {
-      setAutoConfig(snap.val() as AutoIrrigationConfig | null);
-    });
+    return onValue(cfgRef, (snap) => setAutoConfig(snap.val() as AutoIrrigationConfig | null));
   }, []);
 
-  // ── Auto-schedule: plan du jour/lendemain ────────────────────────────────
   useEffect(() => {
-    const endHour = autoConfig?.windowEndHour ?? 6;
+    const endHour = config.windowEndHour ?? 6;
     const h = now.getHours();
     const morningDate = h < endHour
-      ? now.toLocaleDateString("fr-CA")   // YYYY-MM-DD today
-      : new Date(now.getTime() + 86400000).toLocaleDateString("fr-CA"); // tomorrow
+      ? now.toLocaleDateString("fr-CA")
+      : new Date(now.getTime() + 86400000).toLocaleDateString("fr-CA");
     const planRef = ref(database, `${AUTO_SCHEDULE_PLANS_PATH}/${morningDate}`);
-    return onValue(planRef, (snap) => {
-      setTodayPlan(snap.val() as IrrigationPlan | null);
-    });
-  }, [autoConfig?.windowEndHour, now]);
-
-  // ── Toggle enabled/disabled ────────────────────────────────────────────────
-  async function handleToggleAutoSchedule() {
-    setToggling(true);
-    try {
-      const current = autoConfig ?? DEFAULT_AUTO_IRRIGATION_CONFIG;
-      await update(ref(database, AUTO_SCHEDULE_CONFIG_PATH), {
-        ...current,
-        enabled: !current.enabled,
-      });
-      showToast({
-        type: "success",
-        title: current.enabled ? "Arrosage auto désactivé" : "Arrosage auto activé",
-        message: current.enabled
-          ? "Le bridge ne programmera plus d'arrosage nocturne automatique."
-          : "Le bridge calculera le prochain plan selon la pluie mesurée.",
-      });
-    } catch (err) {
-      showToast({ type: "error", title: "Impossible de modifier la config", message: (err as Error).message });
-    } finally {
-      setToggling(false);
-    }
-  }
+    return onValue(planRef, (snap) => setTodayPlan(snap.val() as IrrigationPlan | null));
+  }, [config.windowEndHour, now]);
 
   useEffect(() => {
     const statusRef = ref(database, "irrigation-ha/status/current");
@@ -428,7 +523,6 @@ export default function EauPage() {
         setRefreshing(false);
       },
     );
-
     return () => unsubscribe();
   }, []);
 
@@ -450,6 +544,35 @@ export default function EauPage() {
     }
   }
 
+  async function handleToggleAutoSchedule() {
+    setToggling(true);
+    try {
+      await update(ref(database, AUTO_SCHEDULE_CONFIG_PATH), { ...config, enabled: !config.enabled });
+      showToast({
+        type: "success",
+        title: config.enabled ? "Arrosage auto désactivé" : "Arrosage auto activé",
+        message: config.enabled ? "Le bridge ne programmera plus d’arrosage nocturne automatique." : "Le bridge calculera les cycles profonds selon l’humidité estimée.",
+      });
+    } catch (err) {
+      showToast({ type: "error", title: "Impossible de modifier la config", message: (err as Error).message });
+    } finally {
+      setToggling(false);
+    }
+  }
+
+  async function handleQualityChange(zoneId: 1 | 2, mode: QualityMode) {
+    setUpdatingZone(zoneId);
+    try {
+      const nextZones = config.zones.map((zone) => zone.zone === zoneId ? { ...zone, qualityMode: mode } : zone);
+      await update(ref(database, AUTO_SCHEDULE_CONFIG_PATH), { ...config, zones: nextZones });
+      showToast({ type: "success", title: `Zone ${zoneId} réglée`, message: `Niveau ${QUALITY_LABELS[mode]} appliqué.` });
+    } catch (err) {
+      showToast({ type: "error", title: "Réglage impossible", message: (err as Error).message });
+    } finally {
+      setUpdatingZone(null);
+    }
+  }
+
   const entities = data?.entities;
   const pumpOn = isOn(entities, "switch.sous_station_bat_a_pompe");
   const totalMm = useMemo(() => {
@@ -461,39 +584,21 @@ export default function EauPage() {
   return (
     <div className="min-h-full -m-4 bg-[radial-gradient(circle_at_top_left,#dcfce7_0,transparent_34rem),linear-gradient(180deg,#f8faf7,#eef4ec)] p-4 sm:-m-6 sm:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        <header className="flex flex-col gap-5 rounded-[2rem] border border-white/70 bg-white/70 p-5 shadow-sm backdrop-blur-xl sm:p-7 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1.5 text-xs font-black text-brand-700 ring-1 ring-brand-100">
-              <span className={pumpOn ? "h-2 w-2 rounded-full bg-brand-500" : "h-2 w-2 rounded-full bg-stone-300"} />
-              Home Assistant {data?.ok ? "connecté" : "à connecter"}
-            </div>
-            <h1 className="mt-4 text-3xl font-black tracking-[-0.04em] text-stone-950 sm:text-5xl">Eau & arrosage</h1>
-            <p className="mt-3 max-w-3xl text-base leading-relaxed text-stone-600">
-              Programmateur visuel par zones, suivi du temps d’activation, estimation en mm et coût pompe. Les vannes sont verrouillées : une seule zone à la fois, pompe toujours active pendant l’arrosage.
-            </p>
+        <header className="rounded-[2rem] border border-white/70 bg-white/70 p-5 shadow-sm backdrop-blur-xl sm:p-7">
+          <div className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1.5 text-xs font-black text-brand-700 ring-1 ring-brand-100">
+            <span className={pumpOn ? "h-2 w-2 rounded-full bg-brand-500" : "h-2 w-2 rounded-full bg-stone-300"} />
+            Home Assistant {data?.ok ? "connecté" : "à connecter"}
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => action({ action: "stop_all" }, "Arrêt total envoyé")}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 text-sm font-black text-white shadow-lg shadow-red-200 transition hover:bg-red-700"
-            >
-              <CircleStop className="h-4 w-4" />
-              Arrêt total
-            </button>
-            <button
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-brand-700 px-4 text-sm font-black text-white shadow-lg shadow-brand-200 transition hover:bg-brand-800"
-              title="La V1 utilise les plages Home Assistant actuelles. Les plages multiples seront ajoutées dans la prochaine passe."
-            >
-              <Plus className="h-4 w-4" />
-              Ajouter une plage
-            </button>
-          </div>
+          <h1 className="mt-4 text-3xl font-black tracking-[-0.04em] text-stone-950 sm:text-5xl">Eau & arrosage</h1>
+          <p className="mt-3 max-w-4xl text-base leading-relaxed text-stone-600">
+            Pilotage prioritaire par humidité estimée et pluie réelle. Le manuel reste disponible, mais l’objectif est d’éviter les petits cycles réguliers et de privilégier quelques vrais arrosages utiles.
+          </p>
         </header>
 
         {!data?.ok && !loading && (
           <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <strong>Bridge local Home Assistant indisponible.</strong>
-            <p className="mt-1">L’app Ferme reste gratuite et privée : elle lit Firebase. Il faut que le bridge local tourne chez toi pour synchroniser Home Assistant.</p>
+            <p className="mt-1">L’app Ferme lit Firebase. Le bridge local doit tourner pour synchroniser Home Assistant.</p>
             {data?.error && <p className="mt-2 font-mono text-xs">{data.error}</p>}
           </div>
         )}
@@ -505,80 +610,30 @@ export default function EauPage() {
           <MetricCard label="Coût estimé" value={fmtNumber(stateOf(entities, "sensor.arrosage_cout_aujourd_hui"), 2)} suffix="€" icon={Gauge} tone="amber" />
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[1.35fr_.85fr]">
-          <div className="space-y-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-black tracking-tight text-stone-950">Programmateur par zones</h2>
-                <p className="mt-1 text-sm text-stone-500">Base actuelle : une plage principale par vanne, pilotée par Home Assistant.</p>
-              </div>
-              <span className="hidden rounded-full bg-white px-3 py-1.5 text-xs font-black text-stone-600 ring-1 ring-stone-200 sm:inline-flex">4h = 20mm</span>
-            </div>
-            <ZoneCard zone={1} title="Vanne 1 — Zone source" subtitle="Zone indépendante. La pompe démarre avant l’ouverture de la vanne." entities={entities} refreshing={refreshing} now={now} onRun={(zone, duration) => action({ action: "run_zone", zone, durationMinutes: duration }, `Vanne ${zone} lancée`)} />
-            <ZoneCard zone={2} title="Vanne 2 — Zone pâture" subtitle="Ne peut pas tourner en même temps que la vanne 1." entities={entities} refreshing={refreshing} now={now} onRun={(zone, duration) => action({ action: "run_zone", zone, durationMinutes: duration }, `Vanne ${zone} lancée`)} />
-          </div>
+        <AutomaticIrrigationPanel
+          config={config}
+          plan={todayPlan}
+          onToggle={handleToggleAutoSchedule}
+          onQualityChange={handleQualityChange}
+          toggling={toggling}
+          updatingZone={updatingZone}
+        />
 
-          <aside className="space-y-5">
-            <div className="rounded-[2rem] border border-stone-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xl font-black tracking-tight text-stone-950">Source & cuve</h2>
-                <Waves className="h-5 w-5 text-sky-600" />
-              </div>
-              <div className="mt-5 grid grid-cols-2 gap-3">
-                <MetricSmall label="Pression réseau" value={`${fmtNumber(stateOf(entities, "sensor.sous_station_bat_a_pression_reseau"), 2)} bar`} />
-                <MetricSmall label="Cuve" value={`${fmtNumber(stateOf(entities, "sensor.sous_station_bat_a_remplissage_cuve"), 0)} %`} />
-                <MetricSmall label="Volume" value={`${fmtNumber(stateOf(entities, "sensor.sous_station_bat_a_volume_cuve"), 0)} L`} />
-                <MetricSmall label="Température" value={`${fmtNumber(stateOf(entities, "sensor.sous_station_bat_a_temperature_cuve"), 1)} °C`} />
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] bg-stone-950 p-5 text-white shadow-xl shadow-stone-300">
-              <div className="flex items-center gap-3">
-                <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/10"><ShieldCheck className="h-5 w-5" /></div>
-                <div><h2 className="text-lg font-black">Sécurité système</h2><p className="text-sm text-stone-400">Verrouillages actifs côté Home Assistant</p></div>
-              </div>
-              <div className="mt-5 space-y-3 text-sm">
-                <SafetyRow label="Vannes simultanées" value="Bloquées" />
-                <SafetyRow label="Pompe sans vanne" value="Arrêt auto" />
-                <SafetyRow label="Commande critique" value="Arrêt total" />
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-stone-200 bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-black tracking-tight text-stone-950">Réglages coût</h2>
-              <div className="mt-4 grid gap-3">
-                <MetricSmall label="Puissance pompe" value={`${fmtNumber(stateOf(entities, "input_number.arrosage_pompe_puissance_w"), 0)} W`} />
-                <MetricSmall label="Prix électricité" value={`${fmtNumber(stateOf(entities, "input_number.arrosage_prix_kwh"), 3)} €/kWh`} />
-              </div>
-            </div>
-
-            <AutoScheduleCard
-              config={autoConfig}
-              plan={todayPlan}
-              onToggle={handleToggleAutoSchedule}
-              toggling={toggling}
-            />
-          </aside>
+        <section className="grid gap-5 xl:grid-cols-[.75fr_1.25fr]">
+          <ManualIrrigationCard
+            entities={entities}
+            refreshing={refreshing}
+            now={now}
+            zone={manualZone}
+            duration={manualDuration}
+            onZoneChange={setManualZone}
+            onDurationChange={setManualDuration}
+            onRun={() => action({ action: "run_zone", zone: manualZone, durationMinutes: manualDuration }, `Vanne ${manualZone} lancée ${manualDuration} min`)}
+            onStop={() => action({ action: "stop_all" }, "Arrêt total envoyé")}
+          />
+          <SourceAndCostCard entities={entities} />
         </section>
       </div>
-    </div>
-  );
-}
-
-function MetricSmall({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-stone-50 p-4 ring-1 ring-stone-200/70">
-      <p className="text-xs font-bold uppercase tracking-wide text-stone-400">{label}</p>
-      <p className="mt-1 text-xl font-black tracking-tight text-stone-950">{value}</p>
-    </div>
-  );
-}
-
-function SafetyRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/6 px-3 py-2.5">
-      <span className="text-stone-300">{label}</span>
-      <strong>{value}</strong>
     </div>
   );
 }

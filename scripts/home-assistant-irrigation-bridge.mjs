@@ -74,20 +74,35 @@ const ALLOWED_SWITCHES = new Set([
 // ── Firebase paths ────────────────────────────────────────────────────────────
 const AUTO_SCHEDULE_CONFIG_PATH = "irrigation-ha/auto-schedule/config";
 const AUTO_SCHEDULE_PLANS_PATH  = "irrigation-ha/auto-schedule/plans";
+const ZONE_STATE_PATH           = "irrigation-ha/auto-schedule/zone-state"; // lastIrrigationAt per zone
 const WEATHER_READINGS_PATH     = "weather-readings";
 
-// ── Default auto-schedule config ─────────────────────────────────────────────
+// ── Default auto-schedule config V2 ──────────────────────────────────────────
 const DEFAULT_AUTO_CONFIG = {
-  enabled: false,          // Désactivé par défaut — activer depuis l'UI
-  rainThresholdMm: 15,     // Si pluie du jour ≥ 15 mm, pas d'arrosage
-  targetMm: 20,            // Besoin journalier cible en mm
-  mmPerHour: 5,            // Débit de référence mm/h (informatif)
+  enabled: false,           // Désactivé par défaut — activer depuis l'UI /eau
+  rainThresholdMm: 15,      // Si pluie récente ≥ 15 mm, pas d'arrosage
   zones: [
-    { zone: 1, enabled: true, maxDurationMinutes: 120 },
-    { zone: 2, enabled: true, maxDurationMinutes: 120 },
+    {
+      zone: 1, enabled: true,
+      qualityMode: "passable",
+      soilCapacityMm: 35,
+      irrigationDepthMmPerHour: 5,
+      minRunMinutes: 45,
+      maxRunMinutes: 240,
+      dailyLossMm: 3,
+    },
+    {
+      zone: 2, enabled: true,
+      qualityMode: "passable",
+      soilCapacityMm: 35,
+      irrigationDepthMmPerHour: 5,
+      minRunMinutes: 45,
+      maxRunMinutes: 240,
+      dailyLossMm: 3,
+    },
   ],
-  windowStartHour: 22,     // Début fenêtre nocturne
-  windowEndHour: 6,        // Fin fenêtre nocturne (06:00)
+  windowStartHour: 22,      // Début fenêtre nocturne
+  windowEndHour: 6,         // Fin fenêtre nocturne (06:00)
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -212,7 +227,7 @@ async function executeCommand(id, command) {
       });
     } else if (command.action === "run_zone") {
       const zone = Number(command.zone) === 2 ? 2 : 1;
-      const duration = Math.max(1, Math.min(360, Math.round(Number(command.durationMinutes || 1))));
+      const duration = Math.max(5, Math.min(240, Math.round(Number(command.durationMinutes || 5))));
       const vanne = `switch.sous_station_bat_a_electrovanne_${zone}`;
       await haFetch("/api/services/script/turn_on", {
         method: "POST",
@@ -223,6 +238,14 @@ async function executeCommand(id, command) {
             duree_minutes: duration,
           },
         }),
+      });
+      const zoneConfig = (autoConfig?.zones || DEFAULT_AUTO_CONFIG.zones).find((item) => Number(item.zone) === zone) || {};
+      const mmPerHour = Number(zoneConfig.irrigationDepthMmPerHour || 5);
+      const expectedEndAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
+      await update(ref(db, `${ZONE_STATE_PATH}/${zone}`), {
+        lastIrrigationAt: expectedEndAt,
+        lastIrrigationMm: Number(((duration / 60) * mmPerHour).toFixed(2)),
+        lastManualCommandId: id,
       });
       console.log(`[command] ${id} start zone=${zone} vanne=${vanne} duration=${duration}`);
     } else if ((command.action === "turn_on" || command.action === "turn_off") && command.entityId) {
@@ -270,8 +293,17 @@ function watchCommands() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Auto-schedule — logique pure (miroir de src/lib/irrigationScheduler.ts)
+// Auto-schedule — logique pure V2 (miroir de src/lib/irrigationScheduler.ts)
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Modes qualité ─────────────────────────────────────────────────────────────
+const QUALITY_THRESHOLDS = {
+  eco:      { triggerPct: 25, targetPct: 55 },
+  passable: { triggerPct: 30, targetPct: 65 },
+  correct:  { triggerPct: 40, targetPct: 75 },
+  green:    { triggerPct: 50, targetPct: 85 },
+  manual:   { triggerPct: 30, targetPct: 65 },
+};
 
 /** YYYY-MM-DD en heure locale */
 function localDateStr(date) {
@@ -303,6 +335,115 @@ function computeTodayRain(readings, todayStr) {
     }
   }
   return max;
+}
+
+/** Pluie récente sur 48h (aujourd'hui + hier). */
+function computeRecentRainMm(readings, nowMs) {
+  const now = new Date(nowMs);
+  const todayStr = localDateStr(now);
+  const yesterday = new Date(nowMs - 24 * 60 * 60 * 1000);
+  const yestStr = localDateStr(yesterday);
+  return computeTodayRain(readings, todayStr) + computeTodayRain(readings, yestStr);
+}
+
+/** Estime l'humidité du sol (0–100%) d'une zone. Valeur estimée, pas mesurée. */
+function estimateZoneMoisture(zone, recentRainMm, nowMs) {
+  const capacity = zone.soilCapacityMm ?? 35;
+  const mode = zone.qualityMode ?? "passable";
+  const thresholds = QUALITY_THRESHOLDS[mode] ?? QUALITY_THRESHOLDS.passable;
+  const dailyLoss = zone.dailyLossMm ?? 3;
+
+  let reserveMm;
+  if (zone.lastIrrigationAt) {
+    const lastMs = new Date(zone.lastIrrigationAt).getTime();
+    const daysSince = Math.max(0, (nowMs - lastMs) / (24 * 60 * 60 * 1000));
+    const startMm = (thresholds.targetPct / 100) * capacity;
+    reserveMm = startMm - daysSince * dailyLoss + recentRainMm;
+  } else {
+    reserveMm = 0.4 * capacity + recentRainMm;
+  }
+
+  reserveMm = Math.max(0, Math.min(capacity, reserveMm));
+  return Math.round((reserveMm / capacity) * 100);
+}
+
+/** Calcule la décision d'arrosage pour une zone à partir de son humidité estimée. */
+function computeZoneDecision(zone, humidityPct) {
+  const mode = zone.qualityMode ?? "passable";
+  const thresholds = QUALITY_THRESHOLDS[mode] ?? QUALITY_THRESHOLDS.passable;
+  const triggerPct = (mode === "manual" && zone.triggerPct != null) ? zone.triggerPct : thresholds.triggerPct;
+  const targetPct  = (mode === "manual" && zone.targetPct  != null) ? zone.targetPct  : thresholds.targetPct;
+
+  if (!zone.enabled) {
+    return { zone: zone.zone, estimatedHumidityPct: humidityPct, triggerPct, targetPct, decision: "disabled", plannedDurationMinutes: 0, debugInfo: "Zone désactivée" };
+  }
+
+  if (humidityPct > triggerPct) {
+    return { zone: zone.zone, estimatedHumidityPct: humidityPct, triggerPct, targetPct, decision: "wait", plannedDurationMinutes: 0, debugInfo: `Estimée ${humidityPct}% > seuil ${triggerPct}% — en attente` };
+  }
+
+  const capacity = zone.soilCapacityMm ?? 35;
+  const mmPerHour = zone.irrigationDepthMmPerHour ?? 5;
+  const minRun = zone.minRunMinutes ?? 45;
+  const maxRun = zone.maxRunMinutes ?? (zone.maxDurationMinutes ?? 240);
+
+  const currentMm = (humidityPct / 100) * capacity;
+  const targetMm  = (targetPct  / 100) * capacity;
+  const mmNeeded  = Math.max(0, targetMm - currentMm);
+  const rawMinutes = Math.ceil((mmNeeded / mmPerHour) * 60);
+  const planned = Math.min(maxRun, Math.max(minRun, rawMinutes));
+
+  return {
+    zone: zone.zone, estimatedHumidityPct: humidityPct, triggerPct, targetPct,
+    decision: "irrigate", plannedDurationMinutes: planned,
+    debugInfo: `Estimée ${humidityPct}% ≤ seuil ${triggerPct}% → ${mmNeeded.toFixed(1)} mm → ${planned} min`,
+  };
+}
+
+/** Calcule le plan V2 à partir des états de zone. */
+function computeIrrigationPlanV2(config, zoneStates, rainMeasuredMm, morningDate, now) {
+  const rainThresholdMm = config.rainThresholdMm ?? 15;
+  const base = { planId: morningDate, date: morningDate, rainMeasuredMm, rainThresholdMm, createdAt: now.toISOString(), zoneStates };
+
+  if (rainMeasuredMm >= rainThresholdMm) {
+    return { ...base, status: "skipped", reason: `Pluie récente (${rainMeasuredMm.toFixed(1)} mm ≥ seuil ${rainThresholdMm} mm) — arrosage non nécessaire`, startAt: "", endAt: "", totalDurationMinutes: 0, zones: [] };
+  }
+
+  const toIrrigate = zoneStates.filter(z => z.decision === "irrigate");
+
+  if (toIrrigate.length === 0) {
+    const reasons = zoneStates.map(z => z.decision === "disabled" ? `Z${z.zone}: désactivée` : `Z${z.zone}: estimée ${z.estimatedHumidityPct}% > seuil ${z.triggerPct}%`).join("; ");
+    return { ...base, status: "skipped", reason: `Humidité estimée suffisante — ${reasons}`, startAt: "", endAt: "", totalDurationMinutes: 0, zones: [] };
+  }
+
+  const totalMinutes = toIrrigate.reduce((s, z) => s + z.plannedDurationMinutes, 0);
+
+  if (totalMinutes > 8 * 60) {
+    return { ...base, status: "error", reason: `Durée totale (${totalMinutes} min = ${(totalMinutes / 60).toFixed(1)}h) dépasse le maximum de 8h — réduire maxRunMinutes ou changer le mode qualité.`, startAt: "", endAt: "", totalDurationMinutes: totalMinutes, zones: [] };
+  }
+
+  const hEnd = String(config.windowEndHour).padStart(2, "0");
+  const endLocal = new Date(`${morningDate}T${hEnd}:00:00`);
+  const startLocal = new Date(endLocal.getTime() - totalMinutes * 60 * 1000);
+
+  const dayBefore = new Date(endLocal.getTime() - 24 * 60 * 60 * 1000);
+  dayBefore.setHours(config.windowStartHour, 0, 0, 0);
+
+  if (startLocal < dayBefore) {
+    return { ...base, status: "error", reason: `Heure de démarrage antérieure à ${config.windowStartHour}h00 — fenêtre insuffisante.`, startAt: "", endAt: "", totalDurationMinutes: totalMinutes, zones: [] };
+  }
+
+  let cursor = startLocal.getTime();
+  const scheduledZones = toIrrigate.map(z => {
+    const zStart = new Date(cursor);
+    cursor += z.plannedDurationMinutes * 60 * 1000;
+    return { zone: z.zone, durationMinutes: z.plannedDurationMinutes, startAt: zStart.toISOString(), endAt: new Date(cursor).toISOString(), status: "pending" };
+  });
+
+  const zonesLabel = toIrrigate.map(z => `Z${z.zone} ${z.plannedDurationMinutes}min`).join(" + ");
+  const rainNote = rainMeasuredMm > 0 ? ` · pluie récente ${rainMeasuredMm.toFixed(1)} mm` : "";
+
+  return { ...base, status: "scheduled", reason: `${zonesLabel}${rainNote}`, startAt: startLocal.toISOString(), endAt: endLocal.toISOString(), totalDurationMinutes: totalMinutes, zones: scheduledZones };
 }
 
 /**
@@ -426,15 +567,25 @@ async function checkAndPlanSchedule() {
     // Ne pas écraser un plan en cours ou terminé
     if (existing && ["executing", "done"].includes(existing.status)) return;
 
-    // Lire les données météo (pluie du jour)
+    // Lire les données météo (pluie récente 48h) + état hydrique estimé par zone
     const weatherSnap = await get(ref(db, WEATHER_READINGS_PATH));
-    const weatherData = weatherSnap.val() || {};
-    const todayStr = localDateStr(now);
-    const rainMm = computeTodayRain(weatherData, todayStr);
+    const weatherData = Object.values(weatherSnap.val() || {});
+    const rainMm = computeRecentRainMm(weatherData, now.getTime());
 
-    const plan = computePlan(autoConfig, rainMm, morningDate, now);
+    const zoneStateSnap = await get(ref(db, ZONE_STATE_PATH));
+    const persistedZoneState = zoneStateSnap.val() || {};
+    const zones = (autoConfig.zones || DEFAULT_AUTO_CONFIG.zones).map((zone) => ({
+      ...zone,
+      ...(persistedZoneState[String(zone.zone)] || {}),
+    }));
+    const zoneStates = zones.map((zone) => {
+      const humidity = estimateZoneMoisture(zone, rainMm, now.getTime());
+      return computeZoneDecision(zone, humidity);
+    });
 
-    // Écrire uniquement si pas de plan existant (scheduled), ou si rain a changé
+    const plan = computeIrrigationPlanV2({ ...autoConfig, zones }, zoneStates, rainMm, morningDate, now);
+
+    // Écrire uniquement si pas de plan existant (scheduled), ou si rain/état a changé
     if (!existing || existing.status === "scheduled") {
       await set(planRef, plan);
       await update(ref(db, AUTO_SCHEDULE_CONFIG_PATH), { lastError: null, lastErrorAt: null });
@@ -517,9 +668,17 @@ async function checkAndExecuteSchedule() {
           setTimeout(resolve, zone.durationMinutes * 60 * 1000)
         );
 
+        const zoneDoneAt = new Date().toISOString();
         await update(ref(db, zonePathPrefix), {
           status: "done",
-          doneAt: new Date().toISOString(),
+          doneAt: zoneDoneAt,
+        });
+        const zoneConfig = (autoConfig.zones || DEFAULT_AUTO_CONFIG.zones).find((item) => Number(item.zone) === Number(zone.zone)) || {};
+        const mmPerHour = Number(zoneConfig.irrigationDepthMmPerHour || 5);
+        await update(ref(db, `${ZONE_STATE_PATH}/${zone.zone}`), {
+          lastIrrigationAt: zoneDoneAt,
+          lastIrrigationMm: Number(((Number(zone.durationMinutes) / 60) * mmPerHour).toFixed(2)),
+          lastAutoPlanId: morningDate,
         });
         console.log(`[auto-schedule] zone ${zone.zone} terminée`);
       }
