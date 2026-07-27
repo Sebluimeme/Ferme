@@ -185,13 +185,18 @@ async function executeCommand(id, command) {
     } else if (command.action === "run_zone") {
       const zone = Number(command.zone) === 2 ? 2 : 1;
       const duration = Math.max(1, Math.min(360, Math.round(Number(command.durationMinutes || 1))));
-      await haFetch("/api/services/script/arrosage_lancer_zone", {
+      const vanne = `switch.sous_station_bat_a_electrovanne_${zone}`;
+      await haFetch("/api/services/script/turn_on", {
         method: "POST",
         body: JSON.stringify({
-          vanne: `switch.sous_station_bat_a_electrovanne_${zone}`,
-          duree_minutes: duration,
+          entity_id: "script.arrosage_lancer_zone",
+          variables: {
+            vanne,
+            duree_minutes: duration,
+          },
         }),
       });
+      console.log(`[command] ${id} start zone=${zone} vanne=${vanne} duration=${duration}`);
     } else if ((command.action === "turn_on" || command.action === "turn_off") && command.entityId) {
       if (!ALLOWED_SWITCHES.has(command.entityId)) throw new Error("Entité non autorisée");
       await haFetch(`/api/services/switch/${command.action}`, {
