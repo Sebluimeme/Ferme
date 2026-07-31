@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import firebaseService from "@/lib/firebase-service";
 import { onAuthChange } from "@/lib/auth-service";
 import type { Unsubscribe } from "firebase/database";
@@ -259,6 +260,7 @@ const AppContext = createContext<{
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const listenersRef = useRef<Unsubscribe[]>([]);
+  const pathname = usePathname();
 
   const toggleSidebar = useCallback(() => dispatch({ type: "TOGGLE_SIDEBAR" }), []);
   const closeSidebar = useCallback(() => dispatch({ type: "CLOSE_SIDEBAR" }), []);
@@ -272,7 +274,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, []);
 
-  // Data listeners - only when authenticated
+  // Charge uniquement les données utiles à l'écran courant. Avant ce découpage,
+  // chaque ouverture créait 17 flux Firebase en parallèle, y compris les longs
+  // historiques météo et les modules non consultés.
   useEffect(() => {
     if (!state.user) {
       dispatch({ type: "SET_LOADING", payload: false });
@@ -281,98 +285,95 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     dispatch({ type: "SET_LOADING", payload: true });
     const listeners: Unsubscribe[] = [];
+    const deferredTimers: number[] = [];
 
-    listeners.push(
-      firebaseService.listen<Animal>("animaux", (animaux) => {
-        dispatch({ type: "SET_ANIMAUX", payload: animaux });
+    const listen = <T,>(path: string, action: (data: T[]) => Action) => {
+      listeners.push(firebaseService.listen<T>(path, (data) => {
+        // Une première réponse suffit pour quitter l'état de chargement : chaque écran
+        // continue ensuite à hydrater ses données sans masquer l'interface.
         dispatch({ type: "SET_LOADING", payload: false });
-      })
-    );
-    listeners.push(
-      firebaseService.listen<FicheSoin>("traitements", (data) => dispatch({ type: "SET_TRAITEMENTS", payload: data }))
-    );
-    listeners.push(
-      firebaseService.listen<Transaction>("transactions", (data) => dispatch({ type: "SET_COUTS", payload: data }))
-    );
-    listeners.push(
-      firebaseService.listen("ventes", (data) => dispatch({ type: "SET_VENTES", payload: data }))
-    );
-    listeners.push(
-      firebaseService.listen<Alerte>("alertes", (data) => dispatch({ type: "SET_ALERTES", payload: data }))
-    );
-    listeners.push(
-      firebaseService.listen<Vehicle>("vehicules", (data) => {
-        dispatch({ type: "SET_VEHICLES", payload: data });
-        dispatch({ type: "UPDATE_MAINTENANCE_ALERTS" });
-      })
-    );
-    listeners.push(
-      firebaseService.listen<MaintenanceEntry>("vehicules-maintenance", (data) =>
-        dispatch({ type: "SET_MAINTENANCE_ENTRIES", payload: data })
-      )
-    );
-    listeners.push(
-      firebaseService.listen<MeterReading>("vehicules-releves", (data) =>
-        dispatch({ type: "SET_METER_READINGS", payload: data })
-      )
-    );
-    listeners.push(
-      firebaseService.listen<Task>("taches", (data) =>
-        dispatch({ type: "SET_TACHES", payload: data })
-      )
-    );
-    listeners.push(
-      firebaseService.listen<Partiel>("partiels", (data) =>
-        dispatch({ type: "SET_PARTIELS", payload: data })
-      )
-    );
-    listeners.push(
-      firebaseService.listen<ActiviteFourrage>("activites-fourrage", (data) =>
-        dispatch({ type: "SET_ACTIVITES_FOURRAGE", payload: data })
-      )
-    );
-    listeners.push(
-      firebaseService.listen<Ruche>("ruches", (data) =>
-        dispatch({ type: "SET_RUCHES", payload: data })
-      )
-    );
-    listeners.push(
-      firebaseService.listen<RecolteMiel>("recoltes-miel", (data) =>
-        dispatch({ type: "SET_RECOLTE_MIEL", payload: data })
-      )
-    );
-    listeners.push(
-      firebaseService.listen<VenteMiel>("ventes-miel", (data) =>
-        dispatch({ type: "SET_VENTES_MIEL", payload: data })
-      )
-    );
-    listeners.push(
-      firebaseService.listen<ReleverSource>("releves-source", (data) =>
-        dispatch({ type: "SET_RELEVES_SOURCE", payload: data })
-      )
-    );
-    listeners.push(
-      firebaseService.listen<SejourPaturage>("sejours-paturage", (data) =>
-        dispatch({ type: "SET_SEJOURS_PATURAGE", payload: data })
-      )
-    );
-    listeners.push(
-      firebaseService.listen<PleinCarburant>("carburant-pleins", (data) =>
-        dispatch({ type: "SET_CARBURANT", payload: data })
-      )
-    );
-    listeners.push(
-      firebaseService.listen<WeatherReading>("weather-readings", (data) =>
-        dispatch({ type: "SET_WEATHER_READINGS", payload: data })
-      )
-    );
+        dispatch(action(data));
+      }));
+    };
+    const defer = (callback: () => void) => {
+      deferredTimers.push(window.setTimeout(callback, 700));
+    };
+
+    const listenAnimaux = () => listen<Animal>("animaux", (animaux) => {
+      dispatch({ type: "SET_LOADING", payload: false });
+      return { type: "SET_ANIMAUX", payload: animaux };
+    });
+    const listenTransactions = () => listen<Transaction>("transactions", (data) => ({ type: "SET_COUTS", payload: data }));
+    const listenAlertes = () => listen<Alerte>("alertes", (data) => ({ type: "SET_ALERTES", payload: data }));
+    const listenVehicules = () => listen<Vehicle>("vehicules", (data) => ({ type: "SET_VEHICLES", payload: data }));
+    const listenEntretiens = () => listen<MaintenanceEntry>("vehicules-maintenance", (data) => ({ type: "SET_MAINTENANCE_ENTRIES", payload: data }));
+    const listenRelevesVehicule = () => listen<MeterReading>("vehicules-releves", (data) => ({ type: "SET_METER_READINGS", payload: data }));
+    const listenTaches = () => listen<Task>("taches", (data) => ({ type: "SET_TACHES", payload: data }));
+    const listenPartiels = () => listen<Partiel>("partiels", (data) => ({ type: "SET_PARTIELS", payload: data }));
+    const listenActivitesFourrage = () => listen<ActiviteFourrage>("activites-fourrage", (data) => ({ type: "SET_ACTIVITES_FOURRAGE", payload: data }));
+    const listenMeteo = () => listen<WeatherReading>("weather-readings", (data) => ({ type: "SET_WEATHER_READINGS", payload: data }));
+
+    // La pastille de notification reste disponible dans toute l'application.
+    listenAlertes();
+
+    if (pathname === "/") {
+      // Premier affichage : seulement les KPIs essentiels.
+      listenAnimaux();
+      listenTransactions();
+      listenTaches();
+      // Les widgets secondaires arrivent après que l'accueil est déjà interactif.
+      defer(listenVehicules);
+      defer(listenEntretiens);
+      defer(listenRelevesVehicule);
+      defer(listenActivitesFourrage);
+      defer(listenMeteo);
+    } else if (pathname === "/animaux" || pathname.startsWith("/animaux/")) {
+      listenAnimaux();
+    } else if (pathname === "/traitements") {
+      listenAnimaux();
+      listen<FicheSoin>("traitements", (data) => ({ type: "SET_TRAITEMENTS", payload: data }));
+    } else if (pathname === "/taches") {
+      listenTaches();
+      listenAnimaux();
+      listenVehicules();
+    } else if (pathname === "/fourrage" || pathname === "/fourrage/partiels") {
+      listenPartiels();
+      if (pathname === "/fourrage") {
+        listenAnimaux();
+        listenActivitesFourrage();
+      }
+    } else if (pathname === "/paturage") {
+      listenPartiels();
+      listen<SejourPaturage>("sejours-paturage", (data) => ({ type: "SET_SEJOURS_PATURAGE", payload: data }));
+    } else if (pathname === "/apiculture") {
+      listen<Ruche>("ruches", (data) => ({ type: "SET_RUCHES", payload: data }));
+      listen<RecolteMiel>("recoltes-miel", (data) => ({ type: "SET_RECOLTE_MIEL", payload: data }));
+      listen<VenteMiel>("ventes-miel", (data) => ({ type: "SET_VENTES_MIEL", payload: data }));
+      listenTransactions();
+    } else if (pathname === "/vehicules" || pathname.startsWith("/vehicules/")) {
+      listenVehicules();
+    } else if (pathname === "/entretiens") {
+      listenVehicules();
+      listenEntretiens();
+      listenRelevesVehicule();
+    } else if (pathname === "/carburant") {
+      listen<PleinCarburant>("carburant-pleins", (data) => ({ type: "SET_CARBURANT", payload: data }));
+    } else if (pathname === "/meteo") {
+      listenMeteo();
+    } else if (pathname === "/source") {
+      listen<ReleverSource>("releves-source", (data) => ({ type: "SET_RELEVES_SOURCE", payload: data }));
+    } else if (pathname === "/couts" || pathname === "/profits" || pathname === "/rapports") {
+      listenTransactions();
+      if (pathname === "/rapports") listenAnimaux();
+    }
 
     listenersRef.current = listeners;
 
     return () => {
+      deferredTimers.forEach((timer) => window.clearTimeout(timer));
       listenersRef.current.forEach((unsub) => unsub());
     };
-  }, [state.user]);
+  }, [pathname, state.user]);
 
   return (
     <AppContext.Provider value={{ state, dispatch, toggleSidebar, closeSidebar }}>
