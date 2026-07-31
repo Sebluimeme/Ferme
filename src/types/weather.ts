@@ -29,6 +29,27 @@ export interface WeatherImportResult {
   missingConfig?: boolean;
 }
 
+export interface WeatherForecastDay {
+  date: string;
+  precipitationSumMm: number | null;
+  precipitationProbabilityPct: number | null;
+  weatherCode: number | null;
+}
+
+export interface WeatherForecast {
+  source: "open-meteo";
+  fetchedAt: string;
+  latitude: number;
+  longitude: number;
+  days: WeatherForecastDay[];
+}
+
+export interface WeatherForecastResult {
+  success: boolean;
+  forecast?: WeatherForecast;
+  error?: string;
+}
+
 export interface WeatherStats {
   count: number;
   latest: WeatherReading | null;

@@ -360,6 +360,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       listen<PleinCarburant>("carburant-pleins", (data) => ({ type: "SET_CARBURANT", payload: data }));
     } else if (pathname === "/meteo") {
       listenMeteo();
+      // Les coordonnées des parcelles alimentent les prévisions Open-Meteo.
+      listenPartiels();
     } else if (pathname === "/source") {
       listen<ReleverSource>("releves-source", (data) => ({ type: "SET_RELEVES_SOURCE", payload: data }));
     } else if (pathname === "/couts" || pathname === "/profits" || pathname === "/rapports") {
