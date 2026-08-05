@@ -7,6 +7,19 @@ import KpiCard from "@/components/KpiCard";
 import Modal, { ConfirmModal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import type { ActiviteFourrage, Partiel } from "@/types/fourrage";
+import {
+  origineActivite,
+  estAchat,
+  recoltesDeType,
+  totalTonnes,
+  totalBottes,
+  stockFoin,
+  surfaceRecolteeParType,
+  rendementMoyen,
+  rendementParParcelle,
+  donneesMensuellesRecoltes,
+  type OrigineFourrage,
+} from "@/lib/fourrage-calculs";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const ParcelSelectorMap = dynamic(() => import("@/components/ParcelSelectorMap"), { ssr: false });
@@ -24,10 +37,13 @@ type TypeActivite = "foin" | "ensilage" | "fauche" | "paturage" | "regain";
 
 interface ActiviteFormData {
   typeActivite: TypeActivite;
+  origine: OrigineFourrage;
   dateActivite: string;
   parcelIds: string[];
   nombreBottes: string;
   poidsBotteKg: string;
+  fournisseur: string;
+  prixTotal: string;
   notes: string;
 }
 
@@ -52,6 +68,16 @@ const TYPE_COLORS: Record<TypeActivite, string> = {
   regain: "bg-amber-100 text-amber-800",
 };
 
+const ORIGINE_LABELS: Record<OrigineFourrage, string> = {
+  recolte: "🌾 Récolté",
+  achat: "🛒 Acheté",
+};
+
+const ORIGINE_COLORS: Record<OrigineFourrage, string> = {
+  recolte: "bg-stone-100 text-stone-600",
+  achat: "bg-sky-100 text-sky-800",
+};
+
 // ==================== Formulaire activité ====================
 
 function ActiviteForm({
@@ -70,16 +96,26 @@ function ActiviteForm({
   const today = new Date().toISOString().split("T")[0];
   const [form, setForm] = useState<ActiviteFormData>({
     typeActivite: initial?.typeActivite ?? "foin",
+    origine: initial?.origine ?? "recolte",
     dateActivite: initial?.dateActivite ?? today,
     parcelIds: initial?.parcelIds ?? [],
     nombreBottes: initial?.nombreBottes ?? "",
     poidsBotteKg: initial?.poidsBotteKg ?? "16.5",
+    fournisseur: initial?.fournisseur ?? "",
+    prixTotal: initial?.prixTotal ?? "",
     notes: initial?.notes ?? "",
   });
+
+  const achat = form.origine === "achat";
 
   const poidsTotalT = form.nombreBottes && form.poidsBotteKg
     ? (parseInt(form.nombreBottes) * parseFloat(form.poidsBotteKg)) / 1000
     : null;
+
+  /** Passer en achat vide les parcelles : un achat n'est rattaché à aucune parcelle. */
+  const setOrigine = (origine: OrigineFourrage) =>
+    setForm((p) => (origine === "achat" ? { ...p, origine, parcelIds: [] } : { ...p, origine }));
+
   const togglePartiel = (id: string) => {
     setForm((prev) => ({
       ...prev,
@@ -96,6 +132,32 @@ function ActiviteForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Origine *</label>
+        <div className="grid grid-cols-2 gap-2">
+          {(["recolte", "achat"] as OrigineFourrage[]).map((o) => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => setOrigine(o)}
+              aria-pressed={form.origine === o}
+              className={`px-3 py-2.5 text-sm font-semibold rounded-lg border transition-colors cursor-pointer ${
+                form.origine === o
+                  ? "bg-brand-50 border-brand-500 text-brand-700"
+                  : "bg-white border-stone-300 text-stone-600 hover:bg-stone-50"
+              }`}
+            >
+              {o === "recolte" ? "🌾 Récolté sur la ferme" : "🛒 Acheté"}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-stone-400 mt-1">
+          {achat
+            ? "Les bottes achetées comptent dans le stock et l'objectif foin, mais jamais dans les rendements."
+            : "Les récoltes alimentent les rendements et les analytics par parcelle."}
+        </p>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1">Type d&apos;activité *</label>
@@ -108,8 +170,8 @@ function ActiviteForm({
             <option value="foin">Foin</option>
             <option value="regain">Regain</option>
             <option value="ensilage">Ensilage</option>
-            <option value="fauche">Fauche</option>
-            <option value="paturage">Pâturage</option>
+            {!achat && <option value="fauche">Fauche</option>}
+            {!achat && <option value="paturage">Pâturage</option>}
           </select>
         </div>
         <div>
@@ -124,20 +186,22 @@ function ActiviteForm({
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-stone-700 mb-2">Parcelles concernées</label>
-        {partiels.length === 0 ? (
-          <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            Aucune parcelle créée — allez dans <strong>Parcellaire</strong> pour en ajouter.
-          </p>
-        ) : (
-          <ParcelSelectorMap
-            partiels={partiels}
-            selectedIds={form.parcelIds}
-            onToggle={togglePartiel}
-          />
-        )}
-      </div>
+      {!achat && (
+        <div>
+          <label className="block text-sm font-medium text-stone-700 mb-2">Parcelles concernées</label>
+          {partiels.length === 0 ? (
+            <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Aucune parcelle créée — allez dans <strong>Parcellaire</strong> pour en ajouter.
+            </p>
+          ) : (
+            <ParcelSelectorMap
+              partiels={partiels}
+              selectedIds={form.parcelIds}
+              onToggle={togglePartiel}
+            />
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div>
@@ -171,6 +235,33 @@ function ActiviteForm({
         </div>
       )}
 
+      {achat && (
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Fournisseur</label>
+            <input
+              type="text"
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              value={form.fournisseur}
+              onChange={(e) => setForm((p) => ({ ...p, fournisseur: e.target.value }))}
+              placeholder="Ex : GAEC des Prés"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-stone-700 mb-1">Prix total (€)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              value={form.prixTotal}
+              onChange={(e) => setForm((p) => ({ ...p, prixTotal: e.target.value }))}
+              placeholder="Ex : 450"
+            />
+          </div>
+        </div>
+      )}
+
       <div>
         <label className="block text-sm font-medium text-stone-700 mb-1">Notes</label>
         <textarea
@@ -178,7 +269,7 @@ function ActiviteForm({
           className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
           value={form.notes}
           onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-          placeholder="Observations, conditions météo..."
+          placeholder={achat ? "Qualité, transport, conditions..." : "Observations, conditions météo..."}
         />
       </div>
 
@@ -336,7 +427,7 @@ export default function FourragePage() {
   const { showToast } = useToast();
   const { partiels, activitesFourrage } = state;
 
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState<OrigineFourrage | null>(null);
   const [editActivite, setEditActivite] = useState<ActiviteFourrage | null>(null);
   const [bottesModal, setBottesModal] = useState<ActiviteFourrage | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ActiviteFourrage | null>(null);
@@ -352,7 +443,9 @@ export default function FourragePage() {
     return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
   });
 
-  const bottesCeMois = activitesCeMois.reduce((sum, a) => sum + (a.nombreBottes ?? 0), 0);
+  const bottesCeMois = totalBottes(activitesCeMois);
+  const bottesRecolteesCeMois = totalBottes(activitesCeMois.filter((a) => !estAchat(a)));
+  const bottesAcheteesCeMois = totalBottes(activitesCeMois.filter(estAchat));
   const surfaceTotale = partiels.reduce((sum, p) => sum + (p.surface ?? 0), 0);
 
   // Objectif foin basé sur les animaux actifs
@@ -363,12 +456,11 @@ export default function FourragePage() {
   }, 0);
   const objectifFoinT = objectifFoinKg / 1000;
 
-  const foinsRecoltesT = activitesFourrage
-    .filter((a) => a.typeActivite === "foin" && a.poidsTonne != null)
-    .reduce((sum, a) => sum + (a.poidsTonne ?? 0), 0);
+  // Stock foin = récoltes + achats (les achats comptent pour l'objectif, pas pour les rendements)
+  const stock = stockFoin(activitesFourrage);
 
-  const progressPct = objectifFoinT > 0 ? Math.min(100, (foinsRecoltesT / objectifFoinT) * 100) : 0;
-  const manquantT = Math.max(0, objectifFoinT - foinsRecoltesT);
+  const progressPct = objectifFoinT > 0 ? Math.min(100, (stock.totalT / objectifFoinT) * 100) : 0;
+  const manquantT = Math.max(0, objectifFoinT - stock.totalT);
 
   type AnimalType = "bovin" | "ovin" | "caprin" | "equin" | "porcin";
   const detailParType = (["bovin", "ovin", "caprin", "equin"] as AnimalType[]).map((type) => {
@@ -383,47 +475,25 @@ export default function FourragePage() {
     (a, b) => new Date(b.dateActivite).getTime() - new Date(a.dateActivite).getTime()
   );
 
-  // Analytics foin / regain
-  const activitesFoin = activitesFourrage.filter((a) => a.typeActivite === "foin");
-  const activitesRegain = activitesFourrage.filter((a) => a.typeActivite === "regain");
-  const totalFoinT = activitesFoin.reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
-  const totalRegainT = activitesRegain.reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
-  const parcellesFoinIds = new Set(activitesFoin.flatMap((a) => a.parcelIds ?? []));
-  const parcellesRegainIds = new Set(activitesRegain.flatMap((a) => a.parcelIds ?? []));
-  const surfaceFoin = partiels.filter((p) => parcellesFoinIds.has(p.id) && p.surface != null).reduce((s, p) => s + (p.surface ?? 0), 0);
-  const surfaceRegain = partiels.filter((p) => parcellesRegainIds.has(p.id) && p.surface != null).reduce((s, p) => s + (p.surface ?? 0), 0);
-  const rdtFoin = surfaceFoin > 0 && totalFoinT > 0 ? totalFoinT / surfaceFoin : null;
-  const rdtRegain = surfaceRegain > 0 && totalRegainT > 0 ? totalRegainT / surfaceRegain : null;
+  // Analytics foin / regain — récoltes uniquement, les achats en sont exclus
+  const totalFoinT = totalTonnes(recoltesDeType(activitesFourrage, "foin"));
+  const totalRegainT = totalTonnes(recoltesDeType(activitesFourrage, "regain"));
+  const surfaceFoin = surfaceRecolteeParType(partiels, activitesFourrage, "foin");
+  const surfaceRegain = surfaceRecolteeParType(partiels, activitesFourrage, "regain");
+  const rdtFoin = rendementMoyen(partiels, activitesFourrage, "foin");
+  const rdtRegain = rendementMoyen(partiels, activitesFourrage, "regain");
 
-  // Rendement par parcelle (activités à 1 seule parcelle uniquement)
-  const rdtParParcelle = useMemo(() =>
-    partiels
-      .filter((p) => p.surface && p.surface > 0)
-      .map((p) => {
-        const acts = [...activitesFoin, ...activitesRegain].filter(
-          (a) => a.parcelIds?.length === 1 && a.parcelIds[0] === p.id && a.poidsTonne
-        );
-        if (!acts.length) return null;
-        const totalT = acts.reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
-        const foinT = activitesFoin.filter((a) => a.parcelIds?.length === 1 && a.parcelIds[0] === p.id).reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
-        const regainT = activitesRegain.filter((a) => a.parcelIds?.length === 1 && a.parcelIds[0] === p.id).reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
-        return { parcelle: p, totalT, foinT, regainT, rdt: totalT / p.surface! };
-      })
-      .filter(Boolean) as { parcelle: Partiel; totalT: number; foinT: number; regainT: number; rdt: number }[],
-  [partiels, activitesFoin, activitesRegain]);
+  // Rendement par parcelle (récoltes à 1 seule parcelle uniquement)
+  const rdtParParcelle = useMemo(
+    () => rendementParParcelle<Partiel>(partiels, activitesFourrage),
+    [partiels, activitesFourrage]
+  );
 
-  // Données mensuelles pour la courbe annuelle
-  const donneesMensuelles = useMemo(() => {
-    return MOIS_LABELS.map((mois, idx) => {
-      const foin = activitesFoin
-        .filter((a) => { const d = new Date(a.dateActivite); return d.getMonth() === idx && d.getFullYear() === thisYear; })
-        .reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
-      const regain = activitesRegain
-        .filter((a) => { const d = new Date(a.dateActivite); return d.getMonth() === idx && d.getFullYear() === thisYear; })
-        .reduce((s, a) => s + (a.poidsTonne ?? 0), 0);
-      return { mois, foin: foin || null, regain: regain || null };
-    });
-  }, [activitesFoin, activitesRegain, thisYear]);
+  // Données mensuelles pour la courbe annuelle (récoltes uniquement)
+  const donneesMensuelles = useMemo(
+    () => donneesMensuellesRecoltes(activitesFourrage, thisYear, MOIS_LABELS),
+    [activitesFourrage, thisYear]
+  );
 
   const getPartielsNoms = (ids: string[] | null | undefined) =>
     (ids ?? [])
@@ -434,25 +504,35 @@ export default function FourragePage() {
     new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
   // Handlers
+  /** Champs communs création/édition — un achat n'a jamais de parcelle. */
+  const buildPayload = (data: ActiviteFormData) => {
+    const achat = data.origine === "achat";
+    const nbBottes = data.nombreBottes ? parseInt(data.nombreBottes) : undefined;
+    const poidsBotteKg = data.poidsBotteKg ? parseFloat(data.poidsBotteKg) : undefined;
+    const poidsTonne = nbBottes && poidsBotteKg ? (nbBottes * poidsBotteKg) / 1000 : undefined;
+    const prixTotal = achat && data.prixTotal ? parseFloat(data.prixTotal) : undefined;
+    return {
+      typeActivite: data.typeActivite,
+      origine: data.origine,
+      dateActivite: data.dateActivite,
+      parcelIds: achat ? [] : data.parcelIds,
+      nombreBottes: nbBottes,
+      poidsBotteKg,
+      poidsTonne,
+      fournisseur: achat ? data.fournisseur || undefined : undefined,
+      prixTotal,
+      notes: data.notes || undefined,
+      statut: (nbBottes ? "terminee" : "en_cours") as "terminee" | "en_cours",
+    };
+  };
+
   const handleCreate = async (data: ActiviteFormData) => {
     setSaving(true);
     try {
-      const nbBottes = data.nombreBottes ? parseInt(data.nombreBottes) : undefined;
-      const poidsBotteKg = data.poidsBotteKg ? parseFloat(data.poidsBotteKg) : undefined;
-      const poidsTonne = nbBottes && poidsBotteKg ? (nbBottes * poidsBotteKg) / 1000 : undefined;
-      const result = await createActivite({
-        typeActivite: data.typeActivite,
-        dateActivite: data.dateActivite,
-        parcelIds: data.parcelIds,
-        nombreBottes: nbBottes,
-        poidsBotteKg,
-        poidsTonne,
-        notes: data.notes || undefined,
-        statut: nbBottes ? "terminee" : "en_cours",
-      });
+      const result = await createActivite(buildPayload(data));
       if (result.success) {
-        showToast({ type: "success", title: "Activité créée" });
-        setModalOpen(false);
+        showToast({ type: "success", title: data.origine === "achat" ? "Achat enregistré" : "Activité créée" });
+        setModalOpen(null);
       } else {
         showToast({ type: "error", title: "Erreur", message: result.error });
       }
@@ -465,18 +545,13 @@ export default function FourragePage() {
     if (!editActivite) return;
     setSaving(true);
     try {
-      const nbBottes = data.nombreBottes ? parseInt(data.nombreBottes) : undefined;
-      const poidsBotteKg = data.poidsBotteKg ? parseFloat(data.poidsBotteKg) : undefined;
-      const poidsTonne = nbBottes && poidsBotteKg ? (nbBottes * poidsBotteKg) / 1000 : undefined;
+      const payload = buildPayload(data);
+      // `null` supprime le champ côté Firebase (passage achat ↔ récolte)
       const result = await updateActivite(editActivite.id, {
-        typeActivite: data.typeActivite,
-        dateActivite: data.dateActivite,
-        parcelIds: data.parcelIds,
-        nombreBottes: nbBottes,
-        poidsBotteKg,
-        poidsTonne,
-        notes: data.notes || undefined,
-        statut: nbBottes ? "terminee" : "en_cours",
+        ...payload,
+        parcelIds: payload.parcelIds.length ? payload.parcelIds : null,
+        fournisseur: payload.fournisseur ?? null,
+        prixTotal: payload.prixTotal ?? null,
       });
       if (result.success) {
         showToast({ type: "success", title: "Activité mise à jour" });
@@ -521,17 +596,25 @@ export default function FourragePage() {
   return (
     <div>
       {/* En-tête */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-stone-900">Fourrage</h1>
-          <p className="text-stone-500 mt-1">Gestion des activités de coupe et de récolte</p>
+          <p className="text-stone-500 mt-1">Gestion des activités de coupe, de récolte et des achats de bottes</p>
         </div>
-        <button
-          onClick={() => setModalOpen(true)}
-          className="px-4 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors cursor-pointer"
-        >
-          + Nouvelle activité
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 sm:shrink-0">
+          <button
+            onClick={() => setModalOpen("achat")}
+            className="w-full sm:w-auto whitespace-nowrap px-4 py-2 text-sm font-semibold text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 rounded-lg transition-colors cursor-pointer"
+          >
+            🛒 Achat de bottes
+          </button>
+          <button
+            onClick={() => setModalOpen("recolte")}
+            className="w-full sm:w-auto whitespace-nowrap px-4 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors cursor-pointer"
+          >
+            + Nouvelle activité
+          </button>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -551,6 +634,7 @@ export default function FourragePage() {
         <KpiCard
           label="Bottes ce mois"
           value={bottesCeMois}
+          subtitle={`${bottesRecolteesCeMois} récoltées · ${bottesAcheteesCeMois} achetées`}
           borderColorClass="border-l-yellow-500"
           valueColorClass="text-yellow-600"
         />
@@ -589,7 +673,7 @@ export default function FourragePage() {
           {/* Chiffres */}
           <div className="flex items-center justify-between text-sm mb-4">
             <span className="text-stone-600">
-              <span className="font-semibold text-stone-800">{foinsRecoltesT.toFixed(1)} t</span> récoltées
+              <span className="font-semibold text-stone-800">{stock.totalT.toFixed(1)} t</span> en stock
             </span>
             <span className="text-stone-400">sur</span>
             <span className="text-stone-600">
@@ -601,6 +685,24 @@ export default function FourragePage() {
             {manquantT === 0 && (
               <span className="text-green-600 font-medium">✓ Objectif atteint</span>
             )}
+          </div>
+
+          {/* Répartition stock : récolté vs acheté */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="bg-stone-50 rounded-lg px-3 py-2">
+              <p className="text-xs text-stone-400">Stock total</p>
+              <p className="text-sm font-bold text-stone-800">{stock.totalT.toFixed(1)} t</p>
+            </div>
+            <div className="bg-yellow-50 rounded-lg px-3 py-2">
+              <p className="text-xs text-stone-400">🌾 Récolté</p>
+              <p className="text-sm font-bold text-yellow-700">{stock.recolteT.toFixed(1)} t</p>
+              <p className="text-[11px] text-stone-400">{stock.bottesRecoltees} bottes</p>
+            </div>
+            <div className="bg-sky-50 rounded-lg px-3 py-2">
+              <p className="text-xs text-stone-400">🛒 Acheté</p>
+              <p className="text-sm font-bold text-sky-700">{stock.acheteT.toFixed(1)} t</p>
+              <p className="text-[11px] text-stone-400">{stock.bottesAchetees} bottes</p>
+            </div>
           </div>
 
           {/* Détail par type */}
@@ -627,7 +729,8 @@ export default function FourragePage() {
       {/* Analytics récoltes foin / regain */}
       {(totalFoinT > 0 || totalRegainT > 0) && (
         <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5 mb-8">
-          <h2 className="text-base font-semibold text-stone-800 mb-4">Analytics récoltes</h2>
+          <h2 className="text-base font-semibold text-stone-800">Analytics récoltes</h2>
+          <p className="text-xs text-stone-400 mb-4">Récoltes de la ferme uniquement — les bottes achetées sont exclues.</p>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
             <KpiCard
@@ -739,11 +842,25 @@ export default function FourragePage() {
                     En cours
                   </span>
                 )}
+                <span
+                  className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${ORIGINE_COLORS[origineActivite(activite)]}`}
+                >
+                  {ORIGINE_LABELS[origineActivite(activite)]}
+                </span>
                 <span className="text-sm text-stone-500">{formatDate(activite.dateActivite)}</span>
               </div>
-              <div className="mt-1 text-sm text-stone-700">
-                <span className="font-medium">Parcelles :</span> {getPartielsNoms(activite.parcelIds)}
-              </div>
+              {estAchat(activite) ? (
+                <div className="mt-1 text-sm text-stone-700">
+                  <span className="font-medium">Fournisseur :</span> {activite.fournisseur || "—"}
+                  {activite.prixTotal != null && (
+                    <span className="text-stone-500"> · {activite.prixTotal.toFixed(2)} €</span>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-1 text-sm text-stone-700">
+                  <span className="font-medium">Parcelles :</span> {getPartielsNoms(activite.parcelIds)}
+                </div>
+              )}
               <div className="mt-0.5 text-sm text-stone-600">
                 {activite.nombreBottes != null ? (
                   <>
@@ -787,13 +904,21 @@ export default function FourragePage() {
       </div>
 
       {/* Modal création */}
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Nouvelle activité fourrage">
-        <ActiviteForm
-          partiels={partiels}
-          onSubmit={handleCreate}
-          onCancel={() => setModalOpen(false)}
-          loading={saving}
-        />
+      <Modal
+        isOpen={!!modalOpen}
+        onClose={() => setModalOpen(null)}
+        title={modalOpen === "achat" ? "Achat de bottes" : "Nouvelle activité fourrage"}
+      >
+        {modalOpen && (
+          <ActiviteForm
+            key={modalOpen}
+            partiels={partiels}
+            initial={{ origine: modalOpen }}
+            onSubmit={handleCreate}
+            onCancel={() => setModalOpen(null)}
+            loading={saving}
+          />
+        )}
       </Modal>
 
       {/* Modal édition */}
@@ -807,10 +932,13 @@ export default function FourragePage() {
             partiels={partiels}
             initial={{
               typeActivite: editActivite.typeActivite,
+              origine: origineActivite(editActivite),
               dateActivite: editActivite.dateActivite,
               parcelIds: editActivite.parcelIds ?? [],
               nombreBottes: editActivite.nombreBottes?.toString() ?? "",
               poidsBotteKg: editActivite.poidsBotteKg?.toString() ?? "16.5",
+              fournisseur: editActivite.fournisseur ?? "",
+              prixTotal: editActivite.prixTotal?.toString() ?? "",
               notes: editActivite.notes ?? "",
             }}
             onSubmit={handleUpdate}
