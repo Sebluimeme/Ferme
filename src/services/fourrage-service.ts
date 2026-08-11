@@ -29,12 +29,19 @@ export async function getPartiel(id: string) {
 export async function createActivite(data: Omit<ActiviteFourrage, "id" | "dateCreation" | "derniereMAJ">) {
   const payload: Record<string, unknown> = {
     ...data,
+    origine: data.origine ?? "recolte",
     statut: data.statut ?? "en_cours",
   };
   return firebaseService.create<Record<string, unknown>>(PATH_ACTIVITES, payload);
 }
 
-export async function updateActivite(id: string, data: Partial<Omit<ActiviteFourrage, "id" | "dateCreation" | "derniereMAJ">>) {
+/** `null` sur un champ le supprime côté Firebase (utile en passant récolte → achat). */
+export type ActiviteUpdate = {
+  [K in keyof Omit<ActiviteFourrage, "id" | "dateCreation" | "derniereMAJ">]?:
+    ActiviteFourrage[K] | null;
+};
+
+export async function updateActivite(id: string, data: ActiviteUpdate) {
   const updates: Record<string, unknown> = { ...data };
   return firebaseService.update(PATH_ACTIVITES, id, updates);
 }
