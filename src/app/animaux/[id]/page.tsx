@@ -7,6 +7,7 @@ import { useToast } from "@/components/Toast";
 import Modal, { ConfirmModal } from "@/components/Modal";
 import AnimalForm from "@/components/AnimalForm";
 import AnimalHeader from "@/components/animal-detail/AnimalHeader";
+import { GestationAlertCard } from "@/components/GestationAlerts";
 import AnimalInfoGrid from "@/components/animal-detail/AnimalInfoGrid";
 import ParentCards from "@/components/animal-detail/ParentCards";
 import PhotoGallery from "@/components/animal-detail/PhotoGallery";
@@ -129,6 +130,7 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="fade-in">
+      <GestationAlertCard animal={animal} />
       <AnimalHeader
         animal={animal}
         onEdit={() => setShowEditModal(true)}

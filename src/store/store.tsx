@@ -33,6 +33,8 @@ export interface Animal {
   commentaire?: string;
   numeroBouclePere?: string;
   numeroBoucleMere?: string;
+  dateSaillie?: string;
+  dureeGestationJours?: number;
   photoUrl?: string;
   photoStoragePath?: string;
   dateCreation?: string;

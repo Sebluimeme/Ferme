@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useAppStore, type Animal } from "@/store/store";
+import { getGestationDurationDays, calculateEstimatedBirthDate, formatGestationDate } from "@/lib/reproduction";
 
 type AnimalStatus = Animal["statut"];
 
@@ -13,7 +14,12 @@ interface AnimalFormProps {
 export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
   const { state } = useAppStore();
   const [selectedType, setSelectedType] = useState(animal?.type || "");
+  const [selectedSexe, setSelectedSexe] = useState(animal?.sexe || "");
   const [selectedStatus, setSelectedStatus] = useState<AnimalStatus>(animal?.statut || "actif");
+  const [dateSaillieValue, setDateSaillieValue] = useState(animal?.dateSaillie || "");
+  const [dureeGestationValue, setDureeGestationValue] = useState(
+    animal?.dureeGestationJours ? String(animal.dureeGestationJours) : ""
+  );
   const [raceValue, setRaceValue] = useState(animal?.race || "");
   const [raceDropdownOpen, setRaceDropdownOpen] = useState(false);
   const [raceSearchQuery, setRaceSearchQuery] = useState("");
@@ -115,7 +121,8 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
           </label>
           <select
             name="sexe"
-            defaultValue={animal?.sexe || ""}
+            value={selectedSexe}
+            onChange={(e) => setSelectedSexe(e.target.value)}
             required
             className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10"
           >
@@ -265,6 +272,65 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
           </select>
         </div>
       </div>
+
+      {selectedSexe === "F" && (
+        <div className="rounded-xl border border-brand-600/20 bg-brand-600/5 p-4">
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold text-stone-800">🍼 Reproduction — insémination / saillie</h3>
+            <p className="text-xs text-stone-500">
+              Renseignez la date pour obtenir une estimation automatique de mise bas. Une alerte s&apos;affichera
+              sur la fiche et en haut de la liste quelques jours avant le terme.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block mb-1 text-sm font-medium text-stone-700">Date d&apos;insémination / saillie</label>
+              <input
+                type="date"
+                name="dateSaillie"
+                value={dateSaillieValue}
+                onChange={(e) => setDateSaillieValue(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 bg-white"
+              />
+            </div>
+            <div>
+              <label className="block mb-1 text-sm font-medium text-stone-700">
+                Durée de gestation (jours){" "}
+                <span className="text-xs text-stone-400 font-normal">
+                  défaut {selectedType ? getGestationDurationDays({ type: selectedType as Animal["type"], dureeGestationJours: undefined }) : "—"} j
+                </span>
+              </label>
+              <input
+                type="number"
+                name="dureeGestationJours"
+                value={dureeGestationValue}
+                onChange={(e) => setDureeGestationValue(e.target.value)}
+                min={30}
+                max={400}
+                step={1}
+                placeholder={
+                  selectedType
+                    ? String(getGestationDurationDays({ type: selectedType as Animal["type"], dureeGestationJours: undefined }))
+                    : "Ex : 152"
+                }
+                className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 bg-white"
+              />
+            </div>
+          </div>
+          {dateSaillieValue && selectedType && (() => {
+            const days = dureeGestationValue
+              ? Number(dureeGestationValue)
+              : getGestationDurationDays({ type: selectedType as Animal["type"], dureeGestationJours: undefined });
+            const estimee = Number.isFinite(days) ? calculateEstimatedBirthDate(dateSaillieValue, days) : null;
+            return estimee ? (
+              <div className="mt-3 text-sm font-medium text-brand-700">
+                → Mise bas estimée le {formatGestationDate(estimee)}
+              </div>
+            ) : null;
+          })()}
+        </div>
+      )}
 
       {selectedStatus === "vendu" && (
         <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">

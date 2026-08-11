@@ -2,6 +2,7 @@
 
 import type { Animal } from "@/store/store";
 import { getAnimalIcon, getAnimalLabel, getAnimalBorderColor, getAnimalBgColor, formatAgeFromBirthDate, formatNumber } from "@/lib/utils";
+import { GestationBadge } from "@/components/GestationAlerts";
 
 interface AnimalCardProps {
   animal: Animal;
@@ -95,6 +96,8 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
               <div className="font-medium">{animal.poids ? formatNumber(animal.poids, 2) + " kg" : "-"}</div>
             </div>
           </div>
+
+          <GestationBadge animal={animal} />
 
           {lastModified && (
             <div className="mt-1.5 text-[9px] sm:text-[10px] text-stone-400">

@@ -1,6 +1,7 @@
 import firebaseService from "@/lib/firebase-service";
 import { uploadFile, deleteFile, compressImage } from "@/lib/firebase-storage";
 import { calculateAge } from "@/lib/utils";
+import { GESTATION_DAYS_MIN, GESTATION_DAYS_MAX } from "@/lib/reproduction";
 import type { Animal } from "@/store/store";
 
 const PATH = "animaux";
@@ -16,13 +17,16 @@ export interface AnimalFormData {
   commentaire?: string;
   numeroBouclePere?: string;
   numeroBoucleMere?: string;
+  dateSaillie?: string;
+  dureeGestationJours?: string | number;
   poidsSortieKg?: string | number;
   poidsCarcasseKg?: string | number;
 }
 
-type NormalizedAnimalData = Omit<AnimalFormData, "poidsSortieKg" | "poidsCarcasseKg"> & {
+type NormalizedAnimalData = Omit<AnimalFormData, "poidsSortieKg" | "poidsCarcasseKg" | "dureeGestationJours"> & {
   poidsSortieKg?: number | null;
   poidsCarcasseKg?: number | null;
+  dureeGestationJours?: number | null;
 };
 
 function parseOptionalWeight(value: string | number | undefined): number | null | undefined {
@@ -31,6 +35,15 @@ function parseOptionalWeight(value: string | number | undefined): number | null 
   if (normalized === "") return null;
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseOptionalGestationDays(value: string | number | undefined): number | null | undefined {
+  if (value === undefined || value === null || value === "") return null;
+  const normalized = typeof value === "string" ? value.trim() : value;
+  if (normalized === "") return null;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return undefined;
+  return Math.round(parsed);
 }
 
 function normalizeAnimalData(data: AnimalFormData): NormalizedAnimalData {
@@ -46,10 +59,12 @@ function normalizeAnimalData(data: AnimalFormData): NormalizedAnimalData {
     commentaire: data.commentaire?.trim() || undefined,
     numeroBouclePere: data.numeroBouclePere || undefined,
     numeroBoucleMere: data.numeroBoucleMere || undefined,
+    dateSaillie: data.dateSaillie || undefined,
   };
 
   normalized.poidsSortieKg = statut === "vendu" ? parseOptionalWeight(data.poidsSortieKg) ?? null : null;
   normalized.poidsCarcasseKg = statut === "vendu" ? parseOptionalWeight(data.poidsCarcasseKg) ?? null : null;
+  normalized.dureeGestationJours = data.sexe === "F" ? parseOptionalGestationDays(data.dureeGestationJours) ?? null : null;
   return normalized;
 }
 
@@ -65,6 +80,16 @@ export function validateAnimalData(data: AnimalFormData): { valid: boolean; erro
     const date = new Date(data.dateNaissance);
     if (isNaN(date.getTime())) errors.push("Date de naissance invalide");
     if (date > new Date()) errors.push("La date de naissance ne peut pas être dans le futur");
+  }
+  if (data.dateSaillie) {
+    const date = new Date(data.dateSaillie);
+    if (isNaN(date.getTime())) errors.push("Date d'insémination / saillie invalide");
+    else if (date > new Date()) errors.push("La date d'insémination / saillie ne peut pas être dans le futur");
+  }
+  const dureeGestation = parseOptionalGestationDays(data.dureeGestationJours);
+  if (dureeGestation === undefined) errors.push("La durée de gestation doit être un nombre valide");
+  if (typeof dureeGestation === "number" && (dureeGestation < GESTATION_DAYS_MIN || dureeGestation > GESTATION_DAYS_MAX)) {
+    errors.push(`La durée de gestation doit être comprise entre ${GESTATION_DAYS_MIN} et ${GESTATION_DAYS_MAX} jours`);
   }
   const poidsSortie = parseOptionalWeight(data.poidsSortieKg);
   const poidsCarcasse = parseOptionalWeight(data.poidsCarcasseKg);
@@ -118,6 +143,16 @@ export async function updateAnimal(id: string, data: AnimalFormData) {
 
 export async function deleteAnimal(id: string) {
   return firebaseService.delete(PATH, id);
+}
+
+/**
+ * Efface le suivi de gestation d'un animal (à utiliser une fois la mise bas constatée).
+ */
+export async function clearGestationSuivi(animalId: string) {
+  return firebaseService.update(PATH, animalId, {
+    dateSaillie: null,
+    dureeGestationJours: null,
+  });
 }
 
 /**

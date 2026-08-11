@@ -8,6 +8,7 @@ import Modal, { ConfirmModal } from "@/components/Modal";
 import AnimalCard from "@/components/AnimalCard";
 import AnimalForm from "@/components/AnimalForm";
 import KpiCard from "@/components/KpiCard";
+import { UpcomingBirthsBanner } from "@/components/GestationAlerts";
 import { getAnimalIcon, getAnimalLabel, getAnimalBgColor } from "@/lib/utils";
 import {
   createAnimal,
@@ -169,6 +170,9 @@ export default function AnimauxPageContent() {
           + Ajouter un animal
         </button>
       </div>
+
+      {/* Naissances à venir — vue globale ou filtrée par espèce */}
+      <UpcomingBirthsBanner scope={(currentFilter as Animal["type"]) || undefined} />
 
       {/* Stats rapides - masquées quand un filtre de type est actif */}
       {!currentFilter && (
