@@ -9,6 +9,7 @@ import AnimalCard from "@/components/AnimalCard";
 import AnimalForm from "@/components/AnimalForm";
 import KpiCard from "@/components/KpiCard";
 import { UpcomingBirthsBanner } from "@/components/GestationAlerts";
+import { UpcomingHeatsBanner } from "@/components/HeatAlerts";
 import { getAnimalIcon, getAnimalLabel, getAnimalBgColor } from "@/lib/utils";
 import {
   createAnimal,
@@ -171,8 +172,9 @@ export default function AnimauxPageContent() {
         </button>
       </div>
 
-      {/* Naissances à venir — vue globale ou filtrée par espèce */}
+      {/* Naissances et chaleurs à venir — vue globale ou filtrée par espèce */}
       <UpcomingBirthsBanner scope={(currentFilter as Animal["type"]) || undefined} />
+      <UpcomingHeatsBanner scope={(currentFilter as Animal["type"]) || undefined} />
 
       {/* Stats rapides - masquées quand un filtre de type est actif */}
       {!currentFilter && (

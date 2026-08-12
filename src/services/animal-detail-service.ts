@@ -49,6 +49,15 @@ export interface HistoryEntry {
   derniereMAJ?: string;
 }
 
+export interface ChaleurEntry {
+  id: string;
+  animalId: string;
+  date: string;
+  note?: string;
+  dateCreation?: string;
+  derniereMAJ?: string;
+}
+
 // ============ Poids ============
 
 const WEIGHTS_PATH = (animalId: string) => `animaux-poids/${animalId}`;
@@ -259,4 +268,22 @@ export async function deleteSoin(soinId: string, storagePath?: string) {
 
 export function listenSoins(animalId: string, callback: (data: FicheSoin[]) => void) {
   return firebaseService.listenWhere<FicheSoin>(SOINS_PATH, "animalId", animalId, callback);
+}
+
+// ============ Chaleurs ============
+
+const CHALEURS_PATH = (animalId: string) => `animaux-chaleurs/${animalId}`;
+
+export async function addChaleur(animalId: string, data: { date: string; note?: string }) {
+  const payload: Record<string, unknown> = { date: data.date, animalId };
+  if (data.note) payload.note = data.note;
+  return firebaseService.create(CHALEURS_PATH(animalId), payload);
+}
+
+export async function deleteChaleur(animalId: string, chaleurId: string) {
+  return firebaseService.delete(CHALEURS_PATH(animalId), chaleurId);
+}
+
+export function listenChaleurs(animalId: string, callback: (data: ChaleurEntry[]) => void) {
+  return firebaseService.listen<ChaleurEntry>(CHALEURS_PATH(animalId), callback);
 }

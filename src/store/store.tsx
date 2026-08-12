@@ -15,6 +15,7 @@ import type { ReleverSource } from "@/types/source";
 import type { SejourPaturage } from "@/types/paturage";
 import type { PleinCarburant } from "@/types/carburant";
 import type { WeatherReading } from "@/types/weather";
+import type { ChaleurEntry } from "@/services/animal-detail-service";
 import { calculateMaintenanceAlerts } from "@/services/vehicle-detail-service";
 
 export interface Animal {
@@ -101,6 +102,7 @@ interface AppState {
   sejoursPaturage: SejourPaturage[];
   carburant: PleinCarburant[];
   weatherReadings: WeatherReading[];
+  chaleurs: ChaleurEntry[];
   stats: Stats;
   loading: boolean;
   sidebarOpen: boolean;
@@ -128,6 +130,7 @@ type Action =
   | { type: "SET_SEJOURS_PATURAGE"; payload: SejourPaturage[] }
   | { type: "SET_CARBURANT"; payload: PleinCarburant[] }
   | { type: "SET_WEATHER_READINGS"; payload: WeatherReading[] }
+  | { type: "SET_CHALEURS"; payload: ChaleurEntry[] }
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "TOGGLE_SIDEBAR" }
   | { type: "CLOSE_SIDEBAR" }
@@ -174,6 +177,7 @@ const initialState: AppState = {
   sejoursPaturage: [],
   carburant: [],
   weatherReadings: [],
+  chaleurs: [],
   stats: { totalAnimaux: 0, ovins: 0, bovins: 0, caprins: 0, porcins: 0, profitGlobal: 0 },
   loading: true,
   sidebarOpen: false,
@@ -235,6 +239,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, carburant: action.payload };
     case "SET_WEATHER_READINGS":
       return { ...state, weatherReadings: action.payload };
+    case "SET_CHALEURS":
+      return { ...state, chaleurs: action.payload };
     case "UPDATE_MAINTENANCE_ALERTS": {
       const alerts = calculateMaintenanceAlerts(state.vehicles, state.maintenanceEntries, state.meterReadings);
       return { ...state, maintenanceAlerts: alerts };
@@ -314,6 +320,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const listenPartiels = () => listen<Partiel>("partiels", (data) => ({ type: "SET_PARTIELS", payload: data }));
     const listenActivitesFourrage = () => listen<ActiviteFourrage>("activites-fourrage", (data) => ({ type: "SET_ACTIVITES_FOURRAGE", payload: data }));
     const listenMeteo = () => listen<WeatherReading>("weather-readings", (data) => ({ type: "SET_WEATHER_READINGS", payload: data }));
+    // animaux-chaleurs/{animalId}/{chaleurId} : structure imbriquée par animal, à aplatir en liste unique.
+    const listenChaleursGlobal = () => {
+      listeners.push(firebaseService.listen<Record<string, ChaleurEntry>>("animaux-chaleurs", (data) => {
+        dispatch({ type: "SET_LOADING", payload: false });
+        const chaleurs = data.flatMap((animalChaleurs) => Object.values(animalChaleurs || {}));
+        dispatch({ type: "SET_CHALEURS", payload: chaleurs });
+      }));
+    };
 
     // La pastille de notification reste disponible dans toute l'application.
     listenAlertes();
@@ -323,6 +337,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       listenAnimaux();
       listenTransactions();
       listenTaches();
+      // Rappels reproduction juste sous les KPIs : chargés avec la même priorité.
+      listenChaleursGlobal();
       // Les widgets secondaires arrivent après que l'accueil est déjà interactif.
       defer(listenVehicules);
       defer(listenEntretiens);
@@ -331,6 +347,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       defer(listenMeteo);
     } else if (pathname === "/animaux" || pathname.startsWith("/animaux/")) {
       listenAnimaux();
+      if (pathname === "/animaux") listenChaleursGlobal();
+    } else if (pathname === "/reproduction") {
+      listenAnimaux();
+      listenChaleursGlobal();
     } else if (pathname === "/traitements") {
       listenAnimaux();
       listen<FicheSoin>("traitements", (data) => ({ type: "SET_TRAITEMENTS", payload: data }));

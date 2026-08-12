@@ -22,6 +22,7 @@ import {
   Footprints,
   Fuel,
   CloudSun,
+  HeartPulse,
 } from "lucide-react";
 
 const sections = [
@@ -37,6 +38,7 @@ const sections = [
     items: [
       { icon: PawPrint, label: "Mes Animaux",  route: "/animaux" },
       { icon: Syringe,  label: "Traitements",  route: "/traitements" },
+      { icon: HeartPulse, label: "Reproduction", route: "/reproduction" },
     ],
   },
   {

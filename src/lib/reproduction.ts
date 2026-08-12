@@ -43,7 +43,7 @@ export interface GestationAlert {
  * Retourne l'alerte de mise bas active pour un animal, ou null si aucune n'est pertinente
  * (pas de suivi renseigné, mâle, animal inactif, ou hors fenêtre d'affichage).
  */
-export function getGestationAlert(animal: Animal): GestationAlert | null {
+export function getGestationAlert(animal: Animal, todayInput: Date = new Date()): GestationAlert | null {
   if (!animal.dateSaillie) return null;
   if (animal.sexe !== "F") return null;
   if (animal.statut !== "actif") return null;
@@ -52,7 +52,7 @@ export function getGestationAlert(animal: Animal): GestationAlert | null {
   const dateEstimee = calculateEstimatedBirthDate(animal.dateSaillie, gestationDays);
   if (!dateEstimee) return null;
 
-  const today = new Date();
+  const today = new Date(todayInput);
   today.setHours(0, 0, 0, 0);
   const target = new Date(dateEstimee);
   target.setHours(0, 0, 0, 0);
@@ -77,4 +77,99 @@ export function formatGestationMessage(alert: GestationAlert): string {
   if (alert.joursRestants === 0) return `Naissance prévue aujourd'hui (${dateStr})`;
   if (alert.joursRestants === 1) return `Naissance prévue demain (${dateStr})`;
   return `Naissance prévue le ${dateStr} — dans ${alert.joursRestants} j`;
+}
+
+// ============ Chaleurs (cycle œstral) ============
+
+/** Durées de cycle par défaut (en jours), par espèce — utilisées pour projeter la prochaine chaleur. */
+export const CYCLE_DAYS_DEFAULT: Record<Animal["type"], number> = {
+  ovin: 17,
+  caprin: 21,
+  bovin: 21,
+  porcin: 21,
+  equin: 21,
+};
+
+/** Fenêtre d'affichage de l'alerte de chaleur avant la date estimée (en jours). */
+export const HEAT_ALERT_WINDOW_DAYS = 7;
+
+export interface ChaleurObservation {
+  date: string;
+}
+
+function midnight(date: Date): Date {
+  const result = new Date(date);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+/**
+ * Indique si une femelle est actuellement en gestation à la date `today` (terme estimé pas encore atteint).
+ */
+function isEnGestation(animal: Pick<Animal, "type" | "dateSaillie" | "dureeGestationJours">, today: Date): boolean {
+  if (!animal.dateSaillie) return false;
+  const gestationDays = getGestationDurationDays(animal);
+  const birthDate = calculateEstimatedBirthDate(animal.dateSaillie, gestationDays);
+  if (!birthDate) return false;
+  return midnight(birthDate).getTime() >= midnight(today).getTime();
+}
+
+/**
+ * Projette la prochaine date de chaleur à partir de l'observation la plus récente, en ajoutant
+ * des cycles entiers jusqu'à obtenir une date >= aujourd'hui. Retourne null si aucune observation.
+ */
+export function getNextHeatDate(
+  animal: Pick<Animal, "type">,
+  chaleurs: ChaleurObservation[],
+  today: Date = new Date()
+): Date | null {
+  const validDates = (chaleurs || [])
+    .map((c) => new Date(c.date))
+    .filter((d) => !isNaN(d.getTime()));
+  if (validDates.length === 0) return null;
+
+  const lastObserved = midnight(new Date(Math.max(...validDates.map((d) => d.getTime()))));
+  const cycleDays = CYCLE_DAYS_DEFAULT[animal.type] || 21;
+  const todayMidnight = midnight(today);
+
+  const next = new Date(lastObserved);
+  while (next.getTime() < todayMidnight.getTime()) {
+    next.setDate(next.getDate() + cycleDays);
+  }
+  return next;
+}
+
+export interface HeatAlert {
+  dateEstimee: Date;
+  joursRestants: number;
+}
+
+/**
+ * Retourne l'alerte de chaleur active pour un animal, ou null si aucune n'est pertinente
+ * (mâle, animal inactif, aucune chaleur observée, hors fenêtre d'affichage, ou femelle gestante).
+ */
+export function getHeatAlert(
+  animal: Animal,
+  chaleurs: ChaleurObservation[],
+  today: Date = new Date()
+): HeatAlert | null {
+  if (animal.sexe !== "F") return null;
+  if (animal.statut !== "actif") return null;
+  if (!chaleurs || chaleurs.length === 0) return null;
+  if (isEnGestation(animal, today)) return null;
+
+  const dateEstimee = getNextHeatDate(animal, chaleurs, today);
+  if (!dateEstimee) return null;
+
+  const joursRestants = Math.round((dateEstimee.getTime() - midnight(today).getTime()) / 86400000);
+  if (joursRestants > HEAT_ALERT_WINDOW_DAYS) return null;
+
+  return { dateEstimee, joursRestants };
+}
+
+export function formatHeatMessage(alert: HeatAlert): string {
+  const dateStr = formatGestationDate(alert.dateEstimee);
+  if (alert.joursRestants === 0) return `Chaleur prévue aujourd'hui (${dateStr})`;
+  if (alert.joursRestants === 1) return `Chaleur prévue demain (${dateStr})`;
+  return `Chaleur prévue le ${dateStr} — dans ${alert.joursRestants} j`;
 }

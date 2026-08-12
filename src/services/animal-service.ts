@@ -156,6 +156,34 @@ export async function clearGestationSuivi(animalId: string) {
 }
 
 /**
+ * Enregistre ou modifie la saillie/insémination d'un animal depuis l'onglet Repro.
+ */
+export async function updateGestationSuivi(
+  animalId: string,
+  data: { dateSaillie: string; dureeGestationJours?: string | number }
+) {
+  const date = new Date(data.dateSaillie);
+  if (!data.dateSaillie || isNaN(date.getTime())) {
+    return { success: false, error: "Date d'insémination / saillie invalide" };
+  }
+  if (date > new Date()) {
+    return { success: false, error: "La date d'insémination / saillie ne peut pas être dans le futur" };
+  }
+
+  const updates: Record<string, unknown> = { dateSaillie: data.dateSaillie };
+  const dureeGestation = parseOptionalGestationDays(data.dureeGestationJours);
+  if (dureeGestation === undefined) {
+    return { success: false, error: "La durée de gestation doit être un nombre valide" };
+  }
+  if (dureeGestation !== null && (dureeGestation < GESTATION_DAYS_MIN || dureeGestation > GESTATION_DAYS_MAX)) {
+    return { success: false, error: `La durée de gestation doit être comprise entre ${GESTATION_DAYS_MIN} et ${GESTATION_DAYS_MAX} jours` };
+  }
+  updates.dureeGestationJours = dureeGestation;
+
+  return firebaseService.update(PATH, animalId, updates);
+}
+
+/**
  * Upload ou remplace la photo principale d'un animal.
  * Compresse l'image côté client avant envoi (max 800px, JPEG 78%).
  */

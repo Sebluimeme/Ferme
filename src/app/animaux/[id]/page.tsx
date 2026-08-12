@@ -14,10 +14,11 @@ import PhotoGallery from "@/components/animal-detail/PhotoGallery";
 import WeightChart from "@/components/animal-detail/WeightChart";
 import HistoryTimeline from "@/components/animal-detail/HistoryTimeline";
 import CareRecords from "@/components/animal-detail/CareRecords";
+import ReproductionRecords from "@/components/animal-detail/ReproductionRecords";
 import { updateAnimal, deleteAnimal as deleteAnimalService, validateAnimalData, type AnimalFormData } from "@/services/animal-service";
 import {
-  listenWeights, listenPhotos, listenHistory, listenSoins,
-  type WeightEntry, type AnimalPhoto, type HistoryEntry,
+  listenWeights, listenPhotos, listenHistory, listenSoins, listenChaleurs,
+  type WeightEntry, type AnimalPhoto, type HistoryEntry, type ChaleurEntry,
 } from "@/services/animal-detail-service";
 import type { FicheSoin } from "@/store/store";
 
@@ -26,6 +27,7 @@ const TABS = [
   { id: "photos", label: "Photos" },
   { id: "poids", label: "Poids" },
   { id: "soins", label: "Soins" },
+  { id: "repro", label: "Repro" },
   { id: "historique", label: "Historique" },
 ] as const;
 
@@ -48,8 +50,10 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
   const [photos, setPhotos] = useState<AnimalPhoto[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [soins, setSoins] = useState<FicheSoin[]>([]);
+  const [chaleurs, setChaleurs] = useState<ChaleurEntry[]>([]);
 
   const animal = state.animaux.find((a) => a.id === id) || null;
+  const showReproTab = animal?.sexe === "F";
 
   // Real-time listeners for sub-data
   useEffect(() => {
@@ -59,9 +63,17 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
       listenPhotos(id, setPhotos),
       listenHistory(id, setHistory),
       listenSoins(id, setSoins),
+      listenChaleurs(id, setChaleurs),
     ];
     return () => unsubs.forEach((unsub) => unsub());
   }, [id]);
+
+  // Retombe sur l'onglet infos si l'onglet Repro devient masqué (ex: sexe changé) alors qu'il était actif.
+  useEffect(() => {
+    if (activeTab === "repro" && !showReproTab) setActiveTab("info");
+  }, [activeTab, showReproTab]);
+
+  const visibleTabs = TABS.filter((tab) => tab.id !== "repro" || showReproTab);
 
   const handleSave = async () => {
     if (!formRef.current || !animal || saving) return;
@@ -140,7 +152,7 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm mb-6 overflow-x-auto">
         <div className="flex border-b border-stone-200 min-w-max">
-          {TABS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -166,6 +178,7 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
       {activeTab === "photos" && <PhotoGallery animalId={id} photos={photos} profilePhotoUrl={animal.photoUrl} />}
       {activeTab === "poids" && <WeightChart animalId={id} animalType={animal.type} weights={weights} />}
       {activeTab === "soins" && <CareRecords animalId={id} soins={soins} />}
+      {activeTab === "repro" && showReproTab && <ReproductionRecords animal={animal} chaleurs={chaleurs} />}
       {activeTab === "historique" && <HistoryTimeline animalId={id} history={history} />}
 
       {/* Edit modal */}

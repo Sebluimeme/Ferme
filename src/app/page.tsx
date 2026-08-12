@@ -7,8 +7,12 @@ import { formatAlertMessage } from "@/lib/vehicle-utils";
 import { computeWeatherStats, formatWeatherValue, getWindDirectionLabel } from "@/types/weather";
 import { getVehicleStats } from "@/services/vehicle-service";
 import { getUrgentTasks, getTaskStats, getDaysUntilDue } from "@/services/task-service";
+import { getGestationAlert, getHeatAlert, formatGestationDate } from "@/lib/reproduction";
+import { groupChaleursByAnimal } from "@/components/HeatAlerts";
+import { getAnimalIcon } from "@/lib/utils";
 import KpiCard from "@/components/KpiCard";
 import { useMemo } from "react";
+import type { Animal } from "@/store/store";
 import {
   PawPrint,
   Truck,
@@ -27,12 +31,35 @@ import {
 export default function DashboardPage() {
   const router = useRouter();
   const { state } = useAppStore();
-  const { stats, alertes, vehicles, maintenanceAlerts, taches, animaux, activitesFourrage, weatherReadings } = state;
+  const { stats, alertes, vehicles, maintenanceAlerts, taches, animaux, activitesFourrage, weatherReadings, chaleurs } = state;
 
   const vehicleStats = useMemo(() => getVehicleStats(vehicles), [vehicles]);
   const urgentTasks  = useMemo(() => getUrgentTasks(taches, 5), [taches]);
   const taskStats    = useMemo(() => getTaskStats(taches), [taches]);
   const allActiveTasks = useMemo(() => taches.filter((t) => t.statut !== "terminee"), [taches]);
+
+  const upcomingHeats = useMemo(() => {
+    const chaleursByAnimal = groupChaleursByAnimal(chaleurs);
+    return animaux
+      .map((animal) => {
+        const alert = getHeatAlert(animal, chaleursByAnimal[animal.id] || []);
+        return alert ? { animal, alert } : null;
+      })
+      .filter((x): x is { animal: Animal; alert: NonNullable<ReturnType<typeof getHeatAlert>> } => x !== null)
+      .sort((a, b) => a.alert.joursRestants - b.alert.joursRestants)
+      .slice(0, 3);
+  }, [animaux, chaleurs]);
+
+  const upcomingBirths = useMemo(() => {
+    return animaux
+      .map((animal) => {
+        const alert = getGestationAlert(animal);
+        return alert ? { animal, alert } : null;
+      })
+      .filter((x): x is { animal: Animal; alert: NonNullable<ReturnType<typeof getGestationAlert>> } => x !== null)
+      .sort((a, b) => a.alert.joursRestants - b.alert.joursRestants)
+      .slice(0, 3);
+  }, [animaux]);
 
   const sortedMaintenanceAlerts = useMemo(
     () => [...maintenanceAlerts].sort((a, b) => (a.urgent === b.urgent ? 0 : a.urgent ? -1 : 1)),
@@ -154,6 +181,69 @@ export default function DashboardPage() {
           icon={<Wallet className="w-3.5 h-3.5" />}
         />
       </div>
+
+      {/* Rappels reproduction */}
+      {(upcomingHeats.length > 0 || upcomingBirths.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {upcomingHeats.length > 0 && (
+            <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-stone-100">
+                <span className="text-[13px] font-semibold text-stone-800">⚠️ Prochaines chaleurs</span>
+                <button
+                  onClick={() => router.push("/reproduction")}
+                  className="text-[12px] text-brand-600 hover:underline font-medium cursor-pointer"
+                >
+                  Voir tout
+                </button>
+              </div>
+              <div className="divide-y divide-stone-100">
+                {upcomingHeats.map(({ animal, alert }) => (
+                  <div
+                    key={animal.id}
+                    onClick={() => router.push(`/animaux/${animal.id}`)}
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-stone-50 cursor-pointer transition-colors"
+                  >
+                    <span className="text-lg shrink-0">{getAnimalIcon(animal.type)}</span>
+                    <p className="flex-1 min-w-0 text-[13px] font-medium text-stone-800 truncate">
+                      {animal.nom || animal.numeroBoucle || "Animal"}
+                    </p>
+                    <span className="text-[11px] text-stone-400 shrink-0">{formatGestationDate(alert.dateEstimee)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {upcomingBirths.length > 0 && (
+            <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-stone-100">
+                <span className="text-[13px] font-semibold text-stone-800">🍼 Prochaines mises bas</span>
+                <button
+                  onClick={() => router.push("/reproduction")}
+                  className="text-[12px] text-brand-600 hover:underline font-medium cursor-pointer"
+                >
+                  Voir tout
+                </button>
+              </div>
+              <div className="divide-y divide-stone-100">
+                {upcomingBirths.map(({ animal, alert }) => (
+                  <div
+                    key={animal.id}
+                    onClick={() => router.push(`/animaux/${animal.id}`)}
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-stone-50 cursor-pointer transition-colors"
+                  >
+                    <span className="text-lg shrink-0">{getAnimalIcon(animal.type)}</span>
+                    <p className="flex-1 min-w-0 text-[13px] font-medium text-stone-800 truncate">
+                      {animal.nom || animal.numeroBoucle || "Animal"}
+                    </p>
+                    <span className="text-[11px] text-stone-400 shrink-0">{formatGestationDate(alert.dateEstimee)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {latestWeather && (
         <button
