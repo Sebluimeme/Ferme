@@ -45,6 +45,7 @@ export interface HistoryEntry {
   date: string;
   sujet: string;
   description?: string;
+  categorie?: "reproduction" | string;
   dateCreation?: string;
   derniereMAJ?: string;
 }

@@ -15,6 +15,7 @@ import WeightChart from "@/components/animal-detail/WeightChart";
 import HistoryTimeline from "@/components/animal-detail/HistoryTimeline";
 import CareRecords from "@/components/animal-detail/CareRecords";
 import ReproductionRecords from "@/components/animal-detail/ReproductionRecords";
+import ReproductionHistoryPanel from "@/components/animal-detail/ReproductionHistoryPanel";
 import { updateAnimal, deleteAnimal as deleteAnimalService, validateAnimalData, type AnimalFormData } from "@/services/animal-service";
 import {
   listenWeights, listenPhotos, listenHistory, listenSoins, listenChaleurs,
@@ -180,6 +181,8 @@ export default function AnimalDetailPage({ params }: { params: Promise<{ id: str
       {activeTab === "soins" && <CareRecords animalId={id} soins={soins} />}
       {activeTab === "repro" && showReproTab && <ReproductionRecords animal={animal} chaleurs={chaleurs} />}
       {activeTab === "historique" && <HistoryTimeline animalId={id} history={history} />}
+
+      {showReproTab && <ReproductionHistoryPanel animal={animal} history={history} chaleurs={chaleurs} />}
 
       {/* Edit modal */}
       <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Modifier l'animal" size="large">

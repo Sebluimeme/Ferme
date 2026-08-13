@@ -34,6 +34,15 @@ function stripUndefined<T>(obj: T): T {
 }
 
 class FirebaseService {
+  async updatePaths(updates: Record<string, unknown>): Promise<FirebaseResult> {
+    try {
+      await update(ref(database), stripUndefined(updates));
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: (error as Error).message };
+    }
+  }
+
   async create<T extends Record<string, unknown>>(path: string, data: T): Promise<FirebaseResult<T & { id: string }>> {
     try {
       const newRef = push(ref(database, path));

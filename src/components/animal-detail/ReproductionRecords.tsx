@@ -75,7 +75,7 @@ export default function ReproductionRecords({ animal, chaleurs }: ReproductionRe
     try {
       const result = await clearGestationSuivi(animal.id);
       if (result.success) {
-        showToast({ type: "success", title: "Succès", message: "Suivi de gestation clôturé" });
+        showToast({ type: "success", title: "Succès", message: "Mise bas archivée et suivi clôturé" });
       } else {
         showToast({ type: "error", title: "Erreur", message: result.error || "Erreur" });
       }

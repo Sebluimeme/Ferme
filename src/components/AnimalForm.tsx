@@ -293,6 +293,18 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
                 max={new Date().toISOString().slice(0, 10)}
                 className="w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-500/10 bg-white"
               />
+              {animal?.dateSaillie && dateSaillieValue && (
+                <button
+                  type="button"
+                  onClick={() => setDateSaillieValue("")}
+                  className="mt-2 min-h-11 rounded-lg px-2 text-sm font-medium text-red-600 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                >
+                  Supprimer cette saillie
+                </button>
+              )}
+              {animal?.dateSaillie && !dateSaillieValue && (
+                <p className="mt-2 text-sm text-amber-700">La saillie sera supprimée après enregistrement.</p>
+              )}
             </div>
             <div>
               <label className="block mb-1 text-sm font-medium text-stone-700">

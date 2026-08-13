@@ -42,7 +42,7 @@ export function GestationAlertCard({ animal }: { animal: Animal }) {
     try {
       const result = await clearGestationSuivi(animal.id);
       if (result.success) {
-        showToast({ type: "success", title: "Suivi clôturé", message: "Le suivi de gestation a été effacé." });
+        showToast({ type: "success", title: "Suivi clôturé", message: "La saillie et la mise bas restent visibles dans l’historique." });
       } else {
         showToast({ type: "error", title: "Erreur", message: result.error || "Erreur lors de la mise à jour" });
       }

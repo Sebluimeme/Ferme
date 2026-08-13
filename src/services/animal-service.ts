@@ -23,10 +23,11 @@ export interface AnimalFormData {
   poidsCarcasseKg?: string | number;
 }
 
-type NormalizedAnimalData = Omit<AnimalFormData, "poidsSortieKg" | "poidsCarcasseKg" | "dureeGestationJours"> & {
+type NormalizedAnimalData = Omit<AnimalFormData, "poidsSortieKg" | "poidsCarcasseKg" | "dureeGestationJours" | "dateSaillie"> & {
   poidsSortieKg?: number | null;
   poidsCarcasseKg?: number | null;
   dureeGestationJours?: number | null;
+  dateSaillie?: string | null;
 };
 
 function parseOptionalWeight(value: string | number | undefined): number | null | undefined {
@@ -59,7 +60,9 @@ function normalizeAnimalData(data: AnimalFormData): NormalizedAnimalData {
     commentaire: data.commentaire?.trim() || undefined,
     numeroBouclePere: data.numeroBouclePere || undefined,
     numeroBoucleMere: data.numeroBoucleMere || undefined,
-    dateSaillie: data.dateSaillie || undefined,
+    // `null` est volontaire : Firebase doit réellement effacer une ancienne
+    // saillie quand le champ est vidé dans le formulaire de modification.
+    dateSaillie: data.sexe === "F" ? data.dateSaillie || null : null,
   };
 
   normalized.poidsSortieKg = statut === "vendu" ? parseOptionalWeight(data.poidsSortieKg) ?? null : null;
@@ -149,9 +152,46 @@ export async function deleteAnimal(id: string) {
  * Efface le suivi de gestation d'un animal (à utiliser une fois la mise bas constatée).
  */
 export async function clearGestationSuivi(animalId: string) {
-  return firebaseService.update(PATH, animalId, {
-    dateSaillie: null,
-    dureeGestationJours: null,
+  const animalResult = await firebaseService.getById<Animal>(PATH, animalId);
+  if (!animalResult.success || !animalResult.data) {
+    return { success: false, error: animalResult.error || "Animal introuvable" };
+  }
+  const animal = animalResult.data;
+  if (!animal.dateSaillie) {
+    return { success: false, error: "Aucune saillie active à clôturer" };
+  }
+
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const miseBasDate = nowIso.slice(0, 10);
+  const historyPath = `animaux-historique/${animalId}`;
+  const eventKey = `${animal.dateSaillie}-${miseBasDate}`.replace(/[^0-9-]/g, "");
+  const saillieId = `${eventKey}-saillie`;
+  const miseBasId = `${eventKey}-mise-bas`;
+
+  return firebaseService.updatePaths({
+    [`${historyPath}/${saillieId}`]: {
+      id: saillieId,
+      animalId,
+      date: animal.dateSaillie,
+      sujet: "Saillie / insémination",
+      description: "Saillie archivée lors de la mise bas constatée.",
+      categorie: "reproduction",
+      dateCreation: nowIso,
+      derniereMAJ: nowIso,
+    },
+    [`${historyPath}/${miseBasId}`]: {
+      id: miseBasId,
+      animalId,
+      date: miseBasDate,
+      sujet: "Mise bas constatée",
+      categorie: "reproduction",
+      dateCreation: nowIso,
+      derniereMAJ: nowIso,
+    },
+    [`${PATH}/${animalId}/dateSaillie`]: null,
+    [`${PATH}/${animalId}/dureeGestationJours`]: null,
+    [`${PATH}/${animalId}/derniereMAJ`]: nowIso,
   });
 }
 
