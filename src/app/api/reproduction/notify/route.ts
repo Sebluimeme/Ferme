@@ -60,20 +60,18 @@ async function fetchRtdb<T>(path: string, idToken: string): Promise<T | null> {
   return (await response.json()) as T | null;
 }
 
-async function putRtdb(path: string, idToken: string, value: unknown): Promise<void> {
-  const url = new URL(`${getDatabaseUrl()}/${path}.json`);
+async function patchRtdb(idToken: string, updates: Record<string, unknown>): Promise<void> {
+  const url = new URL(`${getDatabaseUrl()}/.json`);
   url.searchParams.set("auth", idToken);
-
   const response = await fetch(url.toString(), {
-    method: "PUT",
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(value),
+    body: JSON.stringify(updates),
     cache: "no-store",
   });
-
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Firebase a répondu ${response.status} pour ${path} : ${body.slice(0, 240)}`);
+    throw new Error(`Firebase a répondu ${response.status} pendant la finalisation atomique : ${body.slice(0, 240)}`);
   }
 }
 
@@ -222,16 +220,17 @@ export async function GET(request: NextRequest) {
         throw error;
       }
       const envoyeLe = new Date().toISOString();
-      await Promise.all(
-        toSend.map((n) =>
-          putRtdb(`notifications-repro/${n.dedupKey}`, idToken, {
-            envoyeLe,
-            type: n.type,
-            animalId: n.animalId,
-          })
-        )
-      );
-      await putRtdb(lockPath, idToken, { statut: "envoye", envoyeLe, nombre: toSend.length });
+      const updates: Record<string, unknown> = {
+        [lockPath]: { statut: "envoye", envoyeLe, nombre: toSend.length },
+      };
+      for (const notification of toSend) {
+        updates[`notifications-repro/${notification.dedupKey}`] = {
+          envoyeLe,
+          type: notification.type,
+          animalId: notification.animalId,
+        };
+      }
+      await patchRtdb(idToken, updates);
     }
 
     return NextResponse.json<NotifyResult>({ ok: true, envoyes: toSend.length, ignores });
