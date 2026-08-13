@@ -77,17 +77,53 @@ async function putRtdb(path: string, idToken: string, value: unknown): Promise<v
   }
 }
 
+async function deleteRtdb(path: string, idToken: string): Promise<void> {
+  const url = new URL(`${getDatabaseUrl()}/${path}.json`);
+  url.searchParams.set("auth", idToken);
+  const response = await fetch(url.toString(), { method: "DELETE", cache: "no-store" });
+  if (!response.ok) throw new Error(`Firebase a répondu ${response.status} pendant la libération du verrou`);
+}
+
+/** Réserve atomiquement l'envoi quotidien via l'ETag RTDB. */
+async function claimDailyRun(path: string, idToken: string): Promise<boolean> {
+  const url = new URL(`${getDatabaseUrl()}/${path}.json`);
+  url.searchParams.set("auth", idToken);
+  const current = await fetch(url.toString(), {
+    headers: { "X-Firebase-ETag": "true" },
+    cache: "no-store",
+  });
+  if (!current.ok) throw new Error(`Firebase a répondu ${current.status} pendant la lecture du verrou`);
+  if ((await current.json()) !== null) return false;
+  const etag = current.headers.get("etag");
+  if (!etag) throw new Error("Firebase n'a pas renvoyé d'ETag pour le verrou");
+  const claimed = await fetch(url.toString(), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "If-Match": etag },
+    body: JSON.stringify({ statut: "en_cours", reserveLe: new Date().toISOString() }),
+    cache: "no-store",
+  });
+  if (claimed.status === 412) return false;
+  if (!claimed.ok) throw new Error(`Firebase a répondu ${claimed.status} pendant la réservation du verrou`);
+  return true;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[character] ?? character);
+}
+
 function buildEmailHtml(notifications: ReproNotification[]): string {
   const rows = notifications
     .map((n) => {
       const label = n.type === "chaleur" ? "Chaleur prévue" : "Mise bas prévue";
-      return `<li><strong>${n.animalLabel}</strong> — ${label} le ${n.dateEvenement}</li>`;
+      return `<li><strong>${escapeHtml(n.animalLabel)}</strong> — ${label} le ${n.dateEvenement}</li>`;
     })
     .join("");
   return `<p>Les échéances de reproduction suivantes arrivent dans 3 jours :</p><ul>${rows}</ul>`;
 }
 
-async function sendSummaryEmail(notifications: ReproNotification[]): Promise<void> {
+async function sendSummaryEmail(notifications: ReproNotification[], idempotencyKey: string): Promise<void> {
   const apiKey = requireEnv("RESEND_API_KEY");
   const recipientsRaw = requireEnv("REPRO_ALERT_EMAILS");
   if (!apiKey || !recipientsRaw) {
@@ -103,8 +139,9 @@ async function sendSummaryEmail(notifications: ReproNotification[]): Promise<voi
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: ["Bearer", apiKey].join(" "),
       "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey,
     },
     body: JSON.stringify({
       from: "Ferme <onboarding@resend.dev>",
@@ -165,7 +202,19 @@ export async function GET(request: NextRequest) {
     }
 
     if (toSend.length > 0) {
-      await sendSummaryEmail(toSend);
+      const runDate = new Date().toISOString().slice(0, 10);
+      const lockPath = `notifications-repro-runs/${runDate}`;
+      const claimed = await claimDailyRun(lockPath, idToken);
+      if (!claimed) {
+        return NextResponse.json<NotifyResult>({ ok: true, envoyes: 0, ignores: ignores + toSend.length });
+      }
+      try {
+        await sendSummaryEmail(toSend, `ferme-reproduction-${runDate}`);
+      } catch (error) {
+        // Resend déduplique la reprise grâce à l'Idempotency-Key stable.
+        await deleteRtdb(lockPath, idToken);
+        throw error;
+      }
       const envoyeLe = new Date().toISOString();
       await Promise.all(
         toSend.map((n) =>
@@ -176,6 +225,7 @@ export async function GET(request: NextRequest) {
           })
         )
       );
+      await putRtdb(lockPath, idToken, { statut: "envoye", envoyeLe, nombre: toSend.length });
     }
 
     return NextResponse.json<NotifyResult>({ ok: true, envoyes: toSend.length, ignores });
