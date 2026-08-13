@@ -93,7 +93,13 @@ async function claimDailyRun(path: string, idToken: string): Promise<boolean> {
     cache: "no-store",
   });
   if (!current.ok) throw new Error(`Firebase a répondu ${current.status} pendant la lecture du verrou`);
-  if ((await current.json()) !== null) return false;
+  const existing = (await current.json()) as { statut?: string; reserveLe?: string } | null;
+  if (existing) {
+    const reservedAt = Date.parse(existing.reserveLe ?? "");
+    const stale = existing.statut === "en_cours" && Number.isFinite(reservedAt)
+      && Date.now() - reservedAt > 15 * 60 * 1000;
+    if (!stale) return false;
+  }
   const etag = current.headers.get("etag");
   if (!etag) throw new Error("Firebase n'a pas renvoyé d'ETag pour le verrou");
   const claimed = await fetch(url.toString(), {
