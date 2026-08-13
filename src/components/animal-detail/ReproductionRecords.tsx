@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useToast } from "@/components/Toast";
 import Modal from "@/components/Modal";
 import { addChaleur, deleteChaleur, type ChaleurEntry } from "@/services/animal-detail-service";
-import { updateGestationSuivi, clearGestationSuivi } from "@/services/animal-service";
+import { updateGestationSuivi, clearGestationSuivi, deleteGestationSuivi } from "@/services/animal-service";
 import { formatDate } from "@/lib/utils";
 import {
   getGestationDurationDays,
@@ -24,6 +24,8 @@ export default function ReproductionRecords({ animal, chaleurs }: ReproductionRe
   const [editingSaillie, setEditingSaillie] = useState(false);
   const [savingSaillie, setSavingSaillie] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [deleteSaillieOpen, setDeleteSaillieOpen] = useState(false);
+  const [deletingSaillie, setDeletingSaillie] = useState(false);
   const [showChaleurForm, setShowChaleurForm] = useState(false);
   const [savingChaleur, setSavingChaleur] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChaleurEntry | null>(null);
@@ -81,6 +83,21 @@ export default function ReproductionRecords({ animal, chaleurs }: ReproductionRe
       }
     } finally {
       setClearing(false);
+    }
+  };
+
+  const handleDeleteSaillie = async () => {
+    setDeletingSaillie(true);
+    try {
+      const result = await deleteGestationSuivi(animal.id);
+      if (result.success) {
+        showToast({ type: "success", title: "Succès", message: "Saillie supprimée" });
+        setDeleteSaillieOpen(false);
+      } else {
+        showToast({ type: "error", title: "Erreur", message: result.error || "Erreur" });
+      }
+    } finally {
+      setDeletingSaillie(false);
     }
   };
 
@@ -192,7 +209,7 @@ export default function ReproductionRecords({ animal, chaleurs }: ReproductionRe
                 <span className="font-medium">{formatGestationDate(estimatedBirthDate)}</span>
               </div>
             )}
-            <div className="mt-2">
+            <div className="mt-2 flex flex-wrap gap-2">
               <button
                 onClick={handleClear}
                 disabled={clearing}
@@ -200,6 +217,12 @@ export default function ReproductionRecords({ animal, chaleurs }: ReproductionRe
                 title="Effacer le suivi une fois la mise bas constatée"
               >
                 {clearing ? "…" : "✓ Mise bas constatée"}
+              </button>
+              <button
+                onClick={() => setDeleteSaillieOpen(true)}
+                className="px-3 py-1.5 text-xs font-medium bg-white text-red-600 border border-red-200 rounded-lg hover:bg-red-50 cursor-pointer"
+              >
+                Supprimer la saillie
               </button>
             </div>
           </div>
@@ -325,6 +348,29 @@ export default function ReproductionRecords({ animal, chaleurs }: ReproductionRe
             className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 cursor-pointer"
           >
             Supprimer
+          </button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={deleteSaillieOpen} onClose={() => setDeleteSaillieOpen(false)} title="Supprimer la saillie" size="small">
+        <p className="text-stone-700">
+          Voulez-vous vraiment supprimer la saillie du <strong>{animal.dateSaillie && formatDate(animal.dateSaillie)}</strong> ?
+          Cette action n&apos;enregistrera pas de mise bas.
+        </p>
+        <div className="flex gap-3 justify-end mt-6">
+          <button
+            onClick={() => setDeleteSaillieOpen(false)}
+            disabled={deletingSaillie}
+            className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer disabled:opacity-50"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={handleDeleteSaillie}
+            disabled={deletingSaillie}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 cursor-pointer disabled:opacity-50"
+          >
+            {deletingSaillie ? "Suppression..." : "Supprimer"}
           </button>
         </div>
       </Modal>

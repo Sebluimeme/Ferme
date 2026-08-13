@@ -149,6 +149,17 @@ export async function deleteAnimal(id: string) {
 }
 
 /**
+ * Supprime une saillie active sans créer d'événement de mise bas dans
+ * l'historique. Cette action sert à corriger une saisie erronée.
+ */
+export async function deleteGestationSuivi(animalId: string) {
+  return firebaseService.update(PATH, animalId, {
+    dateSaillie: null,
+    dureeGestationJours: null,
+  });
+}
+
+/**
  * Efface le suivi de gestation d'un animal (à utiliser une fois la mise bas constatée).
  */
 export async function clearGestationSuivi(animalId: string) {
