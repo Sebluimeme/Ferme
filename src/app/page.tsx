@@ -11,7 +11,7 @@ import { getGestationAlert, getHeatAlert, formatGestationDate } from "@/lib/repr
 import { groupChaleursByAnimal } from "@/components/HeatAlerts";
 import { getAnimalIcon } from "@/lib/utils";
 import KpiCard from "@/components/KpiCard";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Animal } from "@/store/store";
 import type { CiterneStatus } from "@/lib/citerneEau";
 import { formatFreshnessLabel, formatMetricValue, formatRelativeAge } from "@/lib/citerneEau";
@@ -77,14 +77,31 @@ export default function DashboardPage() {
   const latestWeather = weatherStats.latest;
 
   const [citerne, setCiterne] = useState<CiterneSummaryResponse | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/home-assistant/citerne", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((json: CiterneSummaryResponse) => { if (!cancelled) setCiterne(json); })
-      .catch((err) => { if (!cancelled) setCiterne({ ok: false, error: err instanceof Error ? err.message : "Erreur réseau" }); });
-    return () => { cancelled = true; };
+  const loadCiterne = useCallback(async () => {
+    try {
+      const response = await fetch("/api/home-assistant/citerne", { cache: "no-store" });
+      const json = (await response.json()) as CiterneSummaryResponse;
+      setCiterne(json);
+    } catch (error) {
+      setCiterne({ ok: false, error: error instanceof Error ? error.message : "Erreur réseau" });
+    }
   }, []);
+
+  useEffect(() => {
+    void loadCiterne();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void loadCiterne();
+    };
+    const refreshWhenOnline = () => void loadCiterne();
+    const timer = window.setInterval(() => void loadCiterne(), 5 * 60 * 1000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("online", refreshWhenOnline);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("online", refreshWhenOnline);
+    };
+  }, [loadCiterne]);
   const citerneStatus = citerne?.ok ? citerne.status : null;
 
   const openMaintenanceAlert = (alert: (typeof sortedMaintenanceAlerts)[number]) => {

@@ -342,6 +342,18 @@ export default function SourcePage() {
 
   useEffect(() => {
     loadCiterne();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") loadCiterne();
+    };
+    const refreshWhenOnline = () => loadCiterne();
+    const timer = window.setInterval(loadCiterne, 5 * 60 * 1000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("online", refreshWhenOnline);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("online", refreshWhenOnline);
+    };
   }, [loadCiterne]);
 
   function handleRefreshCiterne() {
