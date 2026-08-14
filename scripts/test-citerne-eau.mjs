@@ -106,6 +106,27 @@ function normalizeCiterneStatus(entities, nowMs) {
   };
 }
 
+function normalizeCiternePayload(payload, receivedAt, nowMs) {
+  const fields = [
+    ["niveau", "niveau", "%"], ["volume", "volumeDisponible", "L"],
+    ["hauteur", "hauteurEau", "m"], ["distance", "distanceCapteur", "cm"],
+    ["debit", "debit", "L/min"], ["batterie", "batterie", "%"],
+    ["batterie_voltage", "tensionBatterie", "V"], ["rssi", "rssi", "dBm"], ["snr", "snr", "dB"],
+  ];
+  const entities = {};
+  for (const [key, metric, unit] of fields) {
+    if (payload[key] === undefined || payload[key] === null) continue;
+    const entityId = CITERNE_ENTITY_IDS[metric];
+    entities[entityId] = haEntity(payload[key], {
+      entity_id: entityId,
+      attributes: { unit_of_measurement: unit },
+      last_changed: receivedAt,
+      last_updated: receivedAt,
+    });
+  }
+  return normalizeCiterneStatus(entities, nowMs);
+}
+
 function formatRelativeAge(iso, nowMs) {
   if (!iso) return "—";
   const t = new Date(iso).getTime();
@@ -270,6 +291,20 @@ test("Toutes les valeurs réelles vérifiées se parsent correctement", () => {
   assertEqual(status.snr.value, 10.5, "snr");
   assertEqual(status.hasData, true, "hasData");
   assertEqual(status.freshness, "fresh", "fraîcheur 1h");
+});
+
+test("Payload MQTT relayé → mêmes valeurs et horodatage", () => {
+  const receivedAt = new Date(NOW - 10 * 60 * 1000).toISOString();
+  const status = normalizeCiternePayload({
+    niveau: 86, volume: 38013, hauteur: 2.34, distance: 57.7,
+    debit: -1, batterie: 54, batterie_voltage: 3.84, rssi: -108, snr: -13.8,
+  }, receivedAt, NOW);
+  assertEqual(status.niveau.value, 86);
+  assertEqual(status.volumeDisponible.value, 38013);
+  assertEqual(status.debit.value, null);
+  assertEqual(status.rssi.value, -108);
+  assertEqual(status.lastUpdated, receivedAt);
+  assertEqual(status.freshness, "fresh");
 });
 
 console.log("\n── normalizeCiterneStatus — cas débit indisponible ──────────────────────\n");

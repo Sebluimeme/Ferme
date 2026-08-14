@@ -182,6 +182,56 @@ export function normalizeCiterneStatus(
   };
 }
 
+export interface CiterneRawPayload {
+  niveau?: number | string;
+  volume?: number | string;
+  hauteur?: number | string;
+  distance?: number | string;
+  debit?: number | string;
+  batterie?: number | string;
+  batterie_voltage?: number | string;
+  rssi?: number | string;
+  snr?: number | string;
+}
+
+const PAYLOAD_FIELDS: Array<{
+  key: keyof CiterneRawPayload;
+  metric: CiterneMetricKey;
+  unit: string;
+}> = [
+  { key: "niveau", metric: "niveau", unit: "%" },
+  { key: "volume", metric: "volumeDisponible", unit: "L" },
+  { key: "hauteur", metric: "hauteurEau", unit: "m" },
+  { key: "distance", metric: "distanceCapteur", unit: "cm" },
+  { key: "debit", metric: "debit", unit: "L/min" },
+  { key: "batterie", metric: "batterie", unit: "%" },
+  { key: "batterie_voltage", metric: "tensionBatterie", unit: "V" },
+  { key: "rssi", metric: "rssi", unit: "dBm" },
+  { key: "snr", metric: "snr", unit: "dB" },
+];
+
+/** Normalizes the raw retained MQTT payload used by the Firebase production relay. */
+export function normalizeCiternePayload(
+  payload: CiterneRawPayload,
+  receivedAt: string,
+  nowMs: number,
+): CiterneStatus {
+  const entities: Record<string, HaEntityState> = {};
+  for (const field of PAYLOAD_FIELDS) {
+    const value = payload[field.key];
+    if (value === undefined || value === null) continue;
+    const entityId = CITERNE_ENTITY_IDS[field.metric];
+    entities[entityId] = {
+      entity_id: entityId,
+      state: String(value),
+      attributes: { unit_of_measurement: field.unit },
+      last_changed: receivedAt,
+      last_updated: receivedAt,
+    };
+  }
+  return normalizeCiterneStatus(entities, nowMs);
+}
+
 // ── Formatting helpers (used by UI) ──────────────────────────────────────────────
 
 export function formatFreshnessLabel(freshness: Freshness): string {
