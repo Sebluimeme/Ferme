@@ -9,6 +9,10 @@ export const metadata: Metadata = {
   title: "La Ferme Tabouche",
   description: "Application de gestion de ferme — Cheptel, coûts, véhicules, fourrage",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-192.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
