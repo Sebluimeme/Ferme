@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { fetchHaStates, haFetch } from "@/lib/homeAssistant";
 
 export const dynamic = "force-dynamic";
-
-type HaState = {
-  entity_id: string;
-  state: string;
-  attributes?: Record<string, unknown>;
-  last_changed?: string;
-  last_updated?: string;
-};
 
 const ENTITY_IDS = [
   "switch.sous_station_bat_a_pompe",
@@ -41,45 +34,9 @@ const ENTITY_IDS = [
   ]),
 ];
 
-function getConfig() {
-  const baseUrl = process.env.HOME_ASSISTANT_URL?.replace(/\/$/, "");
-  const token = process.env.HOME_ASSISTANT_TOKEN;
-  if (!baseUrl || !token) {
-    throw new Error("HOME_ASSISTANT_URL ou HOME_ASSISTANT_TOKEN manquant côté serveur.");
-  }
-  return { baseUrl, token };
-}
-
-async function haFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const { baseUrl, token } = getConfig();
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`Home Assistant ${response.status}: ${body.slice(0, 240)}`);
-  }
-
-  return response.json() as Promise<T>;
-}
-
 export async function GET() {
   try {
-    const states = await haFetch<HaState[]>("/api/states");
-    const wanted = new Set(ENTITY_IDS);
-    const entities = states
-      .filter((item) => wanted.has(item.entity_id))
-      .reduce<Record<string, HaState>>((acc, item) => {
-        acc[item.entity_id] = item;
-        return acc;
-      }, {});
+    const entities = await fetchHaStates(ENTITY_IDS);
 
     return NextResponse.json({ ok: true, entities, updatedAt: new Date().toISOString() });
   } catch (error) {

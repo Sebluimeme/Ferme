@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -11,16 +11,300 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import {
+  Droplets,
+  Waves,
+  Ruler,
+  Gauge,
+  BatteryFull,
+  BatteryMedium,
+  BatteryLow,
+  BatteryWarning,
+  SignalHigh,
+  SignalMedium,
+  SignalLow,
+  SignalZero,
+  Clock,
+  AlertTriangle,
+  RefreshCw,
+  Loader2,
+  Pencil,
+} from "lucide-react";
 import { useAppStore } from "@/store/store";
 import { useToast } from "@/components/Toast";
 import type { ReleverSource, ReleverSourceFormData, UniteDebit } from "@/types/source";
 import { EMPTY_FORM, fmtDebit, computeSourceStats } from "@/types/source";
 import { createReleve, updateReleve, deleteReleve } from "@/services/source-service";
-import KpiCard from "@/components/KpiCard";
+import type { CiterneStatus, Freshness } from "@/lib/citerneEau";
+import { formatFreshnessLabel, formatMetricValue, formatRelativeAge } from "@/lib/citerneEau";
 
 const inputClass =
   "w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400";
 const UNITES: UniteDebit[] = ["L/h", "L/min", "L/s", "m³/h"];
+
+type Tone = "green" | "amber" | "red" | "stone";
+
+const BADGE_CLASSES: Record<Tone, string> = {
+  green: "bg-brand-50 text-brand-700 border-brand-200",
+  amber: "bg-amber-50 text-amber-700 border-amber-200",
+  red: "bg-red-50 text-red-700 border-red-200",
+  stone: "bg-stone-100 text-stone-500 border-stone-200",
+};
+
+const BAR_CLASSES: Record<Tone, string> = {
+  green: "bg-brand-500",
+  amber: "bg-amber-500",
+  red: "bg-red-500",
+  stone: "bg-stone-300",
+};
+
+const TILE_ICON_CLASSES: Record<Tone, string> = {
+  green: "bg-brand-50 text-brand-600",
+  amber: "bg-amber-50 text-amber-600",
+  red: "bg-red-50 text-red-600",
+  stone: "bg-stone-100 text-stone-600",
+};
+
+const FRESHNESS_TONE: Record<Freshness, Tone> = {
+  fresh: "green",
+  aging: "amber",
+  stale: "red",
+  unknown: "stone",
+};
+
+function levelTone(pct: number | null): Tone {
+  if (pct === null) return "stone";
+  if (pct >= 40) return "green";
+  if (pct >= 20) return "amber";
+  return "red";
+}
+
+function batteryVisual(pct: number | null): { icon: typeof BatteryFull; tone: Tone } {
+  if (pct === null) return { icon: BatteryWarning, tone: "stone" };
+  if (pct >= 80) return { icon: BatteryFull, tone: "green" };
+  if (pct >= 40) return { icon: BatteryMedium, tone: "green" };
+  if (pct >= 15) return { icon: BatteryLow, tone: "amber" };
+  return { icon: BatteryWarning, tone: "red" };
+}
+
+function signalVisual(dbm: number | null): { icon: typeof SignalHigh; tone: Tone } {
+  if (dbm === null) return { icon: SignalZero, tone: "stone" };
+  if (dbm >= -67) return { icon: SignalHigh, tone: "green" };
+  if (dbm >= -85) return { icon: SignalMedium, tone: "amber" };
+  if (dbm >= -100) return { icon: SignalLow, tone: "red" };
+  return { icon: SignalLow, tone: "red" };
+}
+
+type CiterneApiResponse =
+  | { ok: true; status: CiterneStatus; updatedAt: string }
+  | { ok: false; error: string };
+
+function TankMetricTile({ icon: Icon, label, value }: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="p-4 flex flex-col gap-1.5 min-w-0">
+      <div className="flex items-center gap-1.5 text-stone-600">
+        <Icon className="w-3.5 h-3.5 shrink-0" />
+        <span className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wide truncate">{label}</span>
+      </div>
+      <p className="text-sm sm:text-base font-bold text-stone-900 tabular-nums truncate">{value}</p>
+    </div>
+  );
+}
+
+function StatusTile({ icon: Icon, label, value, subtitle, tone }: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  subtitle?: string;
+  tone: Tone;
+}) {
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-stone-600">{label}</span>
+        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${TILE_ICON_CLASSES[tone]}`}>
+          <Icon className="w-4 h-4" />
+        </div>
+      </div>
+      <p className="text-lg font-bold text-stone-900">{value}</p>
+      {subtitle && <p className="text-xs text-stone-700 mt-1">{subtitle}</p>}
+    </div>
+  );
+}
+
+function TankSkeleton() {
+  return (
+    <section className="bg-white rounded-2xl border border-stone-200 p-5 sm:p-6 animate-pulse">
+      <div className="h-3 w-40 bg-stone-100 rounded" />
+      <div className="h-6 w-56 bg-stone-100 rounded mt-2" />
+      <div className="h-12 w-32 bg-stone-100 rounded mt-5" />
+      <div className="h-4 w-full bg-stone-100 rounded mt-3" />
+      <div className="h-6 w-64 bg-stone-100 rounded mt-4" />
+    </section>
+  );
+}
+
+function TankErrorCard({ message, onRetry, retrying }: { message: string; onRetry: () => void; retrying: boolean }) {
+  return (
+    <section className="bg-white rounded-2xl border border-red-200 p-5 sm:p-6">
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-lg bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+          <AlertTriangle className="w-4.5 h-4.5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-stone-900">Citerne 1 — indisponible</p>
+          <p className="text-xs text-stone-500 mt-1 break-words">{message}</p>
+        </div>
+      </div>
+      <button
+        onClick={onRetry}
+        disabled={retrying}
+        className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg border border-stone-200 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50 cursor-pointer"
+      >
+        {retrying ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+        Réessayer
+      </button>
+    </section>
+  );
+}
+
+function TankStatusSection({ data, loading, refreshing, onRefresh, nowMs }: {
+  data: CiterneApiResponse | null;
+  loading: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
+  nowMs: number;
+}) {
+  if (loading) return <TankSkeleton />;
+
+  if (!data || !data.ok) {
+    return (
+      <TankErrorCard
+        message={data && !data.ok ? data.error : "Impossible de contacter le serveur."}
+        onRetry={onRefresh}
+        retrying={refreshing}
+      />
+    );
+  }
+
+  const { status } = data;
+
+  if (!status.hasData) {
+    return (
+      <section className="bg-white rounded-2xl border border-stone-200 p-5 sm:p-6 text-center">
+        <div className="w-10 h-10 rounded-full bg-stone-100 text-stone-600 flex items-center justify-center mx-auto">
+          <Droplets className="w-5 h-5" />
+        </div>
+        <p className="text-sm font-semibold text-stone-800 mt-3">Aucune mesure reçue de la citerne 1</p>
+        <p className="text-xs text-stone-500 mt-1">Vérifiez que le module LoRa a effectué son relevé quotidien.</p>
+        <button
+          onClick={onRefresh}
+          disabled={refreshing}
+          className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg border border-stone-200 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50 cursor-pointer"
+        >
+          {refreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          Actualiser
+        </button>
+      </section>
+    );
+  }
+
+  const level = status.niveau.value;
+  const tone = levelTone(level);
+  const fTone = FRESHNESS_TONE[status.freshness];
+  const battery = batteryVisual(status.batterie.value);
+  const signal = signalVisual(status.rssi.value);
+  const debitMesure = status.debit.value !== null;
+
+  return (
+    <div className="space-y-3">
+      <section className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+        <div className="p-5 sm:p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-stone-600">Citerne 1 — Eau potable</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-stone-900 mt-1">Niveau de la citerne</h1>
+            </div>
+            <button
+              onClick={onRefresh}
+              disabled={refreshing}
+              aria-label="Actualiser les mesures de la citerne"
+              className="min-h-11 min-w-11 flex items-center justify-center rounded-lg border border-stone-200 text-stone-500 hover:bg-stone-50 disabled:opacity-50 cursor-pointer shrink-0"
+            >
+              {refreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            </button>
+          </div>
+
+          <div className="mt-5 flex items-end gap-1">
+            <p className="text-5xl font-bold text-stone-900 tabular-nums leading-none">
+              {level !== null ? level.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) : "—"}
+            </p>
+            <span className="text-xl font-semibold text-stone-600 pb-1">%</span>
+          </div>
+
+          <div className="mt-3 h-4 rounded-full bg-stone-100 overflow-hidden" role="progressbar" aria-valuenow={level ?? undefined} aria-valuemin={0} aria-valuemax={100} aria-label="Niveau de la citerne">
+            <div
+              className={`h-full rounded-full transition-all ${BAR_CLASSES[tone]}`}
+              style={{ width: `${Math.max(0, Math.min(100, level ?? 0))}%` }}
+            />
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${BADGE_CLASSES[fTone]}`}>
+              <Clock className="w-3.5 h-3.5" />
+              {formatFreshnessLabel(status.freshness)} · {formatRelativeAge(status.lastUpdated, nowMs)}
+            </span>
+          </div>
+
+          {(status.freshness === "stale" || status.freshness === "unknown") && (
+            <p className="mt-2.5 text-xs text-red-600 flex items-start gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              Pas de nouvelle mesure récente — le module reporte une fois par jour, vérifiez qu&apos;il fonctionne toujours.
+            </p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-3 divide-x divide-stone-100 border-t border-stone-100">
+          <TankMetricTile icon={Waves} label="Volume" value={formatMetricValue(status.volumeDisponible, 0)} />
+          <TankMetricTile icon={Ruler} label="Hauteur" value={formatMetricValue(status.hauteurEau, 2)} />
+          <TankMetricTile
+            icon={Gauge}
+            label="Distance"
+            value={status.distanceCapteur.value === null ? "Absente" : formatMetricValue(status.distanceCapteur, 1)}
+          />
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatusTile
+          icon={battery.icon}
+          label="Batterie"
+          value={status.batterie.value !== null ? `${status.batterie.value.toLocaleString("fr-FR")} %` : "—"}
+          subtitle={status.tensionBatterie.value !== null ? formatMetricValue(status.tensionBatterie, 2) : undefined}
+          tone={battery.tone}
+        />
+        <StatusTile
+          icon={signal.icon}
+          label="Signal LoRa"
+          value={status.rssi.value !== null ? formatMetricValue(status.rssi, 0) : "—"}
+          subtitle={status.snr.value !== null ? `SNR ${formatMetricValue(status.snr, 1)}` : undefined}
+          tone={signal.tone}
+        />
+        <StatusTile
+          icon={Droplets}
+          label="Débit"
+          value={debitMesure ? formatMetricValue(status.debit, 2) : "Non mesuré"}
+          subtitle={debitMesure ? undefined : "Donnée indisponible côté capteur"}
+          tone={debitMesure ? "green" : "stone"}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function SourcePage() {
   const { state } = useAppStore();
@@ -33,13 +317,44 @@ export default function SourcePage() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ReleverSource | null>(null);
 
+  const [citerneData, setCiterneData] = useState<CiterneApiResponse | null>(null);
+  const [citerneLoading, setCiterneLoading] = useState(true);
+  const [citerneRefreshing, setCiterneRefreshing] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const loadCiterne = useCallback(async () => {
+    try {
+      const res = await fetch("/api/home-assistant/citerne", { cache: "no-store" });
+      const json = (await res.json()) as CiterneApiResponse;
+      setCiterneData(json);
+    } catch (err) {
+      setCiterneData({ ok: false, error: err instanceof Error ? err.message : "Erreur réseau" });
+    } finally {
+      setCiterneLoading(false);
+      setCiterneRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCiterne();
+  }, [loadCiterne]);
+
+  function handleRefreshCiterne() {
+    setCiterneRefreshing(true);
+    loadCiterne();
+  }
+
   const stats = useMemo(() => computeSourceStats(releves), [releves]);
 
-  // Données graphique — triées par date, filtrées sur l'unité dominante
   const chartData = useMemo(() => {
     const sorted = [...releves].sort((a, b) => a.date.localeCompare(b.date));
     return sorted.map((r) => ({
-      date: r.date.slice(5), // MM-DD
+      date: r.date.slice(5),
       dateFull: r.date,
       debit: r.debit,
       unite: r.unite,
@@ -106,157 +421,166 @@ export default function SourcePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-900">Source</h1>
-          <p className="text-stone-500 mt-1">Suivi du débit de la source</p>
+      <div>
+        <h1 className="text-2xl font-bold text-stone-900">Source</h1>
+        <p className="text-stone-500 mt-1">Mesures quotidiennes de la citerne 1 et suivi manuel du débit de la source</p>
+      </div>
+
+      {/* Citerne 1 — état opérationnel */}
+      <TankStatusSection
+        data={citerneData}
+        loading={citerneLoading}
+        refreshing={citerneRefreshing}
+        onRefresh={handleRefreshCiterne}
+        nowMs={now.getTime()}
+      />
+
+      {/* Débit de la source — relevés manuels */}
+      <div className="pt-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+          <div>
+            <h2 className="text-lg font-bold text-stone-900">Débit de la source — relevés manuels</h2>
+            <p className="text-xs text-stone-500 mt-0.5">Historique saisi à la main, indépendant des capteurs de la citerne.</p>
+          </div>
+          <button
+            onClick={openCreate}
+            className="min-h-11 px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer shrink-0"
+          >
+            + Nouveau relevé
+          </button>
         </div>
-        <button
-          onClick={openCreate}
-          className="px-4 py-2.5 rounded-lg text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer"
-        >
-          + Nouveau relevé
-        </button>
-      </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard
-          label="Relevés"
-          value={String(stats.count)}
-          icon="📋"
-        />
-        <KpiCard
-          label="Dernier débit"
-          value={stats.dernierDebit ? fmtDebit(stats.dernierDebit.debit, stats.dernierDebit.unite) : "—"}
-          icon="💧"
-        />
-        <KpiCard
-          label="Moyenne"
-          value={stats.count > 0 ? fmtDebit(stats.moyenne, releves[0]?.unite ?? "L/min") : "—"}
-          icon="📊"
-        />
-        <KpiCard
-          label="Min / Max"
-          value={stats.count > 0 ? `${stats.min} / ${stats.max}` : "—"}
-          icon="↕️"
-        />
-      </div>
-
-      {/* Graphique */}
-      <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-5">
-        <h2 className="text-base font-semibold text-stone-800 mb-4">Évolution du débit</h2>
-        {chartData.length < 2 ? (
-          <p className="text-sm text-stone-400 text-center py-10">
-            Ajoutez au moins 2 relevés pour afficher le graphique.
-          </p>
+        {state.loading ? (
+          <div className="bg-white rounded-2xl border border-stone-100 p-10 text-center text-stone-600 text-sm">
+            Chargement des relevés…
+          </div>
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} />
-              <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} />
-              <Tooltip
-                formatter={(v: unknown) =>
-                  v != null ? [`${Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}`, "Débit"] : ["—", "Débit"]
-                }
-                labelStyle={{ fontSize: 12 }}
-                contentStyle={{ borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 12 }}
-              />
-              {moy > 0 && (
-                <ReferenceLine
-                  y={moy}
-                  stroke="#94a3b8"
-                  strokeDasharray="4 4"
-                  label={{ value: "moy", position: "insideTopRight", fontSize: 10, fill: "#94a3b8" }}
-                />
+          <div className="space-y-4">
+            {/* KPIs */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <StatusTile icon={Pencil} label="Relevés" value={String(stats.count)} tone="stone" />
+              <StatusTile icon={Droplets} label="Dernier débit" value={stats.dernierDebit ? fmtDebit(stats.dernierDebit.debit, stats.dernierDebit.unite) : "—"} tone="stone" />
+              <StatusTile icon={Gauge} label="Moyenne" value={stats.count > 0 ? fmtDebit(stats.moyenne, stats.dernierDebit?.unite ?? "L/h") : "—"} tone="stone" />
+              <StatusTile icon={Waves} label="Min / Max" value={stats.count > 0 ? `${stats.min} / ${stats.max} ${stats.dernierDebit?.unite ?? "L/h"}` : "—"} tone="stone" />
+            </div>
+
+            {/* Graphique */}
+            <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-5">
+              <h3 className="text-base font-semibold text-stone-800 mb-4">Évolution du débit</h3>
+              {chartData.length < 2 ? (
+                <p className="text-sm text-stone-600 text-center py-10">
+                  Ajoutez au moins 2 relevés pour afficher le graphique.
+                </p>
+              ) : (
+                <ResponsiveContainer width="100%" height={260}>
+                  <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#57534e" }} />
+                    <YAxis tick={{ fontSize: 11, fill: "#57534e" }} />
+                    <Tooltip
+                      formatter={(v: unknown) =>
+                        v != null ? [`${Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}`, "Débit"] : ["—", "Débit"]
+                      }
+                      labelStyle={{ fontSize: 12 }}
+                      contentStyle={{ borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 12 }}
+                    />
+                    {moy > 0 && (
+                      <ReferenceLine
+                        y={moy}
+                        stroke="#94a3b8"
+                        strokeDasharray="4 4"
+                        label={{ value: "moy", position: "insideTopRight", fontSize: 10, fill: "#94a3b8" }}
+                      />
+                    )}
+                    <Line
+                      type="monotone"
+                      dataKey="debit"
+                      stroke="#3b82f6"
+                      strokeWidth={2.5}
+                      dot={{ r: 4, fill: "#3b82f6" }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               )}
-              <Line
-                type="monotone"
-                dataKey="debit"
-                stroke="#3b82f6"
-                strokeWidth={2.5}
-                dot={{ r: 4, fill: "#3b82f6" }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        )}
-      </div>
+            </div>
 
-      {/* Tableau desktop / Cartes mobile */}
-      <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
-        <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-stone-800">Historique des relevés</h2>
-          <span className="text-xs text-stone-400">{releves.length} relevé(s)</span>
-        </div>
+            {/* Tableau desktop / Cartes mobile */}
+            <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
+              <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between">
+                <h3 className="text-base font-semibold text-stone-800">Historique des relevés</h3>
+                <span className="text-xs text-stone-600">{releves.length} relevé(s)</span>
+              </div>
 
-        {releves.length === 0 ? (
-          <p className="text-sm text-stone-400 text-center py-10">
-            Aucun relevé enregistré — commencez par <button onClick={openCreate} className="text-brand-600 underline cursor-pointer">ajouter un relevé</button>.
-          </p>
-        ) : (
-          <>
-            {/* Vue carte mobile */}
-            <div className="md:hidden divide-y divide-stone-100">
-              {sortedDesc.map((r) => (
-                <div
-                  key={r.id}
-                  onClick={() => openEdit(r)}
-                  className="px-4 py-3 cursor-pointer hover:bg-stone-50 transition-colors"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-stone-800">
-                        {new Date(r.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
-                      </p>
-                      {r.remarque && <p className="text-xs text-stone-400 mt-0.5 truncate max-w-[180px]">{r.remarque}</p>}
-                    </div>
-                    <span className="text-base font-bold text-blue-600 shrink-0">{fmtDebit(r.debit, r.unite)}</span>
+              {releves.length === 0 ? (
+                <p className="text-sm text-stone-600 text-center py-10">
+                  Aucun relevé enregistré — commencez par <button onClick={openCreate} className="text-brand-600 underline cursor-pointer">ajouter un relevé</button>.
+                </p>
+              ) : (
+                <>
+                  {/* Vue carte mobile */}
+                  <div className="md:hidden divide-y divide-stone-100">
+                    {sortedDesc.map((r) => (
+                      <div
+                        key={r.id}
+                        onClick={() => openEdit(r)}
+                        className="px-4 py-3 cursor-pointer hover:bg-stone-50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold text-stone-800">
+                              {new Date(r.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                            </p>
+                            {r.remarque && <p className="text-xs text-stone-600 mt-0.5 truncate max-w-[180px]">{r.remarque}</p>}
+                          </div>
+                          <span className="text-base font-bold text-blue-600 shrink-0">{fmtDebit(r.debit, r.unite)}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
-            </div>
 
-            {/* Vue tableau desktop */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm min-w-[500px]">
-                <thead>
-                  <tr className="bg-stone-50 text-left text-xs font-semibold text-stone-500 uppercase tracking-wide">
-                    <th className="px-5 py-3">Date</th>
-                    <th className="px-5 py-3">Débit</th>
-                    <th className="px-5 py-3">Unité</th>
-                    <th className="px-5 py-3">Remarque</th>
-                    <th className="px-5 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {sortedDesc.map((r) => (
-                    <tr
-                      key={r.id}
-                      onClick={() => openEdit(r)}
-                      className="hover:bg-stone-50/80 transition-colors group cursor-pointer"
-                    >
-                      <td className="px-5 py-3 font-medium text-stone-800">
-                        {new Date(r.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
-                      </td>
-                      <td className="px-5 py-3 font-bold text-blue-600">{r.debit.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</td>
-                      <td className="px-5 py-3 text-stone-500">{r.unite}</td>
-                      <td className="px-5 py-3 text-stone-400 max-w-[220px] truncate">{r.remarque ?? "—"}</td>
-                      <td className="px-5 py-3 text-right">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(r); }}
-                          className="text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer text-xs px-2 py-1 rounded hover:bg-red-50"
-                        >
-                          Suppr.
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  {/* Vue tableau desktop */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <table className="w-full text-sm min-w-[500px]">
+                      <thead>
+                        <tr className="bg-stone-50 text-left text-xs font-semibold text-stone-500 uppercase tracking-wide">
+                          <th className="px-5 py-3">Date</th>
+                          <th className="px-5 py-3">Débit</th>
+                          <th className="px-5 py-3">Unité</th>
+                          <th className="px-5 py-3">Remarque</th>
+                          <th className="px-5 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-100">
+                        {sortedDesc.map((r) => (
+                          <tr
+                            key={r.id}
+                            onClick={() => openEdit(r)}
+                            className="hover:bg-stone-50/80 transition-colors group cursor-pointer"
+                          >
+                            <td className="px-5 py-3 font-medium text-stone-800">
+                              {new Date(r.date + "T00:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                            </td>
+                            <td className="px-5 py-3 font-bold text-blue-600">{r.debit.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</td>
+                            <td className="px-5 py-3 text-stone-500">{r.unite}</td>
+                            <td className="px-5 py-3 text-stone-600 max-w-[220px] truncate">{r.remarque ?? "—"}</td>
+                            <td className="px-5 py-3 text-right">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setDeleteTarget(r); }}
+                                className="text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer text-xs px-2 py-1 rounded hover:bg-red-50"
+                              >
+                                Suppr.
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </div>
-          </>
+          </div>
         )}
       </div>
 
@@ -280,7 +604,7 @@ export default function SourcePage() {
               <h2 className="text-base font-semibold text-stone-900">
                 {editTarget ? "Modifier le relevé" : "Nouveau relevé"}
               </h2>
-              <button onClick={closeModal} className="text-stone-400 hover:text-stone-600 cursor-pointer text-xl leading-none">×</button>
+              <button onClick={closeModal} className="text-stone-600 hover:text-stone-600 cursor-pointer text-xl leading-none">×</button>
             </div>
             {/* Corps scrollable */}
             <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">

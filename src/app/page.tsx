@@ -11,8 +11,10 @@ import { getGestationAlert, getHeatAlert, formatGestationDate } from "@/lib/repr
 import { groupChaleursByAnimal } from "@/components/HeatAlerts";
 import { getAnimalIcon } from "@/lib/utils";
 import KpiCard from "@/components/KpiCard";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Animal } from "@/store/store";
+import type { CiterneStatus } from "@/lib/citerneEau";
+import { formatFreshnessLabel, formatMetricValue, formatRelativeAge } from "@/lib/citerneEau";
 import {
   PawPrint,
   Truck,
@@ -24,9 +26,14 @@ import {
   AlertCircle,
   CloudSun,
   Droplets,
+  Waves,
   Wind,
   Thermometer,
 } from "lucide-react";
+
+type CiterneSummaryResponse =
+  | { ok: true; status: CiterneStatus; updatedAt: string }
+  | { ok: false; error: string };
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -68,6 +75,17 @@ export default function DashboardPage() {
 
   const weatherStats = useMemo(() => computeWeatherStats(weatherReadings), [weatherReadings]);
   const latestWeather = weatherStats.latest;
+
+  const [citerne, setCiterne] = useState<CiterneSummaryResponse | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/home-assistant/citerne", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((json: CiterneSummaryResponse) => { if (!cancelled) setCiterne(json); })
+      .catch((err) => { if (!cancelled) setCiterne({ ok: false, error: err instanceof Error ? err.message : "Erreur réseau" }); });
+    return () => { cancelled = true; };
+  }, []);
+  const citerneStatus = citerne?.ok ? citerne.status : null;
 
   const openMaintenanceAlert = (alert: (typeof sortedMaintenanceAlerts)[number]) => {
     const title = (alert.titre || "").toLowerCase();
@@ -286,6 +304,45 @@ export default function DashboardPage() {
           <p className="text-[11px] text-stone-400 mt-2">
             Vent {getWindDirectionLabel(latestWeather.windDirectionDeg)} · cumul 7 j {formatWeatherValue(weatherStats.rain7DaysMm, "mm", 1)}
           </p>
+        </button>
+      )}
+
+      {citerneStatus?.hasData && (
+        <button
+          onClick={() => router.push("/source")}
+          className="w-full bg-white border border-stone-200 rounded-xl p-4 text-left hover:border-stone-300 hover:shadow-sm transition-all"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+                <Waves className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[13px] font-semibold text-stone-800">Citerne 1 — eau potable</p>
+                <p className="text-[11px] text-stone-400 truncate">
+                  {formatFreshnessLabel(citerneStatus.freshness)} · {formatRelativeAge(citerneStatus.lastUpdated, Date.now())}
+                </p>
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-2xl font-semibold text-stone-900 tracking-tight">
+                {citerneStatus.niveau.value !== null ? `${citerneStatus.niveau.value.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}%` : "—"}
+              </p>
+              <p className="text-[11px] text-brand-600 font-medium">Voir →</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <div className="rounded-lg bg-stone-50 border border-stone-100 px-3 py-2">
+              <div className="flex items-center gap-1.5 text-[11px] text-stone-400"><Droplets className="w-3 h-3" /> Volume dispo.</div>
+              <p className="text-sm font-semibold text-stone-800 mt-0.5">{formatMetricValue(citerneStatus.volumeDisponible, 0)}</p>
+            </div>
+            <div className="rounded-lg bg-stone-50 border border-stone-100 px-3 py-2">
+              <div className="flex items-center gap-1.5 text-[11px] text-stone-400"><Droplets className="w-3 h-3" /> Débit</div>
+              <p className="text-sm font-semibold text-stone-800 mt-0.5">
+                {citerneStatus.debit.value !== null ? formatMetricValue(citerneStatus.debit, 2) : "Non mesuré"}
+              </p>
+            </div>
+          </div>
         </button>
       )}
 
