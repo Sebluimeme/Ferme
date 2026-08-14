@@ -52,13 +52,6 @@ const BADGE_CLASSES: Record<Tone, string> = {
   stone: "bg-stone-100 text-stone-500 border-stone-200",
 };
 
-const BAR_CLASSES: Record<Tone, string> = {
-  green: "bg-brand-500",
-  amber: "bg-amber-500",
-  red: "bg-red-500",
-  stone: "bg-stone-300",
-};
-
 const TILE_ICON_CLASSES: Record<Tone, string> = {
   green: "bg-brand-50 text-brand-600",
   amber: "bg-amber-50 text-amber-600",
@@ -72,13 +65,6 @@ const FRESHNESS_TONE: Record<Freshness, Tone> = {
   stale: "red",
   unknown: "stone",
 };
-
-function levelTone(pct: number | null): Tone {
-  if (pct === null) return "stone";
-  if (pct >= 40) return "green";
-  if (pct >= 20) return "amber";
-  return "red";
-}
 
 function batteryVisual(pct: number | null): { icon: typeof BatteryFull; tone: Tone } {
   if (pct === null) return { icon: BatteryWarning, tone: "stone" };
@@ -149,6 +135,73 @@ function TankSkeleton() {
   );
 }
 
+function TankLevelVisual({ level }: { level: number | null }) {
+  const pct = Math.max(0, Math.min(100, level ?? 0));
+  const tankTop = 18;
+  const tankHeight = 196;
+  const waterTop = tankTop + tankHeight * (1 - pct / 100);
+  const waterHeight = tankHeight * (pct / 100);
+
+  return (
+    <div
+      className="mx-auto w-full max-w-[168px]"
+      role="progressbar"
+      aria-label="Niveau visuel de la citerne"
+      aria-valuenow={level ?? undefined}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      <svg viewBox="0 0 190 240" className="block w-full h-auto" aria-hidden="true">
+        <defs>
+          <clipPath id="tank-water-clip">
+            <rect x="28" y="18" width="112" height="196" rx="30" />
+          </clipPath>
+          <linearGradient id="tank-water-gradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#38bdf8" />
+            <stop offset="100%" stopColor="#0284c7" />
+          </linearGradient>
+        </defs>
+
+        <rect x="28" y="18" width="112" height="196" rx="30" fill="#f5f5f4" />
+        <g clipPath="url(#tank-water-clip)">
+          <rect
+            data-testid="tank-water"
+            data-level={pct}
+            x="28"
+            y={waterTop}
+            width="112"
+            height={waterHeight}
+            fill="url(#tank-water-gradient)"
+            className="motion-safe:transition-all motion-safe:duration-700 motion-safe:ease-out"
+          />
+          {pct > 0 && (
+            <ellipse
+              cx="84"
+              cy={waterTop}
+              rx="56"
+              ry="6"
+              fill="#7dd3fc"
+              className="motion-safe:transition-all motion-safe:duration-700 motion-safe:ease-out"
+            />
+          )}
+        </g>
+        <rect x="28" y="18" width="112" height="196" rx="30" fill="none" stroke="#44403c" strokeWidth="5" />
+        <path d="M48 18V10h72v8M48 214v10h72v-10" fill="none" stroke="#78716c" strokeWidth="4" strokeLinecap="round" />
+
+        {[100, 75, 50, 25, 0].map((mark) => {
+          const y = tankTop + tankHeight * (1 - mark / 100);
+          return (
+            <g key={mark}>
+              <line x1="146" y1={y} x2="154" y2={y} stroke="#a8a29e" strokeWidth="2" />
+              <text x="160" y={y + 4} fontSize="10" fill="#78716c">{mark}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 function TankErrorCard({ message, onRetry, retrying }: { message: string; onRetry: () => void; retrying: boolean }) {
   return (
     <section className="bg-white rounded-2xl border border-red-200 p-5 sm:p-6">
@@ -215,7 +268,6 @@ function TankStatusSection({ data, loading, refreshing, onRefresh, nowMs }: {
   }
 
   const level = status.niveau.value;
-  const tone = levelTone(level);
   const fTone = FRESHNESS_TONE[status.freshness];
   const battery = batteryVisual(status.batterie.value);
   const signal = signalVisual(status.rssi.value);
@@ -240,18 +292,22 @@ function TankStatusSection({ data, loading, refreshing, onRefresh, nowMs }: {
             </button>
           </div>
 
-          <div className="mt-5 flex items-end gap-1">
-            <p className="text-5xl font-bold text-stone-900 tabular-nums leading-none">
-              {level !== null ? level.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) : "—"}
-            </p>
-            <span className="text-xl font-semibold text-stone-600 pb-1">%</span>
-          </div>
-
-          <div className="mt-3 h-4 rounded-full bg-stone-100 overflow-hidden" role="progressbar" aria-valuenow={level ?? undefined} aria-valuemin={0} aria-valuemax={100} aria-label="Niveau de la citerne">
-            <div
-              className={`h-full rounded-full transition-all ${BAR_CLASSES[tone]}`}
-              style={{ width: `${Math.max(0, Math.min(100, level ?? 0))}%` }}
-            />
+          <div className="mt-5 grid grid-cols-[minmax(128px,168px)_1fr] items-center gap-4 sm:grid-cols-[180px_1fr] sm:gap-8">
+            <TankLevelVisual level={level} />
+            <div className="min-w-0">
+              <div className="flex items-end gap-1">
+                <p className="text-4xl sm:text-5xl font-bold text-stone-900 tabular-nums leading-none">
+                  {level !== null ? level.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) : "—"}
+                </p>
+                <span className="text-lg sm:text-xl font-semibold text-stone-600 pb-0.5">%</span>
+              </div>
+              <p className="mt-2 text-sm font-medium text-stone-700">Niveau mesuré</p>
+              <p className="mt-3 text-sm text-stone-600 tabular-nums">
+                {status.volumeDisponible.value !== null
+                  ? `${status.volumeDisponible.value.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} L disponibles`
+                  : "Volume indisponible"}
+              </p>
+            </div>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
