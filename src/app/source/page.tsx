@@ -190,7 +190,7 @@ function TankLevelVisual({ level }: { level: number | null }) {
         <path d="M266 54h9v44h-9" fill="none" stroke="#78716c" strokeWidth="4" strokeLinecap="round" />
         <line x1="145" y1={tankTop} x2="145" y2={tankTop + tankHeight} stroke="#0c0a09" strokeWidth="1.5" opacity="0.65" />
 
-        {[100, 75, 50, 25, 0].map((mark) => {
+        {[75, 50, 25].map((mark) => {
           const y = tankTop + tankHeight * (1 - mark / 100);
           return (
             <g key={mark}>
