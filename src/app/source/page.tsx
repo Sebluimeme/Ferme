@@ -137,24 +137,24 @@ function TankSkeleton() {
 
 function TankLevelVisual({ level }: { level: number | null }) {
   const pct = Math.max(0, Math.min(100, level ?? 0));
-  const tankTop = 18;
-  const tankHeight = 196;
+  const tankTop = 20;
+  const tankHeight = 112;
   const waterTop = tankTop + tankHeight * (1 - pct / 100);
   const waterHeight = tankHeight * (pct / 100);
 
   return (
     <div
-      className="mx-auto w-full max-w-[168px]"
+      className="mx-auto w-full max-w-[320px]"
       role="progressbar"
-      aria-label="Niveau visuel de la citerne"
+      aria-label="Niveau visuel de la citerne horizontale"
       aria-valuenow={level ?? undefined}
       aria-valuemin={0}
       aria-valuemax={100}
     >
-      <svg viewBox="0 0 190 240" className="block w-full h-auto" aria-hidden="true">
+      <svg viewBox="0 0 320 170" className="block w-full h-auto" aria-hidden="true">
         <defs>
           <clipPath id="tank-water-clip">
-            <rect x="28" y="18" width="112" height="196" rx="30" />
+            <rect x="24" y="20" width="242" height="112" rx="56" />
           </clipPath>
           <linearGradient id="tank-water-gradient" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#38bdf8" />
@@ -162,38 +162,39 @@ function TankLevelVisual({ level }: { level: number | null }) {
           </linearGradient>
         </defs>
 
-        <rect x="28" y="18" width="112" height="196" rx="30" fill="#f5f5f4" />
+        <rect x="24" y="20" width="242" height="112" rx="56" fill="#f5f5f4" />
         <g clipPath="url(#tank-water-clip)">
           <rect
             data-testid="tank-water"
             data-level={pct}
-            x="28"
+            x="24"
             y={waterTop}
-            width="112"
+            width="242"
             height={waterHeight}
             fill="url(#tank-water-gradient)"
             className="motion-safe:transition-all motion-safe:duration-700 motion-safe:ease-out"
           />
           {pct > 0 && (
             <ellipse
-              cx="84"
+              cx="145"
               cy={waterTop}
-              rx="56"
-              ry="6"
+              rx="121"
+              ry="5"
               fill="#7dd3fc"
               className="motion-safe:transition-all motion-safe:duration-700 motion-safe:ease-out"
             />
           )}
         </g>
-        <rect x="28" y="18" width="112" height="196" rx="30" fill="none" stroke="#44403c" strokeWidth="5" />
-        <path d="M48 18V10h72v8M48 214v10h72v-10" fill="none" stroke="#78716c" strokeWidth="4" strokeLinecap="round" />
+        <rect x="24" y="20" width="242" height="112" rx="56" fill="none" stroke="#44403c" strokeWidth="5" />
+        <path d="M65 133v12M225 133v12M52 145h26M212 145h26" fill="none" stroke="#78716c" strokeWidth="5" strokeLinecap="round" />
+        <path d="M266 54h9v44h-9" fill="none" stroke="#78716c" strokeWidth="4" strokeLinecap="round" />
 
         {[100, 75, 50, 25, 0].map((mark) => {
           const y = tankTop + tankHeight * (1 - mark / 100);
           return (
             <g key={mark}>
-              <line x1="146" y1={y} x2="154" y2={y} stroke="#a8a29e" strokeWidth="2" />
-              <text x="160" y={y + 4} fontSize="10" fill="#78716c">{mark}</text>
+              <line x1="278" y1={y} x2="286" y2={y} stroke="#a8a29e" strokeWidth="2" />
+              <text x="291" y={y + 4} fontSize="10" fill="#78716c">{mark}</text>
             </g>
           );
         })}
@@ -292,17 +293,19 @@ function TankStatusSection({ data, loading, refreshing, onRefresh, nowMs }: {
             </button>
           </div>
 
-          <div className="mt-5 grid grid-cols-[minmax(128px,168px)_1fr] items-center gap-4 sm:grid-cols-[180px_1fr] sm:gap-8">
+          <div className="mt-5">
             <TankLevelVisual level={level} />
-            <div className="min-w-0">
-              <div className="flex items-end gap-1">
-                <p className="text-4xl sm:text-5xl font-bold text-stone-900 tabular-nums leading-none">
-                  {level !== null ? level.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) : "—"}
-                </p>
-                <span className="text-lg sm:text-xl font-semibold text-stone-600 pb-0.5">%</span>
+            <div className="mt-2 flex items-end justify-between gap-4 rounded-xl bg-stone-50 px-4 py-3">
+              <div className="min-w-0">
+                <div className="flex items-end gap-1">
+                  <p className="text-4xl sm:text-5xl font-bold text-stone-900 tabular-nums leading-none">
+                    {level !== null ? level.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) : "—"}
+                  </p>
+                  <span className="text-lg sm:text-xl font-semibold text-stone-600 pb-0.5">%</span>
+                </div>
+                <p className="mt-1 text-sm font-medium text-stone-700">Niveau mesuré</p>
               </div>
-              <p className="mt-2 text-sm font-medium text-stone-700">Niveau mesuré</p>
-              <p className="mt-3 text-sm text-stone-600 tabular-nums">
+              <p className="max-w-32 text-right text-sm text-stone-600 tabular-nums">
                 {status.volumeDisponible.value !== null
                   ? `${status.volumeDisponible.value.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} L disponibles`
                   : "Volume indisponible"}
