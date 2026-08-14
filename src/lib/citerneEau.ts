@@ -250,6 +250,15 @@ export function formatMetricValue(metric: CiterneMetric, digits = 1): string {
   return `${formatted} ${metric.unit}`;
 }
 
+export function formatMeasurementDateTime(iso: string | null): string {
+  if (!iso) return "heure inconnue";
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return "heure inconnue";
+  const day = date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" }).replace(".", "");
+  const time = date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return `${day} à ${time}`;
+}
+
 /** Relative age label ("il y a 3 h") for a last-updated timestamp. */
 export function formatRelativeAge(iso: string | null, nowMs: number): string {
   if (!iso) return "—";

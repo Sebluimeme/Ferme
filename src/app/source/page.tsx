@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  Legend,
 } from "recharts";
 import {
   Droplets,
@@ -29,15 +30,17 @@ import {
   RefreshCw,
   Loader2,
   Pencil,
+  ChevronDown,
 } from "lucide-react";
 import { useAppStore } from "@/store/store";
 import { useToast } from "@/components/Toast";
 import type { ReleverSource, ReleverSourceFormData, UniteDebit } from "@/types/source";
-import { EMPTY_FORM, fmtDebit, computeSourceStats } from "@/types/source";
+import { EMPTY_FORM, fmtDebit, computeSourceStats, debitToLitresPerHour } from "@/types/source";
 import { createReleve, updateReleve, deleteReleve } from "@/services/source-service";
 import type { CiterneStatus, Freshness } from "@/lib/citerneEau";
-import { formatFreshnessLabel, formatMetricValue, formatRelativeAge } from "@/lib/citerneEau";
-import { loadCiterneStatus } from "@/lib/citerneClient";
+import { formatMeasurementDateTime, formatMetricValue } from "@/lib/citerneEau";
+import { computeEstimatedFlows, type CiterneHistoryPoint } from "@/lib/citerneHistory";
+import { loadCiterneHistory, loadCiterneStatus } from "@/lib/citerneClient";
 
 const inputClass =
   "w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400";
@@ -228,12 +231,11 @@ function TankErrorCard({ message, onRetry, retrying }: { message: string; onRetr
   );
 }
 
-function TankStatusSection({ data, loading, refreshing, onRefresh, nowMs }: {
+function TankStatusSection({ data, loading, refreshing, onRefresh }: {
   data: CiterneApiResponse | null;
   loading: boolean;
   refreshing: boolean;
   onRefresh: () => void;
-  nowMs: number;
 }) {
   if (loading) return <TankSkeleton />;
 
@@ -317,7 +319,7 @@ function TankStatusSection({ data, loading, refreshing, onRefresh, nowMs }: {
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${BADGE_CLASSES[fTone]}`}>
               <Clock className="w-3.5 h-3.5" />
-              {formatFreshnessLabel(status.freshness)} · {formatRelativeAge(status.lastUpdated, nowMs)}
+              Dernière mesure : {formatMeasurementDateTime(status.lastUpdated)}
             </span>
           </div>
 
@@ -377,21 +379,21 @@ export default function SourcePage() {
   const [form, setForm] = useState<ReleverSourceFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ReleverSource | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [sensorHistory, setSensorHistory] = useState<CiterneHistoryPoint[]>([]);
 
   const [citerneData, setCiterneData] = useState<CiterneApiResponse | null>(null);
   const [citerneLoading, setCiterneLoading] = useState(true);
   const [citerneRefreshing, setCiterneRefreshing] = useState(false);
-  const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 60000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   const loadCiterne = useCallback(async () => {
     try {
-      const status = await loadCiterneStatus();
+      const [status, history] = await Promise.all([
+        loadCiterneStatus(),
+        loadCiterneHistory().catch(() => [] as CiterneHistoryPoint[]),
+      ]);
       setCiterneData({ ok: true, status, updatedAt: new Date().toISOString() });
+      setSensorHistory(history);
     } catch (err) {
       setCiterneData({ ok: false, error: err instanceof Error ? err.message : "Erreur réseau" });
     } finally {
@@ -424,16 +426,42 @@ export default function SourcePage() {
   const stats = useMemo(() => computeSourceStats(releves), [releves]);
 
   const chartData = useMemo(() => {
-    const sorted = [...releves].sort((a, b) => a.date.localeCompare(b.date));
-    return sorted.map((r) => ({
-      date: r.date.slice(5),
-      dateFull: r.date,
-      debit: r.debit,
-      unite: r.unite,
-    }));
-  }, [releves]);
+    const byDay = new Map<string, {
+      date: string;
+      dateFull: string;
+      manuel?: number;
+      estime?: number;
+    }>();
 
-  const moy = stats.moyenne;
+    for (const releve of releves) {
+      const dateFull = releve.date;
+      byDay.set(dateFull, {
+        ...(byDay.get(dateFull) ?? {
+          date: new Date(`${dateFull}T00:00:00`).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }),
+          dateFull,
+        }),
+        manuel: Math.round(debitToLitresPerHour(releve.debit, releve.unite) * 100) / 100,
+      });
+    }
+
+    for (const estimate of computeEstimatedFlows(sensorHistory)) {
+      const dateFull = estimate.receivedAt.slice(0, 10);
+      byDay.set(dateFull, {
+        ...(byDay.get(dateFull) ?? {
+          date: new Date(`${dateFull}T00:00:00`).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }),
+          dateFull,
+        }),
+        estime: estimate.debitLitresPerHour,
+      });
+    }
+
+    return [...byDay.values()].sort((a, b) => a.dateFull.localeCompare(b.dateFull));
+  }, [releves, sensorHistory]);
+
+  const manualAverageLh = useMemo(() => {
+    if (releves.length === 0) return 0;
+    return releves.reduce((sum, releve) => sum + debitToLitresPerHour(releve.debit, releve.unite), 0) / releves.length;
+  }, [releves]);
 
   function openCreate() {
     setEditTarget(null);
@@ -504,15 +532,14 @@ export default function SourcePage() {
         loading={citerneLoading}
         refreshing={citerneRefreshing}
         onRefresh={handleRefreshCiterne}
-        nowMs={now.getTime()}
       />
 
       {/* Débit de la source — relevés manuels */}
       <div className="pt-2">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
           <div>
-            <h2 className="text-lg font-bold text-stone-900">Débit de la source — relevés manuels</h2>
-            <p className="text-xs text-stone-500 mt-0.5">Historique saisi à la main, indépendant des capteurs de la citerne.</p>
+            <h2 className="text-lg font-bold text-stone-900">Débit de la source</h2>
+            <p className="text-xs text-stone-500 mt-0.5">Relevés manuels et estimation nette issue des variations de la citerne.</p>
           </div>
           <button
             onClick={openCreate}
@@ -538,39 +565,74 @@ export default function SourcePage() {
 
             {/* Graphique */}
             <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-5">
-              <h3 className="text-base font-semibold text-stone-800 mb-4">Évolution du débit</h3>
+              <div className="mb-4">
+                <h3 className="text-base font-semibold text-stone-800">Évolution du débit</h3>
+                <p className="mt-1 text-xs text-amber-700">
+                  L’estimation correspond à la variation nette du volume de la citerne. La consommation de la maison peut la fausser.
+                </p>
+              </div>
               {chartData.length < 2 ? (
                 <p className="text-sm text-stone-600 text-center py-10">
-                  Ajoutez au moins 2 relevés pour afficher le graphique.
+                  Deux mesures sont nécessaires pour tracer une évolution.
                 </p>
               ) : (
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={chartData} margin={{ top: 5, right: 12, left: -12, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#57534e" }} />
-                    <YAxis tick={{ fontSize: 11, fill: "#57534e" }} />
+                    <YAxis
+                      yAxisId="manual"
+                      tick={{ fontSize: 10, fill: "#2563eb" }}
+                      tickFormatter={(value) => Number(value).toLocaleString("fr-FR", { maximumFractionDigits: 0 })}
+                      width={48}
+                    />
+                    <YAxis
+                      yAxisId="estimate"
+                      orientation="right"
+                      tick={{ fontSize: 10, fill: "#d97706" }}
+                      tickFormatter={(value) => Number(value).toLocaleString("fr-FR", { maximumFractionDigits: 1 })}
+                      width={48}
+                    />
                     <Tooltip
-                      formatter={(v: unknown) =>
-                        v != null ? [`${Number(v).toLocaleString("fr-FR", { maximumFractionDigits: 2 })}`, "Débit"] : ["—", "Débit"]
-                      }
+                      formatter={(value: unknown, name: unknown) => [
+                        value != null ? `${Number(value).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} L/h` : "—",
+                        String(name),
+                      ]}
                       labelStyle={{ fontSize: 12 }}
                       contentStyle={{ borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 12 }}
                     />
-                    {moy > 0 && (
+                    <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                    {manualAverageLh > 0 && (
                       <ReferenceLine
-                        y={moy}
+                        yAxisId="manual"
+                        y={manualAverageLh}
                         stroke="#94a3b8"
                         strokeDasharray="4 4"
-                        label={{ value: "moy", position: "insideTopRight", fontSize: 10, fill: "#94a3b8" }}
+                        label={{ value: "moy. manuelle", position: "insideTopRight", fontSize: 10, fill: "#64748b" }}
                       />
                     )}
                     <Line
                       type="monotone"
-                      dataKey="debit"
-                      stroke="#3b82f6"
+                      yAxisId="manual"
+                      dataKey="manuel"
+                      name="Relevés manuels"
+                      stroke="#2563eb"
                       strokeWidth={2.5}
-                      dot={{ r: 4, fill: "#3b82f6" }}
+                      dot={{ r: 4, fill: "#2563eb" }}
                       activeDot={{ r: 6 }}
+                      connectNulls
+                    />
+                    <Line
+                      type="monotone"
+                      yAxisId="estimate"
+                      dataKey="estime"
+                      name="Estimation capteur"
+                      stroke="#d97706"
+                      strokeWidth={2.5}
+                      strokeDasharray="6 4"
+                      dot={{ r: 4, fill: "#d97706" }}
+                      activeDot={{ r: 6 }}
+                      connectNulls
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -579,12 +641,23 @@ export default function SourcePage() {
 
             {/* Tableau desktop / Cartes mobile */}
             <div className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
-              <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between">
-                <h3 className="text-base font-semibold text-stone-800">Historique des relevés</h3>
-                <span className="text-xs text-stone-600">{releves.length} relevé(s)</span>
+              <div className={`px-5 py-4 flex items-center justify-between gap-4 ${historyOpen ? "border-b border-stone-100" : ""}`}>
+                <div className="min-w-0">
+                  <h3 className="text-base font-semibold text-stone-800">Historique des relevés</h3>
+                  <span className="text-xs text-stone-600">{releves.length} relevé(s)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHistoryOpen((open) => !open)}
+                  aria-expanded={historyOpen}
+                  className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-stone-200 px-3 text-sm font-semibold text-stone-700 hover:bg-stone-50 cursor-pointer"
+                >
+                  {historyOpen ? "Masquer" : "Afficher"}
+                  <ChevronDown className={`h-4 w-4 transition-transform ${historyOpen ? "rotate-180" : ""}`} />
+                </button>
               </div>
 
-              {releves.length === 0 ? (
+              {historyOpen && (releves.length === 0 ? (
                 <p className="text-sm text-stone-600 text-center py-10">
                   Aucun relevé enregistré — commencez par <button onClick={openCreate} className="text-brand-600 underline cursor-pointer">ajouter un relevé</button>.
                 </p>
@@ -650,7 +723,7 @@ export default function SourcePage() {
                     </table>
                   </div>
                 </>
-              )}
+              ))}
             </div>
           </div>
         )}

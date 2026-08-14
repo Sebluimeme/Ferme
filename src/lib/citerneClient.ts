@@ -1,6 +1,10 @@
 import { get, ref } from "firebase/database";
 import { database } from "@/lib/firebase";
 import {
+  normalizeCiterneHistory,
+  type CiterneHistoryPoint,
+} from "@/lib/citerneHistory";
+import {
   normalizeCiternePayload,
   type CiterneRawPayload,
   type CiterneStatus,
@@ -37,4 +41,18 @@ export async function loadCiterneStatus(): Promise<CiterneStatus> {
   const status = normalizeCiternePayload(cached.payload, cached.receivedAt, Date.now());
   if (!status.hasData) throw new Error("Mesures de citerne indisponibles");
   return status;
+}
+
+export async function loadCiterneHistory(): Promise<CiterneHistoryPoint[]> {
+  try {
+    const response = await fetch("/api/home-assistant/citerne/history", { cache: "no-store" });
+    const json = (await response.json()) as { ok?: boolean; history?: unknown };
+    if (response.ok && json.ok) return normalizeCiterneHistory(json.history);
+  } catch {
+    // Continue with the authenticated Firebase fallback.
+  }
+
+  const snapshot = await get(ref(database, "integrations/citerne-1-history"));
+  if (!snapshot.exists()) return [];
+  return normalizeCiterneHistory(snapshot.val());
 }

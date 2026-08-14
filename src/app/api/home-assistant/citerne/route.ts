@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const CACHE_PATH = "integrations/citerne-1";
+const HISTORY_PATH = "integrations/citerne-1-history";
 
 interface CachedCiternePayload {
   payload: CiterneRawPayload;
@@ -76,6 +77,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "Aucune mesure reconnue" }, { status: 400 });
     }
     await writeServerRtdb(CACHE_PATH, { payload, receivedAt });
+    if (status.volumeDisponible.value !== null) {
+      const dayKey = receivedAt.slice(0, 10);
+      await writeServerRtdb(`${HISTORY_PATH}/${dayKey}`, {
+        receivedAt,
+        volumeLitres: status.volumeDisponible.value,
+        niveauPct: status.niveau.value,
+      });
+    }
     return NextResponse.json({ ok: true, status, receivedAt });
   } catch {
     return NextResponse.json({ ok: false, error: "Enregistrement de la mesure impossible" }, { status: 500 });

@@ -30,6 +30,16 @@ export function fmtDebit(debit: number, unite: UniteDebit): string {
   return `${debit.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ${unite}`;
 }
 
+export function debitToLitresPerHour(debit: number, unite: UniteDebit): number {
+  switch (unite) {
+    case "L/min": return debit * 60;
+    case "L/s": return debit * 3600;
+    case "m³/h": return debit * 1000;
+    case "L/h":
+    default: return debit;
+  }
+}
+
 export function computeSourceStats(releves: ReleverSource[]) {
   if (releves.length === 0) {
     return { count: 0, dernierDebit: null, moyenne: 0, min: 0, max: 0 };
