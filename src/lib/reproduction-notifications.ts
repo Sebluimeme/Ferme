@@ -8,7 +8,7 @@ import {
 } from "./reproduction";
 
 /** Nombre de jours avant l'échéance déclenchant l'alerte e-mail. */
-export const NOTIFY_DUE_DAYS = 3;
+export const NOTIFY_DUE_DAYS = 1;
 
 export type ReproNotificationType = "chaleur" | "controle_retour_chaleur" | "mise_bas";
 

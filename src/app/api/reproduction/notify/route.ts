@@ -128,7 +128,7 @@ function buildEmailHtml(notifications: ReproNotification[]): string {
       return `<li><strong>${escapeHtml(n.animalLabel)}</strong> — ${label} le ${n.dateEvenement}</li>`;
     })
     .join("");
-  return `<p>Les échéances de reproduction suivantes arrivent dans 3 jours :</p><ul>${rows}</ul>`;
+  return `<p>Les échéances de reproduction suivantes arrivent demain :</p><ul>${rows}</ul>`;
 }
 
 async function sendSummaryEmail(notifications: ReproNotification[], idempotencyKey: string): Promise<void> {
@@ -142,7 +142,7 @@ async function sendSummaryEmail(notifications: ReproNotification[], idempotencyK
     throw new Error("REPRO_ALERT_EMAILS ne contient aucune adresse valide");
   }
 
-  const subject = `Ferme — ${notifications.length} échéance${notifications.length > 1 ? "s" : ""} de reproduction dans 3 jours`;
+  const subject = `Ferme — ${notifications.length} échéance${notifications.length > 1 ? "s" : ""} de reproduction demain`;
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",

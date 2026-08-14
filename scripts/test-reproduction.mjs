@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Test logique du suivi de reproduction (chaleurs, gestation, alertes J-3).
+ * Test logique du suivi de reproduction (chaleurs, gestation, alertes J-1).
  * Usage: node scripts/test-reproduction.mjs
  *
  * Ce script est autonome (pas de Firebase) et teste la logique pure,
@@ -29,7 +29,7 @@ const CYCLE_DAYS_DEFAULT = {
 };
 
 const HEAT_ALERT_WINDOW_DAYS = 7;
-const NOTIFY_DUE_DAYS = 3;
+const NOTIFY_DUE_DAYS = 1;
 
 // ─── Helpers (miroir exact de reproduction.ts / irrigationScheduler.ts) ───────
 
@@ -316,45 +316,45 @@ test("Prochaine chaleur dans la fenêtre (<= 7 j) → alerte présente", () => {
   assert(alert.joursRestants <= HEAT_ALERT_WINDOW_DAYS, "dans la fenêtre");
 });
 
-console.log("\n── selectDueNotifications : sélection J-3 exacte ─────────────────────────────\n");
+console.log("\n── selectDueNotifications : sélection J-1 exacte ─────────────────────────────\n");
 
-test("Saillie ovine → contrôle du retour en chaleur 17 jours après, notifié à J-3", () => {
+test("Saillie ovine → contrôle du retour en chaleur 17 jours après, notifié à J-1", () => {
   const today = new Date("2026-08-12T10:00:00");
-  const animal = makeAnimal({ id: "a-saillie", type: "ovin", dateSaillie: "2026-07-29" });
+  const animal = makeAnimal({ id: "a-saillie", type: "ovin", dateSaillie: "2026-07-27" });
   const notifications = selectDueNotifications([animal], {}, today);
   const found = notifications.find((n) => n.type === "controle_retour_chaleur");
   assert(found !== undefined, "notification de contrôle après saillie trouvée");
-  assertEqual(found.dateEvenement, "2026-08-15");
-  assertEqual(found.dedupKey, "controle-retour-chaleur-a-saillie-2026-08-15");
+  assertEqual(found.dateEvenement, "2026-08-13");
+  assertEqual(found.dedupKey, "controle-retour-chaleur-a-saillie-2026-08-13");
 });
 
 test("Saillie caprine → contrôle calculé sur le cycle de 21 jours", () => {
   const today = new Date("2026-08-12T10:00:00");
-  const animal = makeAnimal({ id: "a-caprine", type: "caprin", dateSaillie: "2026-07-25" });
+  const animal = makeAnimal({ id: "a-caprine", type: "caprin", dateSaillie: "2026-07-23" });
   const notifications = selectDueNotifications([animal], {}, today);
   const found = notifications.find((n) => n.type === "controle_retour_chaleur");
   assert(found !== undefined, "notification caprine trouvée");
-  assertEqual(found.dateEvenement, "2026-08-15");
+  assertEqual(found.dateEvenement, "2026-08-13");
 });
 
 test("Contrôle après saillie à J-2, animal mâle ou inactif → aucune notification", () => {
   const today = new Date("2026-08-12T10:00:00");
   const j2 = makeAnimal({ id: "a-j2-saillie", type: "ovin", dateSaillie: "2026-07-28" });
-  const male = makeAnimal({ id: "a-male-saillie", sexe: "M", dateSaillie: "2026-07-29" });
-  const inactive = makeAnimal({ id: "a-inactive-saillie", statut: "vendu", dateSaillie: "2026-07-29" });
+  const male = makeAnimal({ id: "a-male-saillie", sexe: "M", dateSaillie: "2026-07-27" });
+  const inactive = makeAnimal({ id: "a-inactive-saillie", statut: "vendu", dateSaillie: "2026-07-27" });
   const notifications = selectDueNotifications([j2, male, inactive], {}, today);
   assertEqual(notifications.filter((n) => n.type === "controle_retour_chaleur").length, 0);
 });
 
-test("Chaleur estimée exactement dans 3 jours → notification sélectionnée", () => {
+test("Chaleur estimée exactement demain → notification sélectionnée", () => {
   const today = new Date("2026-08-12T10:00:00");
-  // Ovin, cycle 17j. Chaleur observée il y a 14j → prochaine dans 3j (2026-08-15).
+  // Ovin, cycle 17j. Chaleur observée il y a 16j → prochaine demain (2026-08-13).
   const animal = makeAnimal({ id: "a-chaleur", type: "ovin" });
-  const chaleurs = [{ date: "2026-07-29" }]; // +17j = 2026-08-15 → 3j à partir du 12/08
+  const chaleurs = [{ date: "2026-07-27" }]; // +17j = 2026-08-13 → J-1 à partir du 12/08
   const notifications = selectDueNotifications([animal], { "a-chaleur": chaleurs }, today);
   const found = notifications.find((n) => n.type === "chaleur" && n.animalId === "a-chaleur");
-  assert(found !== undefined, "notification chaleur J-3 trouvée");
-  assertEqual(found.dateEvenement, "2026-08-15");
+  assert(found !== undefined, "notification chaleur J-1 trouvée");
+  assertEqual(found.dateEvenement, "2026-08-13");
 });
 
 test("Chaleur dans 2 jours (J-2) → aucune notification", () => {
@@ -373,16 +373,16 @@ test("Chaleur dans 4 jours (J-4) → aucune notification", () => {
   assertEqual(notifications.filter((n) => n.animalId === "a-j4").length, 0, "J-4 ne déclenche rien");
 });
 
-test("Mise bas estimée exactement dans 3 jours → notification sélectionnée", () => {
+test("Mise bas estimée exactement demain → notification sélectionnée", () => {
   const today = new Date("2026-08-12T10:00:00");
   const animal = makeAnimal({
     id: "a-misebas",
     dureeGestationJours: 30,
-    dateSaillie: localDateString(new Date(today.getTime() - 27 * 86400000)), // terme dans 3j
+    dateSaillie: localDateString(new Date(today.getTime() - 29 * 86400000)), // terme demain
   });
   const notifications = selectDueNotifications([animal], {}, today);
   const found = notifications.find((n) => n.type === "mise_bas" && n.animalId === "a-misebas");
-  assert(found !== undefined, "notification mise bas J-3 trouvée");
+  assert(found !== undefined, "notification mise bas J-1 trouvée");
 });
 
 test("Mise bas dans 2 jours (J-2) et 4 jours (J-4) → aucune notification", () => {
@@ -408,7 +408,7 @@ test("Mâle avec suivi de gestation incohérent → jamais de notification mise 
     id: "a-male",
     sexe: "M",
     dureeGestationJours: 30,
-    dateSaillie: localDateString(new Date(today.getTime() - 27 * 86400000)),
+    dateSaillie: localDateString(new Date(today.getTime() - 29 * 86400000)),
   });
   const notifications = selectDueNotifications([animal], {}, today);
   assertEqual(notifications.filter((n) => n.animalId === "a-male").length, 0);
@@ -420,9 +420,9 @@ test("Animal non actif → aucune notification (chaleur ou mise bas)", () => {
     id: "a-inactif",
     statut: "vendu",
     dureeGestationJours: 30,
-    dateSaillie: localDateString(new Date(today.getTime() - 27 * 86400000)),
+    dateSaillie: localDateString(new Date(today.getTime() - 29 * 86400000)),
   });
-  const chaleurs = [{ date: "2026-07-29" }];
+  const chaleurs = [{ date: "2026-07-27" }];
   const notifications = selectDueNotifications([animal], { "a-inactif": chaleurs }, today);
   assertEqual(notifications.filter((n) => n.animalId === "a-inactif").length, 0);
 });
@@ -432,7 +432,7 @@ console.log("\n── dedupKey : stabilité ────────────
 test("dedupKey identique pour la même échéance recalculée deux fois", () => {
   const today = new Date("2026-08-12T10:00:00");
   const animal = makeAnimal({ id: "a-stable", type: "ovin" });
-  const chaleurs = [{ date: "2026-07-29" }];
+  const chaleurs = [{ date: "2026-07-27" }];
   const n1 = selectDueNotifications([animal], { "a-stable": chaleurs }, today);
   const n2 = selectDueNotifications([animal], { "a-stable": chaleurs }, new Date(today));
   assertEqual(n1[0].dedupKey, n2[0].dedupKey, "dedupKey stable entre deux calculs");
@@ -441,7 +441,7 @@ test("dedupKey identique pour la même échéance recalculée deux fois", () => 
 test("dedupKey suit le format type-animalId-dateEvenement", () => {
   const today = new Date("2026-08-12T10:00:00");
   const animal = makeAnimal({ id: "a-format", type: "ovin" });
-  const chaleurs = [{ date: "2026-07-29" }];
+  const chaleurs = [{ date: "2026-07-27" }];
   const notifications = selectDueNotifications([animal], { "a-format": chaleurs }, today);
   assertEqual(notifications[0].dedupKey, `chaleur-a-format-${notifications[0].dateEvenement}`);
 });
@@ -450,7 +450,7 @@ test("dedupKey différent pour deux animaux distincts à la même date", () => {
   const today = new Date("2026-08-12T10:00:00");
   const a1 = makeAnimal({ id: "a-x", type: "ovin" });
   const a2 = makeAnimal({ id: "a-y", type: "ovin" });
-  const chaleurs = [{ date: "2026-07-29" }];
+  const chaleurs = [{ date: "2026-07-27" }];
   const notifications = selectDueNotifications([a1, a2], { "a-x": chaleurs, "a-y": chaleurs }, today);
   const keys = notifications.map((n) => n.dedupKey);
   assertEqual(new Set(keys).size, keys.length, "dedupKeys uniques par animal");
