@@ -37,6 +37,7 @@ import { EMPTY_FORM, fmtDebit, computeSourceStats } from "@/types/source";
 import { createReleve, updateReleve, deleteReleve } from "@/services/source-service";
 import type { CiterneStatus, Freshness } from "@/lib/citerneEau";
 import { formatFreshnessLabel, formatMetricValue, formatRelativeAge } from "@/lib/citerneEau";
+import { loadCiterneStatus } from "@/lib/citerneClient";
 
 const inputClass =
   "w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400";
@@ -329,9 +330,8 @@ export default function SourcePage() {
 
   const loadCiterne = useCallback(async () => {
     try {
-      const res = await fetch("/api/home-assistant/citerne", { cache: "no-store" });
-      const json = (await res.json()) as CiterneApiResponse;
-      setCiterneData(json);
+      const status = await loadCiterneStatus();
+      setCiterneData({ ok: true, status, updatedAt: new Date().toISOString() });
     } catch (err) {
       setCiterneData({ ok: false, error: err instanceof Error ? err.message : "Erreur réseau" });
     } finally {

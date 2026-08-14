@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Animal } from "@/store/store";
 import type { CiterneStatus } from "@/lib/citerneEau";
 import { formatFreshnessLabel, formatMetricValue, formatRelativeAge } from "@/lib/citerneEau";
+import { loadCiterneStatus } from "@/lib/citerneClient";
 import {
   PawPrint,
   Truck,
@@ -29,6 +30,7 @@ import {
   Waves,
   Wind,
   Thermometer,
+  RefreshCw,
 } from "lucide-react";
 
 type CiterneSummaryResponse =
@@ -79,9 +81,8 @@ export default function DashboardPage() {
   const [citerne, setCiterne] = useState<CiterneSummaryResponse | null>(null);
   const loadCiterne = useCallback(async () => {
     try {
-      const response = await fetch("/api/home-assistant/citerne", { cache: "no-store" });
-      const json = (await response.json()) as CiterneSummaryResponse;
-      setCiterne(json);
+      const status = await loadCiterneStatus();
+      setCiterne({ ok: true, status, updatedAt: new Date().toISOString() });
     } catch (error) {
       setCiterne({ ok: false, error: error instanceof Error ? error.message : "Erreur réseau" });
     }
@@ -321,6 +322,27 @@ export default function DashboardPage() {
           <p className="text-[11px] text-stone-400 mt-2">
             Vent {getWindDirectionLabel(latestWeather.windDirectionDeg)} · cumul 7 j {formatWeatherValue(weatherStats.rain7DaysMm, "mm", 1)}
           </p>
+        </button>
+      )}
+
+      {!citerne && (
+        <div className="w-full h-28 rounded-xl border border-stone-200 bg-stone-50 animate-pulse" aria-label="Chargement de la citerne" />
+      )}
+
+      {citerne && !citerneStatus?.hasData && (
+        <button
+          onClick={() => void loadCiterne()}
+          className="w-full rounded-xl border border-amber-200 bg-amber-50 p-4 text-left hover:bg-amber-100 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+              <RefreshCw className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[13px] font-semibold text-stone-800">Citerne temporairement indisponible</p>
+              <p className="text-[11px] text-stone-600 mt-0.5">Appuyer ici pour réessayer via Firebase</p>
+            </div>
+          </div>
         </button>
       )}
 
