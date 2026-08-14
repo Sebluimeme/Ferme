@@ -425,6 +425,8 @@ export default function SourcePage() {
 
   const stats = useMemo(() => computeSourceStats(releves), [releves]);
 
+  const estimatedFlows = useMemo(() => computeEstimatedFlows(sensorHistory), [sensorHistory]);
+
   const chartData = useMemo(() => {
     const byDay = new Map<string, {
       date: string;
@@ -444,7 +446,7 @@ export default function SourcePage() {
       });
     }
 
-    for (const estimate of computeEstimatedFlows(sensorHistory)) {
+    for (const estimate of estimatedFlows) {
       const dateFull = estimate.receivedAt.slice(0, 10);
       byDay.set(dateFull, {
         ...(byDay.get(dateFull) ?? {
@@ -456,7 +458,7 @@ export default function SourcePage() {
     }
 
     return [...byDay.values()].sort((a, b) => a.dateFull.localeCompare(b.dateFull));
-  }, [releves, sensorHistory]);
+  }, [releves, estimatedFlows]);
 
   const manualAverageLh = useMemo(() => {
     if (releves.length === 0) return 0;
@@ -570,6 +572,11 @@ export default function SourcePage() {
                 <p className="mt-1 text-xs text-amber-700">
                   L’estimation correspond à la variation nette du volume de la citerne. La consommation de la maison peut la fausser.
                 </p>
+                {estimatedFlows.length === 0 && (
+                  <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                    Courbe estimée disponible après la prochaine mesure de la citerne.
+                  </p>
+                )}
               </div>
               {chartData.length < 2 ? (
                 <p className="text-sm text-stone-600 text-center py-10">
