@@ -90,6 +90,22 @@ export const CYCLE_DAYS_DEFAULT: Record<Animal["type"], number> = {
   equin: 21,
 };
 
+/**
+ * Première date théorique de retour en chaleur après une saillie.
+ * Elle sert à vérifier une éventuelle non-gestation : date de saillie + un cycle de l'espèce.
+ */
+export function calculatePostServiceHeatDate(
+  animal: Pick<Animal, "type" | "dateSaillie">
+): Date | null {
+  if (!animal.dateSaillie) return null;
+  const serviceDate = new Date(animal.dateSaillie);
+  if (isNaN(serviceDate.getTime())) return null;
+
+  const result = new Date(serviceDate);
+  result.setDate(result.getDate() + (CYCLE_DAYS_DEFAULT[animal.type] || 21));
+  return result;
+}
+
 /** Fenêtre d'affichage de l'alerte de chaleur avant la date estimée (en jours). */
 export const HEAT_ALERT_WINDOW_DAYS = 7;
 

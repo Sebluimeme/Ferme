@@ -120,7 +120,11 @@ function escapeHtml(value: string): string {
 function buildEmailHtml(notifications: ReproNotification[]): string {
   const rows = notifications
     .map((n) => {
-      const label = n.type === "chaleur" ? "Chaleur prévue" : "Mise bas prévue";
+      const label = n.type === "chaleur"
+        ? "Chaleur prévue"
+        : n.type === "controle_retour_chaleur"
+          ? "Contrôle du retour en chaleur après saillie"
+          : "Mise bas prévue";
       return `<li><strong>${escapeHtml(n.animalLabel)}</strong> — ${label} le ${n.dateEvenement}</li>`;
     })
     .join("");

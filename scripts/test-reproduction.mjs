@@ -105,6 +105,15 @@ function getNextHeatDate(animal, chaleurs, today = new Date()) {
   return next;
 }
 
+function calculatePostServiceHeatDate(animal) {
+  if (!animal.dateSaillie) return null;
+  const serviceDate = new Date(animal.dateSaillie);
+  if (isNaN(serviceDate.getTime())) return null;
+  const result = new Date(serviceDate);
+  result.setDate(result.getDate() + (CYCLE_DAYS_DEFAULT[animal.type] || 21));
+  return result;
+}
+
 function getHeatAlert(animal, chaleurs, today = new Date()) {
   if (animal.sexe !== "F") return null;
   if (animal.statut !== "actif") return null;
@@ -128,6 +137,24 @@ function selectDueNotifications(animaux, chaleursByAnimal, today = new Date()) {
   const notifications = [];
 
   for (const animal of animaux) {
+    if (animal.sexe === "F" && animal.statut === "actif" && animal.dateSaillie) {
+      const postServiceHeatDate = calculatePostServiceHeatDate(animal);
+      if (postServiceHeatDate) {
+        const target = midnight(postServiceHeatDate);
+        const joursRestants = Math.round((target.getTime() - midnight(today).getTime()) / 86400000);
+        if (joursRestants === NOTIFY_DUE_DAYS) {
+          const dateEvenement = localDateString(postServiceHeatDate);
+          notifications.push({
+            type: "controle_retour_chaleur",
+            animalId: animal.id,
+            animalLabel: animalLabel(animal),
+            dateEvenement,
+            dedupKey: `controle-retour-chaleur-${animal.id}-${dateEvenement}`,
+          });
+        }
+      }
+    }
+
     const heatAlert = getHeatAlert(animal, chaleursByAnimal[animal.id] || [], today);
     if (heatAlert && heatAlert.joursRestants === NOTIFY_DUE_DAYS) {
       const dateEvenement = localDateString(heatAlert.dateEstimee);
@@ -290,6 +317,34 @@ test("Prochaine chaleur dans la fenêtre (<= 7 j) → alerte présente", () => {
 });
 
 console.log("\n── selectDueNotifications : sélection J-3 exacte ─────────────────────────────\n");
+
+test("Saillie ovine → contrôle du retour en chaleur 17 jours après, notifié à J-3", () => {
+  const today = new Date("2026-08-12T10:00:00");
+  const animal = makeAnimal({ id: "a-saillie", type: "ovin", dateSaillie: "2026-07-29" });
+  const notifications = selectDueNotifications([animal], {}, today);
+  const found = notifications.find((n) => n.type === "controle_retour_chaleur");
+  assert(found !== undefined, "notification de contrôle après saillie trouvée");
+  assertEqual(found.dateEvenement, "2026-08-15");
+  assertEqual(found.dedupKey, "controle-retour-chaleur-a-saillie-2026-08-15");
+});
+
+test("Saillie caprine → contrôle calculé sur le cycle de 21 jours", () => {
+  const today = new Date("2026-08-12T10:00:00");
+  const animal = makeAnimal({ id: "a-caprine", type: "caprin", dateSaillie: "2026-07-25" });
+  const notifications = selectDueNotifications([animal], {}, today);
+  const found = notifications.find((n) => n.type === "controle_retour_chaleur");
+  assert(found !== undefined, "notification caprine trouvée");
+  assertEqual(found.dateEvenement, "2026-08-15");
+});
+
+test("Contrôle après saillie à J-2, animal mâle ou inactif → aucune notification", () => {
+  const today = new Date("2026-08-12T10:00:00");
+  const j2 = makeAnimal({ id: "a-j2-saillie", type: "ovin", dateSaillie: "2026-07-28" });
+  const male = makeAnimal({ id: "a-male-saillie", sexe: "M", dateSaillie: "2026-07-29" });
+  const inactive = makeAnimal({ id: "a-inactive-saillie", statut: "vendu", dateSaillie: "2026-07-29" });
+  const notifications = selectDueNotifications([j2, male, inactive], {}, today);
+  assertEqual(notifications.filter((n) => n.type === "controle_retour_chaleur").length, 0);
+});
 
 test("Chaleur estimée exactement dans 3 jours → notification sélectionnée", () => {
   const today = new Date("2026-08-12T10:00:00");
