@@ -151,7 +151,7 @@ function TankLevelVisual({ level }: { level: number | null }) {
       aria-valuemin={0}
       aria-valuemax={100}
     >
-      <svg viewBox="0 0 320 170" className="block w-full h-auto" aria-hidden="true">
+      <svg viewBox="0 0 290 170" className="block w-full h-auto" aria-hidden="true">
         <defs>
           <clipPath id="tank-water-clip">
             <rect x="24" y="20" width="242" height="112" rx="56" />
@@ -188,13 +188,14 @@ function TankLevelVisual({ level }: { level: number | null }) {
         <rect x="24" y="20" width="242" height="112" rx="56" fill="none" stroke="#44403c" strokeWidth="5" />
         <path d="M65 133v12M225 133v12M52 145h26M212 145h26" fill="none" stroke="#78716c" strokeWidth="5" strokeLinecap="round" />
         <path d="M266 54h9v44h-9" fill="none" stroke="#78716c" strokeWidth="4" strokeLinecap="round" />
+        <line x1="145" y1={tankTop} x2="145" y2={tankTop + tankHeight} stroke="#0c0a09" strokeWidth="1.5" opacity="0.65" />
 
         {[100, 75, 50, 25, 0].map((mark) => {
           const y = tankTop + tankHeight * (1 - mark / 100);
           return (
             <g key={mark}>
-              <line x1="278" y1={y} x2="286" y2={y} stroke="#a8a29e" strokeWidth="2" />
-              <text x="291" y={y + 4} fontSize="10" fill="#78716c">{mark}</text>
+              <line x1="132" y1={y} x2="158" y2={y} stroke="#0c0a09" strokeWidth="2" />
+              <text x="163" y={y + 4} fontSize="11" fontWeight="700" fill="#0c0a09">{mark}</text>
             </g>
           );
         })}
