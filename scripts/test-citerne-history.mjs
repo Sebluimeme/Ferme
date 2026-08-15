@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { computeEstimatedFlows } from "../src/lib/citerneHistory.ts";
+import { computeEstimatedFlows, normalizeCiterneHistory } from "../src/lib/citerneHistory.ts";
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
@@ -19,4 +19,10 @@ assertEqual(estimates[0].receivedAt, "2026-08-15T02:00:02.824Z", "horodatage du 
 
 assertEqual(computeEstimatedFlows([liveHistory[0]]).length, 0, "aucune estimation avec une seule mesure");
 
-console.log("✅ citerne history: 4 assertions passées — débit net 408,61 L/h");
+// Citerne 2 : discovery pas encore vue par HA → RTDB n'a jamais reçu d'historique.
+assertEqual(normalizeCiterneHistory(null).length, 0, "historique citerne 2 absent (null) → tableau vide");
+assertEqual(normalizeCiterneHistory(undefined).length, 0, "historique citerne 2 absent (undefined) → tableau vide");
+assertEqual(normalizeCiterneHistory({}).length, 0, "historique citerne 2 absent (objet vide RTDB) → tableau vide");
+assertEqual(computeEstimatedFlows(normalizeCiterneHistory(null)).length, 0, "aucune estimation de débit sans historique citerne 2");
+
+console.log("✅ citerne history: 8 assertions passées — débit net 408,61 L/h, historique vide géré proprement");

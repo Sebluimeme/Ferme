@@ -4,5 +4,5 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET() {
-  return handleCiterneHistoryGet(1);
+  return handleCiterneHistoryGet(2);
 }

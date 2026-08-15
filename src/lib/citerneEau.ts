@@ -16,21 +16,38 @@ export interface HaEntityState {
 
 // ── Whitelisted entities ────────────────────────────────────────────────────────
 
-export const CITERNE_ENTITY_IDS = {
-  niveau: "sensor.citerne_1_eau_potable_niveau",
-  volumeDisponible: "sensor.citerne_1_eau_potable_volume_disponible",
-  hauteurEau: "sensor.citerne_1_eau_potable_hauteur_d_eau",
-  distanceCapteur: "sensor.citerne_1_eau_potable_distance_capteur",
-  debit: "sensor.citerne_1_eau_potable_debit",
-  batterie: "sensor.citerne_1_eau_potable_batterie",
-  tensionBatterie: "sensor.citerne_1_eau_potable_tension_batterie",
-  rssi: "sensor.citerne_1_eau_potable_rssi",
-  snr: "sensor.citerne_1_eau_potable_snr",
-} as const;
+/** The two water tanks relayed by the LoRa relay: `citerne/1/etat` and `citerne/2/etat`. */
+export type TankId = 1 | 2;
+
+/** Builds the whitelisted entity_id map for a given tank, following the Citerne 1 HA naming convention. */
+export function getCiterneEntityIds(tankId: TankId): Record<
+  "niveau" | "volumeDisponible" | "hauteurEau" | "distanceCapteur" | "debit" | "batterie" | "tensionBatterie" | "rssi" | "snr",
+  string
+> {
+  const prefix = `sensor.citerne_${tankId}_eau_potable`;
+  return {
+    niveau: `${prefix}_niveau`,
+    volumeDisponible: `${prefix}_volume_disponible`,
+    hauteurEau: `${prefix}_hauteur_d_eau`,
+    distanceCapteur: `${prefix}_distance_capteur`,
+    debit: `${prefix}_debit`,
+    batterie: `${prefix}_batterie`,
+    tensionBatterie: `${prefix}_tension_batterie`,
+    rssi: `${prefix}_rssi`,
+    snr: `${prefix}_snr`,
+  };
+}
+
+/** Entity ids for Citerne 1, kept as a stable export for existing callers. */
+export const CITERNE_ENTITY_IDS = getCiterneEntityIds(1);
 
 export type CiterneMetricKey = keyof typeof CITERNE_ENTITY_IDS;
 
-export const CITERNE_ENTITY_ID_LIST: string[] = Object.values(CITERNE_ENTITY_IDS);
+export function getCiterneEntityIdList(tankId: TankId): string[] {
+  return Object.values(getCiterneEntityIds(tankId));
+}
+
+export const CITERNE_ENTITY_ID_LIST: string[] = getCiterneEntityIdList(1);
 
 const DEFAULT_UNITS: Record<CiterneMetricKey, string> = {
   niveau: "%",
@@ -148,8 +165,10 @@ function buildMetric(entity: HaEntityState | undefined, key: CiterneMetricKey): 
 export function normalizeCiterneStatus(
   entities: Record<string, HaEntityState>,
   nowMs: number,
+  tankId: TankId = 1,
 ): CiterneStatus {
-  const get = (key: CiterneMetricKey) => entities[CITERNE_ENTITY_IDS[key]];
+  const entityIds = getCiterneEntityIds(tankId);
+  const get = (key: CiterneMetricKey) => entities[entityIds[key]];
 
   const niveau = buildMetric(get("niveau"), "niveau");
   const volumeDisponible = buildMetric(get("volumeDisponible"), "volumeDisponible");
@@ -161,7 +180,7 @@ export function normalizeCiterneStatus(
   const rssi = buildMetric(get("rssi"), "rssi");
   const snr = buildMetric(get("snr"), "snr");
 
-  const presentEntities = CITERNE_ENTITY_ID_LIST
+  const presentEntities = Object.values(entityIds)
     .map((id) => entities[id])
     .filter((e): e is HaEntityState => !!e);
 
@@ -215,12 +234,14 @@ export function normalizeCiternePayload(
   payload: CiterneRawPayload,
   receivedAt: string,
   nowMs: number,
+  tankId: TankId = 1,
 ): CiterneStatus {
+  const entityIds = getCiterneEntityIds(tankId);
   const entities: Record<string, HaEntityState> = {};
   for (const field of PAYLOAD_FIELDS) {
     const value = payload[field.key];
     if (value === undefined || value === null) continue;
-    const entityId = CITERNE_ENTITY_IDS[field.metric];
+    const entityId = entityIds[field.metric];
     entities[entityId] = {
       entity_id: entityId,
       state: String(value),
@@ -229,7 +250,7 @@ export function normalizeCiternePayload(
       last_updated: receivedAt,
     };
   }
-  return normalizeCiterneStatus(entities, nowMs);
+  return normalizeCiterneStatus(entities, nowMs, tankId);
 }
 
 // ── Formatting helpers (used by UI) ──────────────────────────────────────────────

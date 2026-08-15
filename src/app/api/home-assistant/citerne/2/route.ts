@@ -5,9 +5,9 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET() {
-  return handleCiterneGet(1);
+  return handleCiterneGet(2);
 }
 
 export async function POST(request: NextRequest) {
-  return handleCiternePost(1, request);
+  return handleCiternePost(2, request);
 }

@@ -6,8 +6,10 @@ import {
 } from "@/lib/citerneHistory";
 import {
   normalizeCiternePayload,
+  normalizeCiterneStatus,
   type CiterneRawPayload,
   type CiterneStatus,
+  type TankId,
 } from "@/lib/citerneEau";
 
 interface CiterneApiSuccess {
@@ -20,39 +22,50 @@ interface CachedCiternePayload {
   receivedAt: string;
 }
 
+function statusApiPath(tankId: TankId): string {
+  return tankId === 1 ? "/api/home-assistant/citerne" : `/api/home-assistant/citerne/${tankId}`;
+}
+
+function historyApiPath(tankId: TankId): string {
+  return tankId === 1 ? "/api/home-assistant/citerne/history" : `/api/home-assistant/citerne/${tankId}/history`;
+}
+
 /**
  * Reads the Vercel API first, then Firebase directly for authenticated PWA users.
  * This keeps the tank visible even if one delivery path is unavailable on the phone.
  */
-export async function loadCiterneStatus(): Promise<CiterneStatus> {
+export async function loadCiterneStatus(tankId: TankId = 1): Promise<CiterneStatus> {
   try {
-    const response = await fetch("/api/home-assistant/citerne", { cache: "no-store" });
+    const response = await fetch(statusApiPath(tankId), { cache: "no-store" });
     const json = (await response.json()) as CiterneApiSuccess | { ok: false; error?: string };
     if (response.ok && json.ok && json.status.hasData) return json.status;
   } catch {
     // Continue with the authenticated Firebase fallback.
   }
 
-  const snapshot = await get(ref(database, "integrations/citerne-1"));
-  if (!snapshot.exists()) throw new Error("Mesures de citerne absentes dans Firebase");
+  const snapshot = await get(ref(database, `integrations/citerne-${tankId}`));
+  if (!snapshot.exists()) {
+    // No discovery yet for this tank: a neutral, non-error status, not a failed fetch.
+    return normalizeCiterneStatus({}, Date.now(), tankId);
+  }
   const cached = snapshot.val() as CachedCiternePayload;
   if (!cached?.payload || !cached.receivedAt) throw new Error("Mesures de citerne incomplètes dans Firebase");
 
-  const status = normalizeCiternePayload(cached.payload, cached.receivedAt, Date.now());
+  const status = normalizeCiternePayload(cached.payload, cached.receivedAt, Date.now(), tankId);
   if (!status.hasData) throw new Error("Mesures de citerne indisponibles");
   return status;
 }
 
-export async function loadCiterneHistory(): Promise<CiterneHistoryPoint[]> {
+export async function loadCiterneHistory(tankId: TankId = 1): Promise<CiterneHistoryPoint[]> {
   try {
-    const response = await fetch("/api/home-assistant/citerne/history", { cache: "no-store" });
+    const response = await fetch(historyApiPath(tankId), { cache: "no-store" });
     const json = (await response.json()) as { ok?: boolean; history?: unknown };
     if (response.ok && json.ok) return normalizeCiterneHistory(json.history);
   } catch {
     // Continue with the authenticated Firebase fallback.
   }
 
-  const snapshot = await get(ref(database, "integrations/citerne-1-history"));
+  const snapshot = await get(ref(database, `integrations/citerne-${tankId}-history`));
   if (!snapshot.exists()) return [];
   return normalizeCiterneHistory(snapshot.val());
 }

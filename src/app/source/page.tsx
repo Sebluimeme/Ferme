@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useId } from "react";
 import {
   LineChart,
   Line,
@@ -33,7 +33,7 @@ import { useToast } from "@/components/Toast";
 import type { ReleverSource, ReleverSourceFormData, UniteDebit } from "@/types/source";
 import { EMPTY_FORM, fmtDebit, computeSourceStats, debitToLitresPerHour } from "@/types/source";
 import { createReleve, updateReleve, deleteReleve } from "@/services/source-service";
-import type { CiterneStatus, Freshness } from "@/lib/citerneEau";
+import type { CiterneStatus, Freshness, TankId } from "@/lib/citerneEau";
 import { formatMeasurementDateTime, formatMetricValue, getBatteryAlert } from "@/lib/citerneEau";
 import { computeEstimatedFlows, type CiterneHistoryPoint, type EstimatedFlowPoint } from "@/lib/citerneHistory";
 import { loadCiterneHistory, loadCiterneStatus } from "@/lib/citerneClient";
@@ -127,35 +127,38 @@ function TankSkeleton() {
   );
 }
 
-function TankLevelVisual({ level }: { level: number | null }) {
+function TankLevelVisual({ level, tankLabel }: { level: number | null; tankLabel: string }) {
   const pct = Math.max(0, Math.min(100, level ?? 0));
   const tankTop = 20;
   const tankHeight = 112;
   const waterTop = tankTop + tankHeight * (1 - pct / 100);
   const waterHeight = tankHeight * (pct / 100);
+  const uid = useId();
+  const clipId = `tank-water-clip-${uid}`;
+  const gradientId = `tank-water-gradient-${uid}`;
 
   return (
     <div
       className="mx-auto w-full max-w-[320px]"
       role="progressbar"
-      aria-label="Niveau visuel de la citerne horizontale"
+      aria-label={`Niveau visuel de la ${tankLabel.toLowerCase()}`}
       aria-valuenow={level ?? undefined}
       aria-valuemin={0}
       aria-valuemax={100}
     >
       <svg viewBox="0 0 290 170" className="block w-full h-auto" aria-hidden="true">
         <defs>
-          <clipPath id="tank-water-clip">
+          <clipPath id={clipId}>
             <rect x="24" y="20" width="242" height="112" rx="56" />
           </clipPath>
-          <linearGradient id="tank-water-gradient" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#38bdf8" />
             <stop offset="100%" stopColor="#0284c7" />
           </linearGradient>
         </defs>
 
         <rect x="24" y="20" width="242" height="112" rx="56" fill="#f5f5f4" />
-        <g clipPath="url(#tank-water-clip)">
+        <g clipPath={`url(#${clipId})`}>
           <rect
             data-testid="tank-water"
             data-level={pct}
@@ -163,7 +166,7 @@ function TankLevelVisual({ level }: { level: number | null }) {
             y={waterTop}
             width="242"
             height={waterHeight}
-            fill="url(#tank-water-gradient)"
+            fill={`url(#${gradientId})`}
             className="motion-safe:transition-all motion-safe:duration-700 motion-safe:ease-out"
           />
           {pct > 0 && (
@@ -196,7 +199,12 @@ function TankLevelVisual({ level }: { level: number | null }) {
   );
 }
 
-function TankErrorCard({ message, onRetry, retrying }: { message: string; onRetry: () => void; retrying: boolean }) {
+function TankErrorCard({ tankLabel, message, onRetry, retrying }: {
+  tankLabel: string;
+  message: string;
+  onRetry: () => void;
+  retrying: boolean;
+}) {
   return (
     <section className="bg-white rounded-2xl border border-red-200 p-5 sm:p-6">
       <div className="flex items-start gap-3">
@@ -204,7 +212,7 @@ function TankErrorCard({ message, onRetry, retrying }: { message: string; onRetr
           <AlertTriangle className="w-4.5 h-4.5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-stone-900">Citerne 1 — indisponible</p>
+          <p className="text-sm font-semibold text-stone-900">{tankLabel} — indisponible</p>
           <p className="text-xs text-stone-500 mt-1 break-words">{message}</p>
         </div>
       </div>
@@ -220,7 +228,8 @@ function TankErrorCard({ message, onRetry, retrying }: { message: string; onRetr
   );
 }
 
-function TankStatusSection({ data, estimatedFlow, loading, refreshing, onRefresh }: {
+function TankStatusSection({ tankLabel, data, estimatedFlow, loading, refreshing, onRefresh }: {
+  tankLabel: string;
   data: CiterneApiResponse | null;
   estimatedFlow?: EstimatedFlowPoint;
   loading: boolean;
@@ -232,6 +241,7 @@ function TankStatusSection({ data, estimatedFlow, loading, refreshing, onRefresh
   if (!data || !data.ok) {
     return (
       <TankErrorCard
+        tankLabel={tankLabel}
         message={data && !data.ok ? data.error : "Impossible de contacter le serveur."}
         onRetry={onRefresh}
         retrying={refreshing}
@@ -247,7 +257,7 @@ function TankStatusSection({ data, estimatedFlow, loading, refreshing, onRefresh
         <div className="w-10 h-10 rounded-full bg-stone-100 text-stone-600 flex items-center justify-center mx-auto">
           <Droplets className="w-5 h-5" />
         </div>
-        <p className="text-sm font-semibold text-stone-800 mt-3">Aucune mesure reçue de la citerne 1</p>
+        <p className="text-sm font-semibold text-stone-800 mt-3">Aucune mesure reçue de la {tankLabel.toLowerCase()}</p>
         <p className="text-xs text-stone-500 mt-1">Vérifiez que le capteur a effectué son relevé quotidien.</p>
         <button
           onClick={onRefresh}
@@ -274,13 +284,13 @@ function TankStatusSection({ data, estimatedFlow, loading, refreshing, onRefresh
         <div className="p-5 sm:p-6">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-stone-600">Citerne 1 — Eau potable</p>
-              <h1 className="text-xl sm:text-2xl font-bold text-stone-900 mt-1">Niveau de la citerne</h1>
+              <p className="text-xs font-semibold uppercase tracking-wide text-stone-600">{tankLabel} — Eau potable</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-stone-900 mt-1">{tankLabel} — niveau</h2>
             </div>
             <button
               onClick={onRefresh}
               disabled={refreshing}
-              aria-label="Actualiser les mesures de la citerne"
+              aria-label={`Actualiser les mesures de la ${tankLabel.toLowerCase()}`}
               className="min-h-11 min-w-11 flex items-center justify-center rounded-lg border border-stone-200 text-stone-500 hover:bg-stone-50 disabled:opacity-50 cursor-pointer shrink-0"
             >
               {refreshing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -288,7 +298,7 @@ function TankStatusSection({ data, estimatedFlow, loading, refreshing, onRefresh
           </div>
 
           <div className="mt-5">
-            <TankLevelVisual level={level} />
+            <TankLevelVisual level={level} tankLabel={tankLabel} />
             <div className="mt-2 flex items-end justify-between gap-4 rounded-xl bg-stone-50 px-4 py-3">
               <div className="min-w-0">
                 <div className="flex items-end gap-1">
@@ -368,6 +378,53 @@ function TankStatusSection({ data, estimatedFlow, loading, refreshing, onRefresh
   );
 }
 
+/** Loads status + history for one tank and keeps it polled/refreshed; shared by both Citerne cards. */
+function useCiterneStatus(tankId: TankId) {
+  const [data, setData] = useState<CiterneApiResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [history, setHistory] = useState<CiterneHistoryPoint[]>([]);
+
+  const load = useCallback(async () => {
+    try {
+      const [status, tankHistory] = await Promise.all([
+        loadCiterneStatus(tankId),
+        loadCiterneHistory(tankId).catch(() => [] as CiterneHistoryPoint[]),
+      ]);
+      setData({ ok: true, status, updatedAt: new Date().toISOString() });
+      setHistory(tankHistory);
+    } catch (err) {
+      setData({ ok: false, error: err instanceof Error ? err.message : "Erreur réseau" });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [tankId]);
+
+  useEffect(() => {
+    load();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    const refreshWhenOnline = () => load();
+    const timer = window.setInterval(load, 5 * 60 * 1000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("online", refreshWhenOnline);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("online", refreshWhenOnline);
+    };
+  }, [load]);
+
+  const refresh = useCallback(() => {
+    setRefreshing(true);
+    load();
+  }, [load]);
+
+  return { data, loading, refreshing, history, refresh };
+}
+
 export default function SourcePage() {
   const { state } = useAppStore();
   const { showToast } = useToast();
@@ -379,53 +436,18 @@ export default function SourcePage() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ReleverSource | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [sensorHistory, setSensorHistory] = useState<CiterneHistoryPoint[]>([]);
 
-  const [citerneData, setCiterneData] = useState<CiterneApiResponse | null>(null);
-  const [citerneLoading, setCiterneLoading] = useState(true);
-  const [citerneRefreshing, setCiterneRefreshing] = useState(false);
-
-  const loadCiterne = useCallback(async () => {
-    try {
-      const [status, history] = await Promise.all([
-        loadCiterneStatus(),
-        loadCiterneHistory().catch(() => [] as CiterneHistoryPoint[]),
-      ]);
-      setCiterneData({ ok: true, status, updatedAt: new Date().toISOString() });
-      setSensorHistory(history);
-    } catch (err) {
-      setCiterneData({ ok: false, error: err instanceof Error ? err.message : "Erreur réseau" });
-    } finally {
-      setCiterneLoading(false);
-      setCiterneRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadCiterne();
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") loadCiterne();
-    };
-    const refreshWhenOnline = () => loadCiterne();
-    const timer = window.setInterval(loadCiterne, 5 * 60 * 1000);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    window.addEventListener("online", refreshWhenOnline);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-      window.removeEventListener("online", refreshWhenOnline);
-    };
-  }, [loadCiterne]);
-
-  function handleRefreshCiterne() {
-    setCiterneRefreshing(true);
-    loadCiterne();
-  }
+  const tank1 = useCiterneStatus(1);
+  const tank2 = useCiterneStatus(2);
 
   const stats = useMemo(() => computeSourceStats(releves), [releves]);
 
-  const estimatedFlows = useMemo(() => computeEstimatedFlows(sensorHistory), [sensorHistory]);
+  const estimatedFlows = useMemo(() => computeEstimatedFlows(tank1.history), [tank1.history]);
   const latestEstimatedFlow = estimatedFlows.at(-1);
+  const latestEstimatedFlowTank2 = useMemo(
+    () => computeEstimatedFlows(tank2.history).at(-1),
+    [tank2.history],
+  );
 
   const chartData = useMemo(() => {
     const byDay = new Map<string, {
@@ -525,17 +547,28 @@ export default function SourcePage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-stone-900">Source</h1>
-        <p className="text-stone-500 mt-1">Mesures quotidiennes de la citerne 1 et suivi manuel du débit de la source</p>
+        <p className="text-stone-500 mt-1">Mesures quotidiennes des citernes et suivi manuel du débit de la source</p>
       </div>
 
-      {/* Citerne 1 — état opérationnel */}
-      <TankStatusSection
-        data={citerneData}
-        estimatedFlow={latestEstimatedFlow}
-        loading={citerneLoading}
-        refreshing={citerneRefreshing}
-        onRefresh={handleRefreshCiterne}
-      />
+      {/* Citernes 1 et 2 — état opérationnel */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <TankStatusSection
+          tankLabel="Citerne 1"
+          data={tank1.data}
+          estimatedFlow={latestEstimatedFlow}
+          loading={tank1.loading}
+          refreshing={tank1.refreshing}
+          onRefresh={tank1.refresh}
+        />
+        <TankStatusSection
+          tankLabel="Citerne 2"
+          data={tank2.data}
+          estimatedFlow={latestEstimatedFlowTank2}
+          loading={tank2.loading}
+          refreshing={tank2.refreshing}
+          onRefresh={tank2.refresh}
+        />
+      </div>
 
       {/* Débit de la source — relevés manuels */}
       <div className="pt-2">
