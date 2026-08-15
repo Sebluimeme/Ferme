@@ -21,7 +21,7 @@ import { ref, onValue, push, set, update, serverTimestamp } from "firebase/datab
 import { database } from "@/lib/firebase";
 import { useToast } from "@/components/Toast";
 import type { AutoIrrigationConfig, IrrigationPlan, QualityMode, ZoneConfig, ZoneMoistureState } from "@/lib/irrigationScheduler";
-import { DEFAULT_AUTO_IRRIGATION_CONFIG, QUALITY_THRESHOLDS, formatPlanStatus, formatLocalTime } from "@/lib/irrigationScheduler";
+import { DEFAULT_AUTO_IRRIGATION_CONFIG, QUALITY_THRESHOLDS, formatPlanStatus, formatLocalTime, canExecutePlan, isPlanStale } from "@/lib/irrigationScheduler";
 
 type HaEntity = {
   entity_id: string;
@@ -231,6 +231,9 @@ function NextActionCard({
   let tone: PlanStatusTone;
   let timeBlock: { label: string; value: string }[] = [];
 
+  const exec = canExecutePlan(config, plan);
+  const stale = plan ? isPlanStale(plan.createdAt, now.getTime()) : false;
+
   if (!bridgeOk) {
     title = "Bridge Home Assistant indisponible";
     reason = bridgeError ?? "L’app ne reçoit plus de statut du bridge local.";
@@ -239,7 +242,11 @@ function NextActionCard({
     title = `Arrosage en cours — Zone ${activeValve.zone}`;
     reason = `Depuis ${elapsedLabel(activeValve.valve.last_changed, now)}`;
     tone = "green";
-  } else if (config.enabled && plan) {
+  } else if (plan && !config.enabled) {
+    title = "Analyse active · automatique désactivé";
+    reason = plan.reason ? `Conseil : ${plan.reason}` : "Analyse en cours...";
+    tone = "stone";
+  } else if (plan && config.enabled && exec.allowed) {
     title = formatPlanStatus(plan.status);
     reason = plan.reason;
     tone = planStatusTone(plan.status);
@@ -249,10 +256,10 @@ function NextActionCard({
         { label: "Fin max", value: formatLocalTime(plan.endAt) },
       ];
     }
-  } else if (!config.enabled) {
-    title = "Automatique désactivé";
-    reason = "Active l’automatique (dans Réglages) pour générer un plan depuis les mesures météo.";
-    tone = "stone";
+  } else if (plan && config.enabled && !exec.allowed) {
+    title = "Recalcul en cours";
+    reason = "Automatique activé — le plan sera exécutable au prochain cycle d’analyse (5 min).";
+    tone = "blue";
   } else {
     title = "Calcul en attente";
     reason = "Le bridge recalculera le prochain plan au prochain cycle.";
@@ -282,9 +289,14 @@ function NextActionCard({
       </div>
 
       {plan && bridgeOk && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold opacity-70">
-          <CloudRain className="h-4 w-4" />
-          Pluie récente mesurée (prise en compte) : {plan.rainMeasuredMm.toFixed(1)} mm
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs font-semibold opacity-70">
+          <span className="inline-flex items-center gap-2">
+            <CloudRain className="h-4 w-4" />
+            Pluie récente mesurée (prise en compte) : {plan.rainMeasuredMm.toFixed(1)} mm
+          </span>
+          <span className={stale ? "text-amber-700" : ""}>
+            Calculé à {formatLocalTime(plan.createdAt)}{stale ? " · à actualiser" : ""}
+          </span>
         </div>
       )}
 

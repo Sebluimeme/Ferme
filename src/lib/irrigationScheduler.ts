@@ -77,6 +77,13 @@ export interface AutoIrrigationConfig {
 
 export type PlanStatus = "scheduled" | "skipped" | "executing" | "done" | "error";
 
+/**
+ * "advisory": produced while auto-schedule is OFF (or before re-validation) — a
+ * recommendation only, must never be executed.
+ * "executable": produced while auto-schedule is ON — eligible for execution.
+ */
+export type PlanMode = "advisory" | "executable";
+
 export interface ScheduledZone {
   zone: 1 | 2;
   durationMinutes: number;
@@ -113,6 +120,8 @@ export interface IrrigationPlan {
   error?: string;
   // V2 addition: per-zone moisture states at plan creation time
   zoneStates?: ZoneMoistureState[];
+  // V3 addition: advisory (auto OFF) vs executable (auto ON) — see PlanMode.
+  mode?: PlanMode;
 }
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
@@ -207,9 +216,11 @@ export function computeRecentRainMm(
 // ── V2: moisture estimation ───────────────────────────────────────────────────
 
 /**
- * Estimate soil moisture (0–100%) for a zone.
- * Based on time since last irrigation, daily loss, and recent rain.
- * Clearly an ESTIMATE — not a real sensor reading.
+ * @deprecated Superseded by the water-balance model (consolidateWaterBalance +
+ * humidityPctFromBalance below). This always resets to targetPct after any
+ * irrigation and re-adds the full 7-day weighted rain on every call, which
+ * double-counts rain/irrigation across cycles. Kept only for the legacy V1
+ * test suite / retro-compat — no longer wired into the bridge or the UI.
  */
 export function estimateZoneMoisture(
   zone: ZoneConfig,
@@ -304,6 +315,7 @@ export function computeIrrigationPlanV2(
   rainMeasuredMm: number,
   morningDateLocal: string,
   nowIso: string,
+  mode: PlanMode,
 ): IrrigationPlan {
   const planId = morningDateLocal;
   const rainThresholdMm = config.rainThresholdMm ?? 15;
@@ -315,6 +327,7 @@ export function computeIrrigationPlanV2(
     rainThresholdMm,
     createdAt: nowIso,
     zoneStates,
+    mode,
   };
 
   // Hard skip: heavy rain
@@ -399,6 +412,224 @@ export function computeIrrigationPlanV2(
     totalDurationMinutes: totalMinutes,
     zones: scheduledZones,
   };
+}
+
+// ── V3: water balance (permanent analysis, idempotent ledger) ─────────────────
+//
+// Replaces the age-weighted estimate above. A per-zone reserve (mm, 0..capacity)
+// is advanced from its last `updatedAt`: soil-loss is applied continuously,
+// measured rain and confirmed irrigation are applied as bounded, idempotent
+// deltas in chronological order. Forecast rain never enters this reserve —
+// only measured daily totals coming from weather-readings.
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+export interface IrrigationEvent {
+  /** Deterministic idempotency key — e.g. "2026-07-29-zone1" (auto) or the manual command id. */
+  id: string;
+  zone: 1 | 2;
+  appliedMm: number;
+  /** ISO timestamp of actual completion — not the command's send time. */
+  at: string;
+  source: "manual" | "auto";
+  /** Only confirmed events are integrated into the balance; unconfirmed ones are ignored. */
+  confirmed: boolean;
+}
+
+export interface WaterBalanceState {
+  zone: 1 | 2;
+  reserveMm: number;
+  capacityMm: number;
+  /** ISO timestamp up to which losses/rain/irrigation have already been consolidated. */
+  updatedAt: string;
+  /** Cumulative daily rain total (mm) already counted, per YYYY-MM-DD — prevents replay. */
+  countedRainByDate: Record<string, number>;
+  /** Irrigation event IDs already applied — idempotency guard against double counting. */
+  appliedEventIds: Record<string, true>;
+  /** True while the reserve traces back to the migration seed rather than fully-tracked inputs. */
+  seeded: boolean;
+}
+
+function clampMm(value: number, capacityMm: number): number {
+  return Math.max(0, Math.min(capacityMm, value));
+}
+
+/**
+ * Build a YYYY-MM-DD → cumulative daily rain total (mm) map from raw weather readings.
+ * Same max-of-day logic as computeTodayRain, but across every date present in the readings.
+ */
+export function buildDailyRainTotals(readings: WeatherReading[]): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const r of readings) {
+    const date = r.date ?? r.timestamp?.slice(0, 10);
+    if (!date || r.rainTotalMm == null || !Number.isFinite(r.rainTotalMm as number)) continue;
+    const value = r.rainTotalMm as number;
+    totals[date] = totals[date] != null ? Math.max(totals[date], value) : value;
+  }
+  return totals;
+}
+
+/**
+ * Prudent migration seed for a zone with no prior ledger.
+ * Starting point = current/last-known estimate (%) if available, else 40%.
+ * Marks every currently-known daily rain total as already counted so the new
+ * ledger doesn't replay the old model's 7-day weighted rain on first run.
+ */
+export function initWaterBalanceState(params: {
+  zone: 1 | 2;
+  capacityMm: number;
+  seedPct: number | null;
+  nowIso: string;
+  knownRainByDate: Record<string, number>;
+}): WaterBalanceState {
+  const seedPct = params.seedPct != null && Number.isFinite(params.seedPct) ? params.seedPct : 40;
+  return {
+    zone: params.zone,
+    reserveMm: clampMm((seedPct / 100) * params.capacityMm, params.capacityMm),
+    capacityMm: params.capacityMm,
+    updatedAt: params.nowIso,
+    countedRainByDate: { ...params.knownRainByDate },
+    appliedEventIds: {},
+    seeded: true,
+  };
+}
+
+interface BalanceDelta {
+  atMs: number;
+  deltaMm: number;
+  commit: (draft: { countedRainByDate: Record<string, number>; appliedEventIds: Record<string, true> }) => void;
+}
+
+/**
+ * Consolidate a zone's water balance:
+ * - advance soil-loss continuously since `state.updatedAt`;
+ * - integrate only unrecorded POSITIVE rain deltas (per date, vs. countedRainByDate);
+ * - integrate confirmed irrigation events not yet in appliedEventIds;
+ * - apply all of the above chronologically (by their own timestamp, day-granularity
+ *   for rain via local noon), bounding the reserve to [0, capacity] after every step.
+ * Idempotent: replaying with identical inputs and the same `nowIso` changes nothing.
+ */
+export function consolidateWaterBalance(params: {
+  state: WaterBalanceState;
+  capacityMm: number;
+  dailyLossMm: number;
+  rainByDate: Record<string, number>;
+  events: IrrigationEvent[];
+  nowIso: string;
+}): WaterBalanceState {
+  const { state, capacityMm, dailyLossMm } = params;
+  const nowMs = new Date(params.nowIso).getTime();
+  const updatedAtMs = new Date(state.updatedAt).getTime();
+
+  const deltas: BalanceDelta[] = [];
+
+  for (const [date, total] of Object.entries(params.rainByDate)) {
+    const already = state.countedRainByDate[date] ?? 0;
+    const delta = total - already;
+    if (delta <= 0) continue;
+    deltas.push({
+      atMs: new Date(`${date}T12:00:00`).getTime(),
+      deltaMm: delta,
+      commit: (draft) => { draft.countedRainByDate[date] = total; },
+    });
+  }
+
+  for (const event of params.events) {
+    if (!event.confirmed) continue;
+    if (event.zone !== state.zone) continue;
+    if (state.appliedEventIds[event.id]) continue;
+    deltas.push({
+      atMs: new Date(event.at).getTime(),
+      deltaMm: event.appliedMm,
+      commit: (draft) => { draft.appliedEventIds[event.id] = true; },
+    });
+  }
+
+  deltas.sort((a, b) => a.atMs - b.atMs);
+
+  let reserve = state.reserveMm;
+  let cursorMs = updatedAtMs;
+  const countedRainByDate = { ...state.countedRainByDate };
+  const appliedEventIds = { ...state.appliedEventIds };
+
+  for (const delta of deltas) {
+    // Clamp into [cursor, now]: day-granularity rain timestamps can fall before the
+    // last consolidation or, for "today", before the precise current instant.
+    const atMs = Math.min(Math.max(delta.atMs, cursorMs), nowMs);
+    const elapsedDays = Math.max(0, (atMs - cursorMs) / MS_PER_DAY);
+    reserve = clampMm(reserve - elapsedDays * dailyLossMm, capacityMm);
+    reserve = clampMm(reserve + delta.deltaMm, capacityMm);
+    delta.commit({ countedRainByDate, appliedEventIds });
+    cursorMs = atMs;
+  }
+
+  const tailDays = Math.max(0, (nowMs - cursorMs) / MS_PER_DAY);
+  reserve = clampMm(reserve - tailDays * dailyLossMm, capacityMm);
+
+  return {
+    zone: state.zone,
+    reserveMm: Number(reserve.toFixed(2)),
+    capacityMm,
+    updatedAt: params.nowIso,
+    countedRainByDate,
+    appliedEventIds,
+    seeded: state.seeded,
+  };
+}
+
+/** Humidity % (0–100) derived from the water balance reserve. */
+export function humidityPctFromBalance(state: WaterBalanceState): number {
+  if (state.capacityMm <= 0) return 0;
+  return Math.round((state.reserveMm / state.capacityMm) * 100);
+}
+
+// ── V3: analysis vs execution separation ───────────────────────────────────────
+
+/** A plan is considered fresh for this long after createdAt before the UI flags it as stale. */
+export const PLAN_FRESH_WINDOW_MS = 6 * 60 * 1000; // analysis cadence (5 min) + margin
+
+export function isPlanStale(createdAtIso: string | undefined, nowMs: number, maxAgeMs: number = PLAN_FRESH_WINDOW_MS): boolean {
+  if (!createdAtIso) return true;
+  const createdMs = new Date(createdAtIso).getTime();
+  if (!Number.isFinite(createdMs)) return true;
+  return nowMs - createdMs > maxAgeMs;
+}
+
+/**
+ * Defense-in-depth gate before any real execution: even if the caller forgot to
+ * check config.enabled, a plan computed while auto-schedule was OFF (mode !==
+ * "executable") — or an absent/non-scheduled plan — must never be run.
+ */
+export function canExecutePlan(
+  config: Pick<AutoIrrigationConfig, "enabled"> | null | undefined,
+  plan: IrrigationPlan | null | undefined,
+): { allowed: boolean; reason: string } {
+  if (!config?.enabled) {
+    return { allowed: false, reason: "Automatique désactivé" };
+  }
+  if (!plan) {
+    return { allowed: false, reason: "Aucun plan" };
+  }
+  if (plan.mode !== "executable") {
+    return { allowed: false, reason: "Plan calculé en mode conseil — exécution refusée" };
+  }
+  if (plan.status !== "scheduled") {
+    return { allowed: false, reason: `Statut du plan (${plan.status}) non exécutable` };
+  }
+  return { allowed: true, reason: "" };
+}
+
+/**
+ * Délai (ms, jamais négatif) avant qu'une confirmation d'arrosage manuel en
+ * attente doive être écrite dans le bilan hydrique. Utilisé au démarrage du
+ * bridge pour reprendre les confirmations persistées
+ * (irrigation-ha/water-balance/pending-manual) après un redémarrage : un délai
+ * nul signifie que l'arrosage physique s'est déjà terminé pendant que le
+ * bridge était hors ligne, donc la confirmation doit être écrite immédiatement
+ * plutôt que d'être reprogrammée.
+ */
+export function computeManualConfirmationDelayMs(expectedConfirmAtIso: string, nowMs: number): number {
+  return Math.max(0, new Date(expectedConfirmAtIso).getTime() - nowMs);
 }
 
 // ── Legacy V1 computation (kept for retro-compat) ─────────────────────────────

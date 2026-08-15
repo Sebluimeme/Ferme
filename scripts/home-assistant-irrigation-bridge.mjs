@@ -8,12 +8,27 @@
  * - écoute les commandes Firebase : irrigation-ha/commands ;
  * - exécute uniquement une allowlist d'actions Home Assistant ;
  * - marque chaque commande done/error ;
- * - planifie et exécute l'arrosage automatique nocturne (22h→6h) selon les précipitations.
+ * - calcule en permanence l'analyse d'arrosage (bilan hydrique + décision par
+ *   zone) et, seulement si l'automatique est activé, exécute le plan nocturne.
  *
- * Auto-schedule :
- * - Configuration : irrigation-ha/auto-schedule/config
- * - Plans :         irrigation-ha/auto-schedule/plans/{YYYY-MM-DD}
- * - Fenêtre :       22:00 → 06:00 (heure locale), départ au plus près du matin
+ * Auto-schedule (V3 — analyse permanente / exécution séparée) :
+ * - Configuration :     irrigation-ha/auto-schedule/config
+ * - Plans (conseil ou   irrigation-ha/auto-schedule/plans/{YYYY-MM-DD}
+ *   exécutable, voir plan.mode)
+ * - Bilan hydrique :    irrigation-ha/water-balance/state/{zone}
+ * - Ledger arrosage :   irrigation-ha/water-balance/events/{zone}/{eventId}
+ * - Confirmations       irrigation-ha/water-balance/pending-manual/{commandId}
+ *   manuelles en attente (persistées : reprises au redémarrage, voir
+ *   resumePendingManualConfirmations)
+ * - Fenêtre :           22:00 → 06:00 (heure locale), départ au plus près du matin
+ *
+ * L'analyse (checkAndPlanSchedule) tourne toutes les 5 min et à chaque
+ * changement de config, QUE l'automatique soit activé ou non : elle met à
+ * jour le bilan hydrique et la décision par zone, et écrit un plan taggué
+ * mode "advisory" (conseil, jamais exécuté) ou "executable" (auto ON).
+ * L'exécution (checkAndExecuteSchedule) reste protégée par `enabled` ET par
+ * `canExecutePlan()` (défense supplémentaire : refuse tout plan qui n'est
+ * pas explicitement mode="executable").
  *
  * Usage : npm run ha:bridge
  */
@@ -31,6 +46,18 @@ import {
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  getNextMorningDate,
+  computeRecentRainMm,
+  buildDailyRainTotals,
+  initWaterBalanceState,
+  consolidateWaterBalance,
+  humidityPctFromBalance,
+  computeZoneDecision,
+  computeIrrigationPlanV2,
+  canExecutePlan,
+  computeManualConfirmationDelayMs,
+} from "../src/lib/irrigationScheduler.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, "..");
@@ -74,7 +101,9 @@ const ALLOWED_SWITCHES = new Set([
 // ── Firebase paths ────────────────────────────────────────────────────────────
 const AUTO_SCHEDULE_CONFIG_PATH = "irrigation-ha/auto-schedule/config";
 const AUTO_SCHEDULE_PLANS_PATH  = "irrigation-ha/auto-schedule/plans";
-const ZONE_STATE_PATH           = "irrigation-ha/auto-schedule/zone-state"; // lastIrrigationAt per zone
+const WATER_BALANCE_STATE_PATH  = "irrigation-ha/water-balance/state";  // bilan par zone
+const WATER_BALANCE_EVENTS_PATH = "irrigation-ha/water-balance/events"; // ledger idempotent par zone
+const WATER_BALANCE_PENDING_PATH = "irrigation-ha/water-balance/pending-manual"; // confirmations manuelles en attente (survit à un redémarrage)
 const WEATHER_READINGS_PATH     = "weather-readings";
 
 // ── Default auto-schedule config V2 ──────────────────────────────────────────
@@ -211,6 +240,57 @@ async function publishStatus(extra = {}) {
   }
 }
 
+/**
+ * Écrit un événement d'arrosage confirmé et idempotent dans le ledger.
+ * `id` doit être déterministe (id de commande manuelle, ou "{planId}-zone{n}"
+ * pour l'auto) afin qu'un rejeu ne double-compte jamais le même arrosage.
+ */
+async function writeConfirmedIrrigationEvent({ zone, appliedMm, at, source, id }) {
+  await set(ref(db, `${WATER_BALANCE_EVENTS_PATH}/${zone}/${id}`), {
+    zone, appliedMm, at, source, confirmed: true,
+  });
+  console.log(`[water-balance] zone ${zone} arrosage confirmé +${appliedMm}mm (${source}, id=${id})`);
+}
+
+/**
+ * Programme la confirmation d'un arrosage manuel à `expectedConfirmAt`. Le
+ * pending record en Firebase (WATER_BALANCE_PENDING_PATH) est la source de
+ * vérité — le setTimeout n'est qu'une optimisation locale ; s'il est perdu
+ * (redémarrage du bridge), resumePendingManualConfirmations() le reprogramme
+ * au démarrage suivant avec le temps restant. Si ce temps est déjà écoulé, la
+ * confirmation est écrite immédiatement en utilisant `expectedConfirmAt`
+ * comme heure réelle de fin (l'arrosage physique se termine côté Home
+ * Assistant indépendamment de l'état du bridge).
+ */
+function scheduleManualConfirmation({ id, zone, appliedMm, expectedConfirmAt }) {
+  const remainingMs = computeManualConfirmationDelayMs(expectedConfirmAt, Date.now());
+  setTimeout(async () => {
+    try {
+      await writeConfirmedIrrigationEvent({ zone, appliedMm, at: expectedConfirmAt, source: "manual", id });
+      await set(ref(db, `${WATER_BALANCE_PENDING_PATH}/${id}`), null);
+    } catch (err) {
+      console.error(`[water-balance] confirmation manuelle ${id} échouée:`, err instanceof Error ? err.message : err);
+    }
+  }, remainingMs);
+}
+
+/**
+ * Au démarrage : reprend toute confirmation manuelle encore en attente
+ * (bridge redémarré pendant qu'un arrosage manuel était en cours). Sans ceci,
+ * un arrosage manuel confirmé pile pendant l'interruption ne serait jamais
+ * intégré au bilan hydrique.
+ */
+async function resumePendingManualConfirmations() {
+  const snap = await get(ref(db, WATER_BALANCE_PENDING_PATH));
+  const pending = snap.val() || {};
+  const ids = Object.keys(pending);
+  if (ids.length === 0) return;
+  console.log(`[water-balance] reprise de ${ids.length} confirmation(s) manuelle(s) en attente après redémarrage`);
+  for (const [id, entry] of Object.entries(pending)) {
+    scheduleManualConfirmation({ id, zone: entry.zone, appliedMm: entry.appliedMm, expectedConfirmAt: entry.expectedConfirmAt });
+  }
+}
+
 async function executeCommand(id, command) {
   const commandRef = ref(db, `irrigation-ha/commands/${id}`);
   await update(commandRef, {
@@ -241,13 +321,18 @@ async function executeCommand(id, command) {
       });
       const zoneConfig = (autoConfig?.zones || DEFAULT_AUTO_CONFIG.zones).find((item) => Number(item.zone) === zone) || {};
       const mmPerHour = Number(zoneConfig.irrigationDepthMmPerHour || 5);
-      const expectedEndAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
-      await update(ref(db, `${ZONE_STATE_PATH}/${zone}`), {
-        lastIrrigationAt: expectedEndAt,
-        lastIrrigationMm: Number(((duration / 60) * mmPerHour).toFixed(2)),
-        lastManualCommandId: id,
-      });
-      console.log(`[command] ${id} start zone=${zone} vanne=${vanne} duration=${duration}`);
+      const appliedMm = Number(((duration / 60) * mmPerHour).toFixed(2));
+      const expectedConfirmAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
+      console.log(`[command] ${id} start zone=${zone} vanne=${vanne} duration=${duration} — confirmation prévue ${expectedConfirmAt}`);
+      // Ne pas écrire l'événement d'arrosage tout de suite : la commande n'est
+      // que "envoyée", pas "confirmée". On attend la durée réelle avant de
+      // l'intégrer au bilan hydrique — un arrosage non confirmé ne doit
+      // jamais compter. Le rendez-vous est persisté dans Firebase (pas
+      // seulement en mémoire) : resumePendingManualConfirmations() le
+      // reprogramme au démarrage si le bridge redémarre pendant l'attente.
+      const pending = { zone, appliedMm, source: "manual", id, expectedConfirmAt };
+      await set(ref(db, `${WATER_BALANCE_PENDING_PATH}/${id}`), pending);
+      scheduleManualConfirmation(pending);
     } else if ((command.action === "turn_on" || command.action === "turn_off") && command.entityId) {
       if (!ALLOWED_SWITCHES.has(command.entityId)) throw new Error("Entité non autorisée");
       await haFetch(`/api/services/switch/${command.action}`, {
@@ -293,267 +378,25 @@ function watchCommands() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Auto-schedule — logique pure V2 (miroir de src/lib/irrigationScheduler.ts)
+// Auto-schedule — analyse permanente (bilan hydrique) + exécution séparée
+// Logique pure importée directement de src/lib/irrigationScheduler.ts (pas de
+// copie miroir) : getNextMorningDate, computeRecentRainMm, buildDailyRainTotals,
+// initWaterBalanceState, consolidateWaterBalance, humidityPctFromBalance,
+// computeZoneDecision, computeIrrigationPlanV2, canExecutePlan.
 // ═══════════════════════════════════════════════════════════════════════════════
-
-// ── Modes qualité ─────────────────────────────────────────────────────────────
-const QUALITY_THRESHOLDS = {
-  eco:      { triggerPct: 25, targetPct: 55 },
-  passable: { triggerPct: 30, targetPct: 65 },
-  correct:  { triggerPct: 40, targetPct: 75 },
-  green:    { triggerPct: 50, targetPct: 85 },
-  manual:   { triggerPct: 30, targetPct: 65 },
-};
-
-/** YYYY-MM-DD en heure locale */
-function localDateStr(date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
-}
-
-/**
- * Retourne la date YYYY-MM-DD du "matin" (fin de fenêtre 06:00) suivant.
- * Si heure < windowEndHour → ce matin ; sinon → demain matin.
- */
-function getNextMorningDate(now, windowEndHour) {
-  if (now.getHours() < windowEndHour) return localDateStr(now);
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  return localDateStr(tomorrow);
-}
-
-/** Calcule la pluie du jour (mm) depuis les readings Firebase. */
-function computeTodayRain(readings, todayStr) {
-  let max = 0;
-  const values = Array.isArray(readings) ? readings : Object.values(readings || {});
-  for (const r of values) {
-    const date = r.date ?? r.timestamp?.slice(0, 10);
-    if (date === todayStr && r.rainTotalMm != null && Number.isFinite(r.rainTotalMm)) {
-      max = Math.max(max, r.rainTotalMm);
-    }
-  }
-  return max;
-}
-
-/** Pluie utile récente sur 7 jours, pondérée: plus la pluie est ancienne, moins elle compte. */
-function computeRecentRainMm(readings, nowMs) {
-  const weights = [1, 0.85, 0.7, 0.5, 0.35, 0.2, 0.1];
-  return Number(weights.reduce((sum, weight, daysAgo) => {
-    const day = new Date(nowMs - daysAgo * 24 * 60 * 60 * 1000);
-    return sum + computeTodayRain(readings, localDateStr(day)) * weight;
-  }, 0).toFixed(2));
-}
-
-/** Estime l'humidité du sol (0–100%) d'une zone. Valeur estimée, pas mesurée. */
-function estimateZoneMoisture(zone, recentRainMm, nowMs) {
-  const capacity = zone.soilCapacityMm ?? 35;
-  const mode = zone.qualityMode ?? "passable";
-  const thresholds = QUALITY_THRESHOLDS[mode] ?? QUALITY_THRESHOLDS.passable;
-  const dailyLoss = zone.dailyLossMm ?? 3;
-
-  let reserveMm;
-  if (zone.lastIrrigationAt) {
-    const lastMs = new Date(zone.lastIrrigationAt).getTime();
-    const daysSince = Math.max(0, (nowMs - lastMs) / (24 * 60 * 60 * 1000));
-    const startMm = (thresholds.targetPct / 100) * capacity;
-    reserveMm = startMm - daysSince * dailyLoss + recentRainMm;
-  } else {
-    reserveMm = 0.4 * capacity + recentRainMm;
-  }
-
-  reserveMm = Math.max(0, Math.min(capacity, reserveMm));
-  return Math.round((reserveMm / capacity) * 100);
-}
-
-/** Calcule la décision d'arrosage pour une zone à partir de son humidité estimée. */
-function computeZoneDecision(zone, humidityPct) {
-  const mode = zone.qualityMode ?? "passable";
-  const thresholds = QUALITY_THRESHOLDS[mode] ?? QUALITY_THRESHOLDS.passable;
-  const triggerPct = (mode === "manual" && zone.triggerPct != null) ? zone.triggerPct : thresholds.triggerPct;
-  const targetPct  = (mode === "manual" && zone.targetPct  != null) ? zone.targetPct  : thresholds.targetPct;
-
-  if (!zone.enabled) {
-    return { zone: zone.zone, estimatedHumidityPct: humidityPct, triggerPct, targetPct, decision: "disabled", plannedDurationMinutes: 0, debugInfo: "Zone désactivée" };
-  }
-
-  if (humidityPct > triggerPct) {
-    return { zone: zone.zone, estimatedHumidityPct: humidityPct, triggerPct, targetPct, decision: "wait", plannedDurationMinutes: 0, debugInfo: `Estimée ${humidityPct}% > seuil ${triggerPct}% — en attente` };
-  }
-
-  const capacity = zone.soilCapacityMm ?? 35;
-  const mmPerHour = zone.irrigationDepthMmPerHour ?? 5;
-  const minRun = zone.minRunMinutes ?? 45;
-  const maxRun = zone.maxRunMinutes ?? (zone.maxDurationMinutes ?? 240);
-
-  const currentMm = (humidityPct / 100) * capacity;
-  const targetMm  = (targetPct  / 100) * capacity;
-  const mmNeeded  = Math.max(0, targetMm - currentMm);
-  const rawMinutes = Math.ceil((mmNeeded / mmPerHour) * 60);
-  const planned = Math.min(maxRun, Math.max(minRun, rawMinutes));
-
-  return {
-    zone: zone.zone, estimatedHumidityPct: humidityPct, triggerPct, targetPct,
-    decision: "irrigate", plannedDurationMinutes: planned,
-    debugInfo: `Estimée ${humidityPct}% ≤ seuil ${triggerPct}% → ${mmNeeded.toFixed(1)} mm → ${planned} min`,
-  };
-}
-
-/** Calcule le plan V2 à partir des états de zone. */
-function computeIrrigationPlanV2(config, zoneStates, rainMeasuredMm, morningDate, now) {
-  const rainThresholdMm = config.rainThresholdMm ?? 15;
-  const base = { planId: morningDate, date: morningDate, rainMeasuredMm, rainThresholdMm, createdAt: now.toISOString(), zoneStates };
-
-  if (rainMeasuredMm >= rainThresholdMm) {
-    return { ...base, status: "skipped", reason: `Pluie récente (${rainMeasuredMm.toFixed(1)} mm ≥ seuil ${rainThresholdMm} mm) — arrosage non nécessaire`, startAt: "", endAt: "", totalDurationMinutes: 0, zones: [] };
-  }
-
-  const toIrrigate = zoneStates.filter(z => z.decision === "irrigate");
-
-  if (toIrrigate.length === 0) {
-    const reasons = zoneStates.map(z => z.decision === "disabled" ? `Z${z.zone}: désactivée` : `Z${z.zone}: estimée ${z.estimatedHumidityPct}% > seuil ${z.triggerPct}%`).join("; ");
-    return { ...base, status: "skipped", reason: `Humidité estimée suffisante — ${reasons}`, startAt: "", endAt: "", totalDurationMinutes: 0, zones: [] };
-  }
-
-  const totalMinutes = toIrrigate.reduce((s, z) => s + z.plannedDurationMinutes, 0);
-
-  if (totalMinutes > 8 * 60) {
-    return { ...base, status: "error", reason: `Durée totale (${totalMinutes} min = ${(totalMinutes / 60).toFixed(1)}h) dépasse le maximum de 8h — réduire maxRunMinutes ou changer le mode qualité.`, startAt: "", endAt: "", totalDurationMinutes: totalMinutes, zones: [] };
-  }
-
-  const hEnd = String(config.windowEndHour).padStart(2, "0");
-  const endLocal = new Date(`${morningDate}T${hEnd}:00:00`);
-  const startLocal = new Date(endLocal.getTime() - totalMinutes * 60 * 1000);
-
-  const dayBefore = new Date(endLocal.getTime() - 24 * 60 * 60 * 1000);
-  dayBefore.setHours(config.windowStartHour, 0, 0, 0);
-
-  if (startLocal < dayBefore) {
-    return { ...base, status: "error", reason: `Heure de démarrage antérieure à ${config.windowStartHour}h00 — fenêtre insuffisante.`, startAt: "", endAt: "", totalDurationMinutes: totalMinutes, zones: [] };
-  }
-
-  let cursor = startLocal.getTime();
-  const scheduledZones = toIrrigate.map(z => {
-    const zStart = new Date(cursor);
-    cursor += z.plannedDurationMinutes * 60 * 1000;
-    return { zone: z.zone, durationMinutes: z.plannedDurationMinutes, startAt: zStart.toISOString(), endAt: new Date(cursor).toISOString(), status: "pending" };
-  });
-
-  const zonesLabel = toIrrigate.map(z => `Z${z.zone} ${z.plannedDurationMinutes}min`).join(" + ");
-  const rainNote = rainMeasuredMm > 0 ? ` · pluie récente ${rainMeasuredMm.toFixed(1)} mm` : "";
-
-  return { ...base, status: "scheduled", reason: `${zonesLabel}${rainNote}`, startAt: startLocal.toISOString(), endAt: endLocal.toISOString(), totalDurationMinutes: totalMinutes, zones: scheduledZones };
-}
-
-/**
- * Calcule le plan d'arrosage pour un matin donné.
- * Retourne un objet plan à écrire dans Firebase.
- */
-function computePlan(config, rainMm, morningDate, now) {
-  const base = {
-    planId: morningDate,
-    date: morningDate,
-    rainMeasuredMm: rainMm,
-    rainThresholdMm: config.rainThresholdMm,
-    createdAt: now.toISOString(),
-  };
-
-  // ── Skip: pluie suffisante ──────────────────────────────────────────────────
-  if (rainMm >= config.rainThresholdMm) {
-    return {
-      ...base,
-      status: "skipped",
-      reason: `Pluie suffisante (${rainMm.toFixed(1)} mm ≥ seuil ${config.rainThresholdMm} mm)`,
-      startAt: "", endAt: "", totalDurationMinutes: 0, zones: [],
-    };
-  }
-
-  const enabledZones = (config.zones || []).filter((z) => z.enabled);
-  if (enabledZones.length === 0) {
-    return {
-      ...base,
-      status: "skipped",
-      reason: "Aucune zone activée dans la configuration",
-      startAt: "", endAt: "", totalDurationMinutes: 0, zones: [],
-    };
-  }
-
-  // ── Durées proportionnelles au déficit ─────────────────────────────────────
-  const deficit = Math.max(0, config.targetMm - rainMm);
-  const scale = config.targetMm > 0 ? Math.min(1, deficit / config.targetMm) : 1;
-
-  const zoneDurations = enabledZones.map((z) => ({
-    zone: z.zone,
-    durationMinutes: Math.max(1, Math.round(z.maxDurationMinutes * scale)),
-  }));
-  const totalMinutes = zoneDurations.reduce((s, z) => s + z.durationMinutes, 0);
-
-  const windowMax = (config.windowEndHour + 24 - config.windowStartHour) * 60; // 480 min
-  if (totalMinutes > windowMax) {
-    return {
-      ...base,
-      status: "error",
-      reason: `Durée totale (${totalMinutes} min) dépasse la fenêtre ${config.windowStartHour}h–${config.windowEndHour}h (max ${windowMax} min)`,
-      startAt: "", endAt: "", totalDurationMinutes: totalMinutes, zones: [],
-    };
-  }
-
-  // ── Calcul heure de démarrage (à rebours depuis 06:00) ─────────────────────
-  const hEnd = String(config.windowEndHour).padStart(2, "0");
-  // Parsed as LOCAL time (no Z suffix) — correct on a bridge running in France
-  const endLocal = new Date(`${morningDate}T${hEnd}:00:00`);
-  const startLocal = new Date(endLocal.getTime() - totalMinutes * 60 * 1000);
-
-  // Borne inférieure : veille à 22:00
-  const dayBefore = new Date(endLocal.getTime() - 24 * 60 * 60 * 1000);
-  dayBefore.setHours(config.windowStartHour, 0, 0, 0);
-
-  if (startLocal < dayBefore) {
-    return {
-      ...base,
-      status: "error",
-      reason: `Heure de démarrage (${startLocal.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}) antérieure à ${config.windowStartHour}h00`,
-      startAt: "", endAt: "", totalDurationMinutes: totalMinutes, zones: [],
-    };
-  }
-
-  // ── Plan séquentiel par zone ────────────────────────────────────────────────
-  let cursor = startLocal.getTime();
-  const scheduledZones = zoneDurations.map((z) => {
-    const zStart = new Date(cursor);
-    cursor += z.durationMinutes * 60 * 1000;
-    return {
-      zone: z.zone,
-      durationMinutes: z.durationMinutes,
-      startAt: zStart.toISOString(),
-      endAt: new Date(cursor).toISOString(),
-      status: "pending",
-    };
-  });
-
-  return {
-    ...base,
-    status: "scheduled",
-    reason: `Déficit: ${deficit.toFixed(1)} mm (${rainMm.toFixed(1)} mm mesuré, cible ${config.targetMm} mm)`,
-    startAt: startLocal.toISOString(),
-    endAt: endLocal.toISOString(),
-    totalDurationMinutes: totalMinutes,
-    zones: scheduledZones,
-  };
-}
-
-// ─── État auto-schedule ───────────────────────────────────────────────────────
 
 let autoConfig = null;
 let executingAutoZone = false;
 
 /**
- * Vérifie si un plan doit être créé/mis à jour et l'écrit dans Firebase.
+ * Recalcule en permanence l'analyse d'arrosage : bilan hydrique par zone,
+ * décision par zone, et plan (conseil si auto OFF, exécutable si auto ON).
+ * Tourne QUE l'automatique soit activé ou non — seule l'exécution réelle
+ * (checkAndExecuteSchedule) est conditionnée par `enabled`.
  * N'écrase jamais un plan en cours d'exécution ou terminé.
  */
 async function checkAndPlanSchedule() {
-  if (!autoConfig?.enabled) return;
+  if (!autoConfig) return; // config pas encore chargée au démarrage
 
   try {
     const now = new Date();
@@ -567,29 +410,70 @@ async function checkAndPlanSchedule() {
     // Ne pas écraser un plan en cours ou terminé
     if (existing && ["executing", "done"].includes(existing.status)) return;
 
-    // Lire les données météo (pluie utile récente sur 7 jours) + état hydrique estimé par zone
+    // Lire les données météo mesurées (jamais de prévision) : totaux journaliers
+    // pour le bilan hydrique + pluie utile récente pour le garde-fou "forte pluie".
     const weatherSnap = await get(ref(db, WEATHER_READINGS_PATH));
     const weatherData = Object.values(weatherSnap.val() || {});
-    const rainMm = computeRecentRainMm(weatherData, now.getTime());
+    const rainByDate = buildDailyRainTotals(weatherData);
+    const recentRainMm = computeRecentRainMm(weatherData, now.getTime());
 
-    const zoneStateSnap = await get(ref(db, ZONE_STATE_PATH));
-    const persistedZoneState = zoneStateSnap.val() || {};
-    const zones = (autoConfig.zones || DEFAULT_AUTO_CONFIG.zones).map((zone) => ({
-      ...zone,
-      ...(persistedZoneState[String(zone.zone)] || {}),
-    }));
-    const zoneStates = zones.map((zone) => {
-      const humidity = estimateZoneMoisture(zone, rainMm, now.getTime());
-      return computeZoneDecision(zone, humidity);
-    });
+    const zonesConfig = autoConfig.zones || DEFAULT_AUTO_CONFIG.zones;
+    const zoneStates = [];
 
-    const plan = computeIrrigationPlanV2({ ...autoConfig, zones }, zoneStates, rainMm, morningDate, now);
+    for (const zoneCfg of zonesConfig) {
+      const capacityMm = zoneCfg.soilCapacityMm ?? 35;
+      const dailyLossMm = zoneCfg.dailyLossMm ?? 3;
+      const balanceRef = ref(db, `${WATER_BALANCE_STATE_PATH}/${zoneCfg.zone}`);
+      const balanceSnap = await get(balanceRef);
+      let state = balanceSnap.val();
 
-    // Réécrire tout plan non verrouillé. Les plans skipped/error doivent pouvoir
-    // évoluer si la qualité, la pluie ou l'état estimé changent.
+      if (!state) {
+        // Migration prudente : point de départ = estimation du plan courant
+        // pour cette zone si disponible, sinon 40%. Les totaux pluie connus
+        // sont marqués "déjà comptés" pour ne pas rejouer les 7 derniers
+        // jours de l'ancien modèle pondéré. Cette valeur reste "estimée"
+        // (seeded=true) tant qu'elle n'a pas reçu d'apport réel.
+        const seedFromExisting = existing?.zoneStates?.find(
+          (z) => Number(z.zone) === Number(zoneCfg.zone)
+        )?.estimatedHumidityPct;
+        state = initWaterBalanceState({
+          zone: zoneCfg.zone,
+          capacityMm,
+          seedPct: seedFromExisting != null ? Number(seedFromExisting) : null,
+          nowIso: now.toISOString(),
+          knownRainByDate: rainByDate,
+        });
+        console.log(`[water-balance] zone ${zoneCfg.zone} bilan initial (estimée) → ${state.reserveMm}/${capacityMm}mm`);
+      }
+
+      const eventsSnap = await get(ref(db, `${WATER_BALANCE_EVENTS_PATH}/${zoneCfg.zone}`));
+      const eventsVal = eventsSnap.val() || {};
+      const events = Object.entries(eventsVal).map(([eventId, e]) => ({ id: eventId, ...e }));
+
+      const consolidated = consolidateWaterBalance({
+        state, capacityMm, dailyLossMm, rainByDate, events, nowIso: now.toISOString(),
+      });
+      await set(balanceRef, consolidated);
+
+      const humidity = humidityPctFromBalance(consolidated);
+      zoneStates.push(computeZoneDecision(zoneCfg, humidity));
+    }
+
+    const mode = autoConfig.enabled ? "executable" : "advisory";
+    const plan = computeIrrigationPlanV2(
+      { ...autoConfig, zones: zonesConfig },
+      zoneStates,
+      recentRainMm,
+      morningDate,
+      now.toISOString(),
+      mode,
+    );
+
+    // Réécrire tout plan non verrouillé. Les plans skipped/error/advisory
+    // doivent pouvoir évoluer si la qualité, la pluie ou le bilan changent.
     await set(planRef, plan);
     await update(ref(db, AUTO_SCHEDULE_CONFIG_PATH), { lastError: null, lastErrorAt: null });
-    console.log(`[auto-schedule] plan ${morningDate} → ${plan.status}: ${plan.reason}`);
+    console.log(`[auto-schedule] analyse ${morningDate} → ${plan.status} (${mode}): ${plan.reason}`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await update(ref(db, AUTO_SCHEDULE_CONFIG_PATH), {
@@ -602,7 +486,9 @@ async function checkAndPlanSchedule() {
 
 /**
  * Vérifie si c'est l'heure d'exécuter le plan et lance les zones séquentiellement.
- * Protégé par un flag pour éviter le double déclenchement.
+ * Double protection : `enabled` (gate rapide) ET `canExecutePlan()` (défense
+ * supplémentaire — refuse tout plan qui n'est pas explicitement mode="executable",
+ * même en cas d'incohérence transitoire entre config et plan).
  */
 async function checkAndExecuteSchedule() {
   if (!autoConfig?.enabled || executingAutoZone) return;
@@ -614,7 +500,11 @@ async function checkAndExecuteSchedule() {
     const planSnap = await get(planRef);
     const plan = planSnap.val();
 
-    if (!plan || plan.status !== "scheduled") return;
+    const gate = canExecutePlan(autoConfig, plan);
+    if (!gate.allowed) {
+      if (plan) console.log(`[auto-schedule] exécution refusée (${gate.reason})`);
+      return;
+    }
 
     // Pas encore l'heure
     if (plan.startAt && now < new Date(plan.startAt)) return;
@@ -672,12 +562,18 @@ async function checkAndExecuteSchedule() {
           status: "done",
           doneAt: zoneDoneAt,
         });
+
+        // Arrosage réellement terminé → événement confirmé et idempotent
+        // (id déterministe : un seul événement par plan+zone, même en cas de rejeu).
         const zoneConfig = (autoConfig.zones || DEFAULT_AUTO_CONFIG.zones).find((item) => Number(item.zone) === Number(zone.zone)) || {};
         const mmPerHour = Number(zoneConfig.irrigationDepthMmPerHour || 5);
-        await update(ref(db, `${ZONE_STATE_PATH}/${zone.zone}`), {
-          lastIrrigationAt: zoneDoneAt,
-          lastIrrigationMm: Number(((Number(zone.durationMinutes) / 60) * mmPerHour).toFixed(2)),
-          lastAutoPlanId: morningDate,
+        const appliedMm = Number(((Number(zone.durationMinutes) / 60) * mmPerHour).toFixed(2));
+        await writeConfirmedIrrigationEvent({
+          zone: zone.zone,
+          appliedMm,
+          at: zoneDoneAt,
+          source: "auto",
+          id: `${morningDate}-zone${zone.zone}`,
         });
         console.log(`[auto-schedule] zone ${zone.zone} terminée`);
       }
@@ -709,9 +605,10 @@ async function checkAndExecuteSchedule() {
 /**
  * Initialise l'auto-schedule :
  * - Crée la config par défaut si absente
- * - Surveille la config en temps réel
+ * - Surveille la config en temps réel : recalcule l'analyse à chaque changement,
+ *   même si `enabled` est false (l'analyse ne dépend jamais de `enabled`)
  * - Lance la vérification/planification toutes les 5 min
- * - Lance la vérification d'exécution toutes les 5 s
+ * - Lance la vérification d'exécution toutes les 5 s (protégée par `enabled`)
  */
 async function initAutoSchedule() {
   const configRef = ref(db, AUTO_SCHEDULE_CONFIG_PATH);
@@ -735,7 +632,7 @@ async function initAutoSchedule() {
     );
   });
 
-  // Planification : toutes les 5 min
+  // Planification/analyse : toutes les 5 min, que l'auto soit ON ou OFF.
   setInterval(() => checkAndPlanSchedule(), 5 * 60 * 1000);
 
   // Exécution : toutes les 5 secondes pour démarrer au plus près de l'heure calculée.
@@ -752,6 +649,7 @@ async function main() {
   console.log(`[bridge] Firebase connecté. HA=${haBaseUrl}`);
 
   watchCommands();
+  await resumePendingManualConfirmations();
   await publishStatus();
   setInterval(() => publishStatus(), pollMs);
 

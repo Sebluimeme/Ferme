@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "node scripts/test-reproduction.mjs",
-    "ha:bridge": "node scripts/home-assistant-irrigation-bridge.mjs"
+    "test:irrigation": "node --experimental-strip-types scripts/test-irrigation-scheduler.mjs",
+    "ha:bridge": "node --experimental-strip-types scripts/home-assistant-irrigation-bridge.mjs"
   },
   "keywords": [],
   "author": "",
