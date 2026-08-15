@@ -21,10 +21,6 @@ import {
   BatteryMedium,
   BatteryLow,
   BatteryWarning,
-  SignalHigh,
-  SignalMedium,
-  SignalLow,
-  SignalZero,
   Clock,
   AlertTriangle,
   RefreshCw,
@@ -38,8 +34,8 @@ import type { ReleverSource, ReleverSourceFormData, UniteDebit } from "@/types/s
 import { EMPTY_FORM, fmtDebit, computeSourceStats, debitToLitresPerHour } from "@/types/source";
 import { createReleve, updateReleve, deleteReleve } from "@/services/source-service";
 import type { CiterneStatus, Freshness } from "@/lib/citerneEau";
-import { formatMeasurementDateTime, formatMetricValue } from "@/lib/citerneEau";
-import { computeEstimatedFlows, type CiterneHistoryPoint } from "@/lib/citerneHistory";
+import { formatMeasurementDateTime, formatMetricValue, getBatteryAlert } from "@/lib/citerneEau";
+import { computeEstimatedFlows, type CiterneHistoryPoint, type EstimatedFlowPoint } from "@/lib/citerneHistory";
 import { loadCiterneHistory, loadCiterneStatus } from "@/lib/citerneClient";
 
 const inputClass =
@@ -77,13 +73,6 @@ function batteryVisual(pct: number | null): { icon: typeof BatteryFull; tone: To
   return { icon: BatteryWarning, tone: "red" };
 }
 
-function signalVisual(dbm: number | null): { icon: typeof SignalHigh; tone: Tone } {
-  if (dbm === null) return { icon: SignalZero, tone: "stone" };
-  if (dbm >= -67) return { icon: SignalHigh, tone: "green" };
-  if (dbm >= -85) return { icon: SignalMedium, tone: "amber" };
-  if (dbm >= -100) return { icon: SignalLow, tone: "red" };
-  return { icon: SignalLow, tone: "red" };
-}
 
 type CiterneApiResponse =
   | { ok: true; status: CiterneStatus; updatedAt: string }
@@ -231,8 +220,9 @@ function TankErrorCard({ message, onRetry, retrying }: { message: string; onRetr
   );
 }
 
-function TankStatusSection({ data, loading, refreshing, onRefresh }: {
+function TankStatusSection({ data, estimatedFlow, loading, refreshing, onRefresh }: {
   data: CiterneApiResponse | null;
+  estimatedFlow?: EstimatedFlowPoint;
   loading: boolean;
   refreshing: boolean;
   onRefresh: () => void;
@@ -258,7 +248,7 @@ function TankStatusSection({ data, loading, refreshing, onRefresh }: {
           <Droplets className="w-5 h-5" />
         </div>
         <p className="text-sm font-semibold text-stone-800 mt-3">Aucune mesure reçue de la citerne 1</p>
-        <p className="text-xs text-stone-500 mt-1">Vérifiez que le module LoRa a effectué son relevé quotidien.</p>
+        <p className="text-xs text-stone-500 mt-1">Vérifiez que le capteur a effectué son relevé quotidien.</p>
         <button
           onClick={onRefresh}
           disabled={refreshing}
@@ -274,8 +264,9 @@ function TankStatusSection({ data, loading, refreshing, onRefresh }: {
   const level = status.niveau.value;
   const fTone = FRESHNESS_TONE[status.freshness];
   const battery = batteryVisual(status.batterie.value);
-  const signal = signalVisual(status.rssi.value);
+  const batteryAlert = getBatteryAlert(status.batterie.value);
   const debitMesure = status.debit.value !== null;
+  const debitEstime = !debitMesure && estimatedFlow !== undefined;
 
   return (
     <div className="space-y-3">
@@ -329,6 +320,13 @@ function TankStatusSection({ data, loading, refreshing, onRefresh }: {
               Pas de nouvelle mesure récente — le module reporte une fois par jour, vérifiez qu&apos;il fonctionne toujours.
             </p>
           )}
+
+          {batteryAlert && (
+            <p className={`mt-2.5 text-xs flex items-start gap-1.5 ${batteryAlert.tone === "red" ? "text-red-600" : "text-amber-600"}`}>
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              {batteryAlert.message}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-3 divide-x divide-stone-100 border-t border-stone-100">
@@ -342,7 +340,7 @@ function TankStatusSection({ data, loading, refreshing, onRefresh }: {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <StatusTile
           icon={battery.icon}
           label="Batterie"
@@ -351,18 +349,19 @@ function TankStatusSection({ data, loading, refreshing, onRefresh }: {
           tone={battery.tone}
         />
         <StatusTile
-          icon={signal.icon}
-          label="Signal LoRa"
-          value={status.rssi.value !== null ? formatMetricValue(status.rssi, 0) : "—"}
-          subtitle={status.snr.value !== null ? `SNR ${formatMetricValue(status.snr, 1)}` : undefined}
-          tone={signal.tone}
-        />
-        <StatusTile
           icon={Droplets}
-          label="Débit"
-          value={debitMesure ? formatMetricValue(status.debit, 2) : "Non mesuré"}
-          subtitle={debitMesure ? undefined : "Donnée indisponible côté capteur"}
-          tone={debitMesure ? "green" : "stone"}
+          label={debitMesure ? "Débit mesuré" : "Débit net estimé"}
+          value={debitMesure
+            ? formatMetricValue(status.debit, 2)
+            : debitEstime
+              ? `${estimatedFlow.debitLitresPerHour.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} L/h`
+              : "En attente"}
+          subtitle={debitMesure
+            ? undefined
+            : debitEstime
+              ? "Calculé entre les deux derniers volumes ; la consommation peut le fausser."
+              : "Disponible après deux mesures de volume."}
+          tone={debitMesure ? "green" : debitEstime ? "amber" : "stone"}
         />
       </div>
     </div>
@@ -426,6 +425,7 @@ export default function SourcePage() {
   const stats = useMemo(() => computeSourceStats(releves), [releves]);
 
   const estimatedFlows = useMemo(() => computeEstimatedFlows(sensorHistory), [sensorHistory]);
+  const latestEstimatedFlow = estimatedFlows.at(-1);
 
   const chartData = useMemo(() => {
     const byDay = new Map<string, {
@@ -531,6 +531,7 @@ export default function SourcePage() {
       {/* Citerne 1 — état opérationnel */}
       <TankStatusSection
         data={citerneData}
+        estimatedFlow={latestEstimatedFlow}
         loading={citerneLoading}
         refreshing={citerneRefreshing}
         onRefresh={handleRefreshCiterne}

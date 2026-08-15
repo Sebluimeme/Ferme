@@ -127,6 +127,14 @@ function normalizeCiternePayload(payload, receivedAt, nowMs) {
   return normalizeCiterneStatus(entities, nowMs);
 }
 
+function getBatteryAlert(pct) {
+  if (pct === null) return null;
+  if (pct <= 5) return { threshold: 5, tone: "red", message: "Batterie critique (≤ 5 %) — remplacez-la dès que possible." };
+  if (pct <= 10) return { threshold: 10, tone: "red", message: "Batterie faible (≤ 10 %) — prévoyez un remplacement rapide." };
+  if (pct <= 15) return { threshold: 15, tone: "amber", message: "Batterie sous 15 % — surveillez le capteur." };
+  return null;
+}
+
 function formatRelativeAge(iso, nowMs) {
   if (!iso) return "—";
   const t = new Date(iso).getTime();
@@ -421,6 +429,53 @@ test("il y a 3 heures → 'il y a 3 h'", () => {
 test("il y a 2 jours → 'il y a 2 j'", () => {
   const ts = new Date(NOW - 2 * 24 * 3600 * 1000).toISOString();
   assertEqual(formatRelativeAge(ts, NOW), "il y a 2 j");
+});
+
+console.log("\n── getBatteryAlert — seuils 15 % / 10 % / 5 %, sans doublon ─────────────\n");
+
+test("null → aucune alerte", () => {
+  assertEqual(getBatteryAlert(null), null);
+});
+
+test("50 % → aucune alerte", () => {
+  assertEqual(getBatteryAlert(50), null);
+});
+
+test("16 % → aucune alerte (juste au-dessus du premier seuil)", () => {
+  assertEqual(getBatteryAlert(16), null);
+});
+
+test("15 % → alerte amber, seuil 15", () => {
+  const alert = getBatteryAlert(15);
+  assertEqual(alert.threshold, 15);
+  assertEqual(alert.tone, "amber");
+});
+
+test("12 % → toujours seuil 15 (pas de doublon avec 10)", () => {
+  const alert = getBatteryAlert(12);
+  assertEqual(alert.threshold, 15);
+});
+
+test("10 % → alerte red, seuil 10 (un seul niveau, pas 15 et 10 cumulés)", () => {
+  const alert = getBatteryAlert(10);
+  assertEqual(alert.threshold, 10);
+  assertEqual(alert.tone, "red");
+});
+
+test("7 % → toujours seuil 10 (pas de doublon avec 5)", () => {
+  const alert = getBatteryAlert(7);
+  assertEqual(alert.threshold, 10);
+});
+
+test("5 % → alerte red, seuil 5", () => {
+  const alert = getBatteryAlert(5);
+  assertEqual(alert.threshold, 5);
+  assertEqual(alert.tone, "red");
+});
+
+test("0 % → toujours seuil 5 (un seul niveau retourné, jamais 15+10+5 empilés)", () => {
+  const alert = getBatteryAlert(0);
+  assertEqual(alert.threshold, 5);
 });
 
 // ─── Résumé ─────────────────────────────────────────────────────────────────

@@ -259,6 +259,29 @@ export function formatMeasurementDateTime(iso: string | null): string {
   return `${day} à ${time}`;
 }
 
+// ── Battery threshold alerts ─────────────────────────────────────────────────
+
+export type BatteryAlertTone = "amber" | "red";
+
+export interface BatteryAlert {
+  threshold: 15 | 10 | 5;
+  tone: BatteryAlertTone;
+  message: string;
+}
+
+/**
+ * Returns the single most severe battery alert for a percentage, or null above 15%.
+ * Only one tier is ever returned (never stacked) so the UI never shows duplicate alerts
+ * for the same reading.
+ */
+export function getBatteryAlert(pct: number | null): BatteryAlert | null {
+  if (pct === null) return null;
+  if (pct <= 5) return { threshold: 5, tone: "red", message: "Batterie critique (≤ 5 %) — remplacez-la dès que possible." };
+  if (pct <= 10) return { threshold: 10, tone: "red", message: "Batterie faible (≤ 10 %) — prévoyez un remplacement rapide." };
+  if (pct <= 15) return { threshold: 15, tone: "amber", message: "Batterie sous 15 % — surveillez le capteur." };
+  return null;
+}
+
 /** Relative age label ("il y a 3 h") for a last-updated timestamp. */
 export function formatRelativeAge(iso: string | null, nowMs: number): string {
   if (!iso) return "—";
