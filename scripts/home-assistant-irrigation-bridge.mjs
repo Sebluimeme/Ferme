@@ -7,7 +7,10 @@
  * - publie l'état dans Firebase Realtime Database : irrigation-ha/status/current ;
  * - écoute les commandes Firebase : irrigation-ha/commands ;
  * - exécute uniquement une allowlist d'actions Home Assistant ;
- * - marque chaque commande done/error ;
+ * - exige une preuve d'état (pompe on + bonne vanne on + autre vanne off) avant
+ *   de valider un arrosage, puis la surveille pendant toute la durée ;
+ * - ne comptabilise dans zone-state que les minutes réellement confirmées ;
+ * - marque chaque commande running/done/error ;
  * - planifie et exécute l'arrosage automatique nocturne (22h→6h) selon les précipitations.
  *
  * Auto-schedule :
@@ -31,6 +34,10 @@ import {
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  runIrrigationWithProof,
+  proofSnapshot,
+} from "./lib/ha-irrigation-proof.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, "..");
@@ -136,6 +143,11 @@ const haBaseUrl = requireEnv(env, "HOME_ASSISTANT_URL").replace(/\/$/, "");
 const haToken = requireEnv(env, "HOME_ASSISTANT_TOKEN");
 const pollMs = Number(env.HA_BRIDGE_POLL_MS || 10000);
 
+// Preuve d'état : délai borné pour confirmer un démarrage, puis surveillance pendant l'arrosage.
+const proofTimeoutMs = Number(env.HA_PROOF_TIMEOUT_MS || 45000);
+const proofIntervalMs = Number(env.HA_PROOF_INTERVAL_MS || 3000);
+const proofMonitorIntervalMs = Number(env.HA_PROOF_MONITOR_INTERVAL_MS || 30000);
+
 const firebaseConfig = {
   apiKey: requireEnv(env, "NEXT_PUBLIC_FIREBASE_API_KEY"),
   authDomain: requireEnv(env, "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
@@ -169,6 +181,34 @@ async function haFetch(path, init = {}) {
   }
 
   return response.json();
+}
+
+const readHaStates = () => haFetch("/api/states");
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+/** Débit d'irrigation configuré pour une zone (mm/h). */
+function zoneMmPerHour(zone) {
+  const zones = autoConfig?.zones || DEFAULT_AUTO_CONFIG.zones;
+  const config = zones.find((item) => Number(item.zone) === Number(zone)) || {};
+  return Number(config.irrigationDepthMmPerHour || 5);
+}
+
+/**
+ * Lance une zone puis surveille la preuve d'arrosage sur toute la durée.
+ * Ne rend la main qu'à la fin de la durée demandée ou à la perte de la preuve.
+ */
+function runZoneUnderProof(zone, durationMinutes, onConfirmed) {
+  return runIrrigationWithProof({
+    zone,
+    durationMs: durationMinutes * 60 * 1000,
+    mmPerHour: zoneMmPerHour(zone),
+    readStates: readHaStates,
+    sleep,
+    proofTimeoutMs,
+    proofIntervalMs,
+    monitorIntervalMs: proofMonitorIntervalMs,
+    onConfirmed,
+  });
 }
 
 async function publishStatus(extra = {}) {
@@ -219,6 +259,8 @@ async function executeCommand(id, command) {
     processingAtServer: serverTimestamp(),
   });
 
+  let commandExtra = {};
+
   try {
     if (command.action === "stop_all") {
       await haFetch("/api/services/script/arrosage_arret_total", {
@@ -239,15 +281,51 @@ async function executeCommand(id, command) {
           },
         }),
       });
-      const zoneConfig = (autoConfig?.zones || DEFAULT_AUTO_CONFIG.zones).find((item) => Number(item.zone) === zone) || {};
-      const mmPerHour = Number(zoneConfig.irrigationDepthMmPerHour || 5);
-      const expectedEndAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
-      await update(ref(db, `${ZONE_STATE_PATH}/${zone}`), {
-        lastIrrigationAt: expectedEndAt,
-        lastIrrigationMm: Number(((duration / 60) * mmPerHour).toFixed(2)),
-        lastManualCommandId: id,
+
+      // L'acceptation du service HA ne prouve rien, et une confirmation de
+      // démarrage ne prouve pas la durée : surveiller la preuve pendant tout
+      // l'arrosage et ne créditer que les minutes réellement confirmées.
+      // La commande est traitée hors du callback onValue : l'écoute Firebase
+      // reste vivante pendant toute la surveillance.
+      const run = await runZoneUnderProof(zone, duration, async (startProof) => {
+        await update(commandRef, {
+          status: "running",
+          confirmedAt: new Date().toISOString(),
+          confirmationDelayMs: startProof.elapsedMs,
+          expectedEndAt: new Date(Date.now() + Math.max(0, duration * 60 * 1000 - startProof.elapsedMs)).toISOString(),
+          proof: proofSnapshot(startProof),
+        });
+        console.log(`[command] ${id} start zone=${zone} vanne=${vanne} duration=${duration} (preuve OK en ${startProof.elapsedMs} ms, surveillance en cours)`);
       });
-      console.log(`[command] ${id} start zone=${zone} vanne=${vanne} duration=${duration}`);
+
+      if (!run.started) {
+        throw new Error(`Arrosage manuel zone ${zone} non confirmé — ${run.reason}. Aucun arrosage comptabilisé.`);
+      }
+
+      const endedAt = new Date().toISOString();
+      commandExtra = {
+        confirmedMinutes: run.minutes,
+        confirmedMm: run.mm,
+        requestedMinutes: duration,
+        endedAt,
+        proof: proofSnapshot(run.proof),
+      };
+
+      // Ne comptabiliser que les minutes réellement confirmées.
+      if (run.minutes > 0) {
+        await update(ref(db, `${ZONE_STATE_PATH}/${zone}`), {
+          lastIrrigationAt: endedAt,
+          lastIrrigationMm: run.mm,
+          lastIrrigationMinutes: run.minutes,
+          lastManualCommandId: id,
+          lastConfirmedAt: endedAt,
+        });
+      }
+
+      if (!run.ok) {
+        throw new Error(`Arrosage manuel zone ${zone} interrompu — ${run.reason}. ${run.minutes} min confirmées sur ${duration} min demandées.`);
+      }
+      console.log(`[command] ${id} zone=${zone} terminée (${run.minutes}/${duration} min confirmées)`);
     } else if ((command.action === "turn_on" || command.action === "turn_off") && command.entityId) {
       if (!ALLOWED_SWITCHES.has(command.entityId)) throw new Error("Entité non autorisée");
       await haFetch(`/api/services/switch/${command.action}`, {
@@ -263,15 +341,19 @@ async function executeCommand(id, command) {
       doneAt: new Date().toISOString(),
       doneAtServer: serverTimestamp(),
       error: null,
+      ...commandExtra,
     });
     console.log(`[command] ${id} done action=${command.action}`);
     await publishStatus({ lastCommandId: id });
   } catch (error) {
+    // commandExtra porte les minutes déjà confirmées quand un arrosage a
+    // démarré puis perdu sa preuve : l'erreur reste chiffrée.
     await update(commandRef, {
       status: "error",
       error: error instanceof Error ? error.message : String(error),
       errorAt: new Date().toISOString(),
       errorAtServer: serverTimestamp(),
+      ...commandExtra,
     });
     console.error(`[command] ${id} error`, error instanceof Error ? error.message : error);
     await publishStatus({ lastCommandId: id });
@@ -660,26 +742,60 @@ async function checkAndExecuteSchedule() {
             variables: { vanne, duree_minutes: zone.durationMinutes },
           }),
         });
-        console.log(`[auto-schedule] zone ${zone.zone} démarrée (${zone.durationMinutes} min)`);
+        console.log(`[auto-schedule] zone ${zone.zone} commande envoyée (${zone.durationMinutes} min)`);
 
-        // Attendre la durée prévue. Pas de marge ajoutée : la fenêtre doit rester au plus proche de 06h.
-        await new Promise((resolve) =>
-          setTimeout(resolve, zone.durationMinutes * 60 * 1000)
-        );
+        // Preuve de démarrage puis surveillance sur toute la durée prévue.
+        // Pas de marge ajoutée : la fenêtre doit rester au plus proche de 06h,
+        // le délai de confirmation est donc déduit de la durée.
+        const run = await runZoneUnderProof(zone.zone, Number(zone.durationMinutes), async (startProof) => {
+          await update(ref(db, zonePathPrefix), {
+            confirmedAt: new Date().toISOString(),
+            proof: proofSnapshot(startProof),
+          });
+          console.log(`[auto-schedule] zone ${zone.zone} confirmée (preuve OK en ${startProof.elapsedMs} ms)`);
+        });
 
-        const zoneDoneAt = new Date().toISOString();
+        const zoneEndAt = new Date().toISOString();
+
+        if (!run.started) {
+          const message = `Zone ${zone.zone} du plan ${morningDate} non confirmée — ${run.reason}. Aucun arrosage comptabilisé.`;
+          await update(ref(db, zonePathPrefix), {
+            status: "error",
+            error: message,
+            errorAt: zoneEndAt,
+            confirmedMinutes: 0,
+          });
+          throw new Error(message); // → plan error, flux arrêté, zone-state intact
+        }
+
+        // Ne comptabiliser que les minutes réellement confirmées.
+        if (run.minutes > 0) {
+          await update(ref(db, `${ZONE_STATE_PATH}/${zone.zone}`), {
+            lastIrrigationAt: zoneEndAt,
+            lastIrrigationMm: run.mm,
+            lastIrrigationMinutes: run.minutes,
+            lastAutoPlanId: morningDate,
+            lastConfirmedAt: zoneEndAt,
+          });
+        }
+
+        if (!run.ok) {
+          const message = `Zone ${zone.zone} interrompue — ${run.reason}. ${run.minutes} min confirmées comptabilisées sur ${zone.durationMinutes} min prévues.`;
+          await update(ref(db, zonePathPrefix), {
+            status: "error",
+            error: message,
+            errorAt: zoneEndAt,
+            confirmedMinutes: run.minutes,
+          });
+          throw new Error(message); // → plan error, flux arrêté
+        }
+
         await update(ref(db, zonePathPrefix), {
           status: "done",
-          doneAt: zoneDoneAt,
+          doneAt: zoneEndAt,
+          confirmedMinutes: run.minutes,
         });
-        const zoneConfig = (autoConfig.zones || DEFAULT_AUTO_CONFIG.zones).find((item) => Number(item.zone) === Number(zone.zone)) || {};
-        const mmPerHour = Number(zoneConfig.irrigationDepthMmPerHour || 5);
-        await update(ref(db, `${ZONE_STATE_PATH}/${zone.zone}`), {
-          lastIrrigationAt: zoneDoneAt,
-          lastIrrigationMm: Number(((Number(zone.durationMinutes) / 60) * mmPerHour).toFixed(2)),
-          lastAutoPlanId: morningDate,
-        });
-        console.log(`[auto-schedule] zone ${zone.zone} terminée`);
+        console.log(`[auto-schedule] zone ${zone.zone} terminée (${run.minutes} min confirmées)`);
       }
 
       await update(planRef, {

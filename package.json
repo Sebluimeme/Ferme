@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "ha:bridge": "node scripts/home-assistant-irrigation-bridge.mjs"
+    "ha:bridge": "node scripts/home-assistant-irrigation-bridge.mjs",
+    "test": "node scripts/test-irrigation-scheduler.mjs && node scripts/test-irrigation-proof.mjs && node scripts/test-fourrage-calculs.mjs"
   },
   "keywords": [],
   "author": "",
