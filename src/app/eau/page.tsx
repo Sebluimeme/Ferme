@@ -168,7 +168,7 @@ function TankLevelVisual({ level, tankLabel }: { level: number | null; tankLabel
       <svg viewBox="0 0 290 170" className="block w-full h-auto" aria-hidden="true">
         <defs>
           <clipPath id={clipId}>
-            <rect x="24" y="20" width="242" height="112" rx="56" />
+            <rect x="24" y="20" width="242" height="112" rx="16" />
           </clipPath>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#38bdf8" />
@@ -176,7 +176,7 @@ function TankLevelVisual({ level, tankLabel }: { level: number | null; tankLabel
           </linearGradient>
         </defs>
 
-        <rect x="24" y="20" width="242" height="112" rx="56" fill="#f5f5f4" />
+        <rect x="24" y="20" width="242" height="112" rx="16" fill="#f5f5f4" />
         <g clipPath={`url(#${clipId})`}>
           <rect
             data-testid="tank-water"
@@ -199,7 +199,7 @@ function TankLevelVisual({ level, tankLabel }: { level: number | null; tankLabel
             />
           )}
         </g>
-        <rect x="24" y="20" width="242" height="112" rx="56" fill="none" stroke="#44403c" strokeWidth="5" />
+        <rect x="24" y="20" width="242" height="112" rx="16" fill="none" stroke="#44403c" strokeWidth="5" />
         <path d="M65 133v12M225 133v12M52 145h26M212 145h26" fill="none" stroke="#78716c" strokeWidth="5" strokeLinecap="round" />
         <path d="M266 54h9v44h-9" fill="none" stroke="#78716c" strokeWidth="4" strokeLinecap="round" />
         <line x1="145" y1={tankTop} x2="145" y2={tankTop + tankHeight} stroke="#0c0a09" strokeWidth="1.5" opacity="0.65" />
