@@ -27,6 +27,9 @@ import {
   isPlanStale,
   PLAN_FRESH_WINDOW_MS,
   computeManualConfirmationDelayMs,
+  estimateLiveHumidityPct,
+  computePartialAppliedMm,
+  resumeStuckExecutingPlan,
 } from "../src/lib/irrigationScheduler.ts";
 
 const DEFAULT_CONFIG = {
@@ -489,6 +492,81 @@ test("Bridge redémarré après la fin de l'arrosage → délai nul (confirmatio
 test("Bridge redémarré pile à l'heure de fin prévue → délai nul", () => {
   const at = "2026-07-29T21:30:00Z";
   assertEqual(computeManualConfirmationDelayMs(at, new Date(at).getTime()), 0);
+});
+
+console.log("\n── V3.1: estimateLiveHumidityPct (estimation pendant l'arrosage) ────────────\n");
+
+test("Aucun temps écoulé → pas de projection, pct = état confirmé", () => {
+  const confirmedState = { reserveMm: 14, capacityMm: 35 }; // 40%
+  const r = estimateLiveHumidityPct({
+    confirmedState, mmPerHour: 5, startedAtIso: "2026-07-29T22:00:00",
+    plannedDurationMinutes: 60, nowMs: new Date("2026-07-29T22:00:00").getTime(),
+  });
+  assertEqual(r.pct, 40);
+  assertEqual(r.projectedMm, 0);
+});
+
+test("Moitié du cycle écoulée → moitié de l'apport projeté (ne touche jamais le ledger confirmé)", () => {
+  const confirmedState = { reserveMm: 14, capacityMm: 35 }; // 40%
+  const r = estimateLiveHumidityPct({
+    confirmedState, mmPerHour: 5, startedAtIso: "2026-07-29T22:00:00",
+    plannedDurationMinutes: 60, nowMs: new Date("2026-07-29T22:30:00").getTime(),
+  });
+  assertClose(r.projectedMm, 2.5, 0.01, "30min à 5mm/h = 2.5mm");
+  assert(r.pct > 40, `pct doit progresser visiblement: ${r.pct}`);
+});
+
+test("Temps écoulé au-delà de la durée prévue → plafonné à la durée planifiée", () => {
+  const confirmedState = { reserveMm: 14, capacityMm: 35 };
+  const r = estimateLiveHumidityPct({
+    confirmedState, mmPerHour: 5, startedAtIso: "2026-07-29T22:00:00",
+    plannedDurationMinutes: 60, nowMs: new Date("2026-07-29T23:30:00").getTime(),
+  });
+  assertClose(r.projectedMm, 5 * (60 / 60), 0.01, "plafonné à 60min");
+});
+
+test("Projection bornée à capacityMm (jamais > 100%)", () => {
+  const confirmedState = { reserveMm: 34, capacityMm: 35 };
+  const r = estimateLiveHumidityPct({
+    confirmedState, mmPerHour: 20, startedAtIso: "2026-07-29T22:00:00",
+    plannedDurationMinutes: 240, nowMs: new Date("2026-07-30T00:00:00").getTime(),
+  });
+  assert(r.pct <= 100, `pct borné: ${r.pct}`);
+});
+
+console.log("\n── V3.1: computePartialAppliedMm (stop_all — crédit partiel) ────────────────\n");
+
+test("Arrêté à mi-cycle → crédite seulement la moitié, jamais le plein tarif", () => {
+  const mm = computePartialAppliedMm({
+    mmPerHour: 5, startedAtIso: "2026-07-29T22:00:00", stoppedAtIso: "2026-07-29T22:30:00",
+    plannedDurationMinutes: 60,
+  });
+  assertClose(mm, 2.5, 0.01, "30min à 5mm/h = 2.5mm, pas 5mm");
+});
+
+test("Arrêté immédiatement (0s écoulée) → 0mm crédité", () => {
+  const mm = computePartialAppliedMm({
+    mmPerHour: 5, startedAtIso: "2026-07-29T22:00:00", stoppedAtIso: "2026-07-29T22:00:00",
+    plannedDurationMinutes: 60,
+  });
+  assertEqual(mm, 0);
+});
+
+test("Arrêté après la fin prévue → plafonné à la durée planifiée, jamais plus", () => {
+  const mm = computePartialAppliedMm({
+    mmPerHour: 5, startedAtIso: "2026-07-29T22:00:00", stoppedAtIso: "2026-07-29T23:30:00",
+    plannedDurationMinutes: 60,
+  });
+  assertClose(mm, 5, 0.01, "plafonné à 60min = 5mm");
+});
+
+console.log("\n── V3.1: resumeStuckExecutingPlan (reprise après crash) ─────────────────────\n");
+
+test("Plan bloqué en executing → sortie sûre en erreur motivée", () => {
+  const r = resumeStuckExecutingPlan("2026-07-30T03:00:00Z");
+  assertEqual(r.status, "error");
+  assert(r.reason.length > 0, "raison non vide");
+  assertEqual(r.errorAt, "2026-07-30T03:00:00Z");
 });
 
 // ─── Résumé ─────────────────────────────────────────────────────────────────

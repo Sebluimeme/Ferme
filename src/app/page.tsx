@@ -348,7 +348,7 @@ export default function DashboardPage() {
 
       {citerneStatus?.hasData && (
         <button
-          onClick={() => router.push("/source")}
+          onClick={() => router.push("/eau")}
           className="w-full bg-white border border-stone-200 rounded-xl p-4 text-left hover:border-stone-300 hover:shadow-sm transition-all"
         >
           <div className="flex items-center justify-between gap-3">

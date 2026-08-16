@@ -57,7 +57,11 @@ import {
   computeIrrigationPlanV2,
   canExecutePlan,
   computeManualConfirmationDelayMs,
+  computePartialAppliedMm,
+  resumeStuckExecutingPlan,
 } from "../src/lib/irrigationScheduler.ts";
+import { getCiterneEntityIds, normalizeCiterneStatus } from "../src/lib/citerneEau.ts";
+import { canStartIrrigation, metersToCentimeters } from "../src/lib/irrigationSafety.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, "..");
@@ -102,13 +106,14 @@ const ALLOWED_SWITCHES = new Set([
 const AUTO_SCHEDULE_CONFIG_PATH = "irrigation-ha/auto-schedule/config";
 const AUTO_SCHEDULE_PLANS_PATH  = "irrigation-ha/auto-schedule/plans";
 const WATER_BALANCE_STATE_PATH  = "irrigation-ha/water-balance/state";  // bilan par zone
+const WATER_BALANCE_LIVE_PATH   = "irrigation-ha/water-balance/live";   // instantané zoneStates, jamais verrouillé (même executing/done)
 const WATER_BALANCE_EVENTS_PATH = "irrigation-ha/water-balance/events"; // ledger idempotent par zone
 const WATER_BALANCE_PENDING_PATH = "irrigation-ha/water-balance/pending-manual"; // confirmations manuelles en attente (survit à un redémarrage)
 const WEATHER_READINGS_PATH     = "weather-readings";
 
 // ── Default auto-schedule config V2 ──────────────────────────────────────────
 const DEFAULT_AUTO_CONFIG = {
-  enabled: false,           // Désactivé par défaut — activer depuis l'UI /eau
+  enabled: false,           // Désactivé par défaut — activer depuis l'UI /arrosage
   rainThresholdMm: 15,      // Si pluie récente ≥ 15 mm, pas d'arrosage
   zones: [
     {
@@ -200,6 +205,32 @@ async function haFetch(path, init = {}) {
   return response.json();
 }
 
+// ── Barrière de sécurité (fail-closed) — Citerne 2 < 10cm OU Citerne 1 < 75% ──
+const CITERNE_1_ENTITY_IDS = getCiterneEntityIds(1);
+const CITERNE_2_ENTITY_IDS = getCiterneEntityIds(2);
+const CITERNE_GATE_ENTITY_IDS = [...Object.values(CITERNE_1_ENTITY_IDS), ...Object.values(CITERNE_2_ENTITY_IDS)];
+
+/**
+ * Relit les citernes en direct sur Home Assistant et applique canStartIrrigation().
+ * Appelée avant CHAQUE lancement (manuel ou zone auto) — jamais un seul contrôle
+ * global en tête de plan. Aucun appel HA de commande, aucune écriture
+ * pending/ledger ne doit avoir lieu si le résultat est refusé.
+ */
+async function checkIrrigationGate() {
+  const states = await haFetch("/api/states");
+  const byId = new Map(states.map((s) => [s.entity_id, s]));
+  const entitiesOf = (ids) =>
+    Object.fromEntries(Object.values(ids).map((id) => [id, byId.get(id)]).filter(([, v]) => v !== undefined));
+
+  const c1 = normalizeCiterneStatus(entitiesOf(CITERNE_1_ENTITY_IDS), Date.now(), 1);
+  const c2 = normalizeCiterneStatus(entitiesOf(CITERNE_2_ENTITY_IDS), Date.now(), 2);
+
+  return canStartIrrigation(
+    { value: c1.niveau.value, freshness: c1.freshness },
+    { value: metersToCentimeters(c2.hauteurEau.value), freshness: c2.freshness },
+  );
+}
+
 async function publishStatus(extra = {}) {
   try {
     const states = await haFetch("/api/states");
@@ -252,6 +283,11 @@ async function writeConfirmedIrrigationEvent({ zone, appliedMm, at, source, id }
   console.log(`[water-balance] zone ${zone} arrosage confirmé +${appliedMm}mm (${source}, id=${id})`);
 }
 
+// Poignées des setTimeout de confirmation manuelle en attente, indexées par
+// commandId — permet à stop_all() d'annuler la confirmation "plein tarif" et
+// de la remplacer par un crédit partiel (temps réellement écoulé).
+const pendingManualTimeouts = new Map();
+
 /**
  * Programme la confirmation d'un arrosage manuel à `expectedConfirmAt`. Le
  * pending record en Firebase (WATER_BALANCE_PENDING_PATH) est la source de
@@ -264,7 +300,8 @@ async function writeConfirmedIrrigationEvent({ zone, appliedMm, at, source, id }
  */
 function scheduleManualConfirmation({ id, zone, appliedMm, expectedConfirmAt }) {
   const remainingMs = computeManualConfirmationDelayMs(expectedConfirmAt, Date.now());
-  setTimeout(async () => {
+  const timeout = setTimeout(async () => {
+    pendingManualTimeouts.delete(id);
     try {
       await writeConfirmedIrrigationEvent({ zone, appliedMm, at: expectedConfirmAt, source: "manual", id });
       await set(ref(db, `${WATER_BALANCE_PENDING_PATH}/${id}`), null);
@@ -272,6 +309,7 @@ function scheduleManualConfirmation({ id, zone, appliedMm, expectedConfirmAt }) 
       console.error(`[water-balance] confirmation manuelle ${id} échouée:`, err instanceof Error ? err.message : err);
     }
   }, remainingMs);
+  pendingManualTimeouts.set(id, timeout);
 }
 
 /**
@@ -291,6 +329,40 @@ async function resumePendingManualConfirmations() {
   }
 }
 
+/**
+ * Arrêt total : annule toute confirmation manuelle "plein tarif" encore en
+ * attente et la remplace par un crédit proportionnel au temps réellement
+ * écoulé (computePartialAppliedMm) — un stop_all ne doit jamais créditer de
+ * l'eau qui n'a pas coulé. Idempotent (id déterministe), sans effet si aucune
+ * confirmation n'est en attente.
+ */
+async function creditPendingManualConfirmationsOnStop() {
+  const snap = await get(ref(db, WATER_BALANCE_PENDING_PATH));
+  const pending = snap.val() || {};
+  const now = new Date().toISOString();
+
+  for (const [id, entry] of Object.entries(pending)) {
+    const timeout = pendingManualTimeouts.get(id);
+    if (timeout) {
+      clearTimeout(timeout);
+      pendingManualTimeouts.delete(id);
+    }
+    const partialMm = computePartialAppliedMm({
+      mmPerHour: Number(entry.mmPerHour || 0),
+      startedAtIso: entry.startedAt,
+      stoppedAtIso: now,
+      plannedDurationMinutes: Number(entry.durationMinutes || 0),
+    });
+    try {
+      await writeConfirmedIrrigationEvent({ zone: entry.zone, appliedMm: partialMm, at: now, source: "manual", id });
+      await set(ref(db, `${WATER_BALANCE_PENDING_PATH}/${id}`), null);
+      console.log(`[water-balance] stop_all: confirmation manuelle ${id} créditée partiellement (+${partialMm}mm, au lieu de +${entry.appliedMm}mm plein tarif)`);
+    } catch (err) {
+      console.error(`[water-balance] stop_all: crédit partiel ${id} échoué:`, err instanceof Error ? err.message : err);
+    }
+  }
+}
+
 async function executeCommand(id, command) {
   const commandRef = ref(db, `irrigation-ha/commands/${id}`);
   await update(commandRef, {
@@ -301,11 +373,22 @@ async function executeCommand(id, command) {
 
   try {
     if (command.action === "stop_all") {
+      // Toujours disponible, même si la barrière de sécurité refuserait un
+      // nouveau lancement — l'arrêt total n'est jamais bloqué.
       await haFetch("/api/services/script/arrosage_arret_total", {
         method: "POST",
         body: JSON.stringify({}),
       });
+      await creditPendingManualConfirmationsOnStop();
     } else if (command.action === "run_zone") {
+      // Barrière de sécurité fail-closed : aucun appel HA, aucune écriture
+      // pending/ledger si refusé. Revérifiée ici (pas seulement côté UI) car
+      // c'est le bridge qui a réellement accès à Home Assistant.
+      const gate = await checkIrrigationGate();
+      if (!gate.allowed) {
+        throw new Error(gate.reasons.join(" ; "));
+      }
+
       const zone = Number(command.zone) === 2 ? 2 : 1;
       const duration = Math.max(5, Math.min(240, Math.round(Number(command.durationMinutes || 5))));
       const vanne = `switch.sous_station_bat_a_electrovanne_${zone}`;
@@ -322,6 +405,7 @@ async function executeCommand(id, command) {
       const zoneConfig = (autoConfig?.zones || DEFAULT_AUTO_CONFIG.zones).find((item) => Number(item.zone) === zone) || {};
       const mmPerHour = Number(zoneConfig.irrigationDepthMmPerHour || 5);
       const appliedMm = Number(((duration / 60) * mmPerHour).toFixed(2));
+      const startedAt = new Date().toISOString();
       const expectedConfirmAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
       console.log(`[command] ${id} start zone=${zone} vanne=${vanne} duration=${duration} — confirmation prévue ${expectedConfirmAt}`);
       // Ne pas écrire l'événement d'arrosage tout de suite : la commande n'est
@@ -330,7 +414,10 @@ async function executeCommand(id, command) {
       // jamais compter. Le rendez-vous est persisté dans Firebase (pas
       // seulement en mémoire) : resumePendingManualConfirmations() le
       // reprogramme au démarrage si le bridge redémarre pendant l'attente.
-      const pending = { zone, appliedMm, source: "manual", id, expectedConfirmAt };
+      // startedAt/durationMinutes/mmPerHour permettent à stop_all de créditer
+      // uniquement le temps réellement écoulé (computePartialAppliedMm) au
+      // lieu du plein tarif si l'arrosage est interrompu avant son terme.
+      const pending = { zone, appliedMm, source: "manual", id, expectedConfirmAt, startedAt, durationMinutes: duration, mmPerHour };
       await set(ref(db, `${WATER_BALANCE_PENDING_PATH}/${id}`), pending);
       scheduleManualConfirmation(pending);
     } else if ((command.action === "turn_on" || command.action === "turn_off") && command.entityId) {
@@ -393,7 +480,13 @@ let executingAutoZone = false;
  * décision par zone, et plan (conseil si auto OFF, exécutable si auto ON).
  * Tourne QUE l'automatique soit activé ou non — seule l'exécution réelle
  * (checkAndExecuteSchedule) est conditionnée par `enabled`.
- * N'écrase jamais un plan en cours d'exécution ou terminé.
+ *
+ * Le bilan hydrique (WATER_BALANCE_STATE_PATH) et l'instantané live des
+ * décisions par zone (WATER_BALANCE_LIVE_PATH) sont TOUJOURS mis à jour, même
+ * pendant un plan "executing"/"done" — sinon l'humidité reste figée pendant
+ * tout un cycle manuel/auto. Seule l'écriture du PLAN lui-même (relance des
+ * vannes, écrasement du planning) reste verrouillée tant que status est
+ * executing/done.
  */
 async function checkAndPlanSchedule() {
   if (!autoConfig) return; // config pas encore chargée au démarrage
@@ -406,9 +499,7 @@ async function checkAndPlanSchedule() {
     // Lire le plan existant
     const existingSnap = await get(planRef);
     const existing = existingSnap.val();
-
-    // Ne pas écraser un plan en cours ou terminé
-    if (existing && ["executing", "done"].includes(existing.status)) return;
+    const planLocked = existing && ["executing", "done"].includes(existing.status);
 
     // Lire les données météo mesurées (jamais de prévision) : totaux journaliers
     // pour le bilan hydrique + pluie utile récente pour le garde-fou "forte pluie".
@@ -419,6 +510,7 @@ async function checkAndPlanSchedule() {
 
     const zonesConfig = autoConfig.zones || DEFAULT_AUTO_CONFIG.zones;
     const zoneStates = [];
+    const liveZoneStates = [];
 
     for (const zoneCfg of zonesConfig) {
       const capacityMm = zoneCfg.soilCapacityMm ?? 35;
@@ -450,13 +542,39 @@ async function checkAndPlanSchedule() {
       const eventsVal = eventsSnap.val() || {};
       const events = Object.entries(eventsVal).map(([eventId, e]) => ({ id: eventId, ...e }));
 
+      // Toujours consolidé — pluie/arrosages confirmés doivent apparaître même
+      // pendant un plan verrouillé (executing/done), sinon l'humidité reste
+      // figée pendant tout le cycle en cours.
       const consolidated = consolidateWaterBalance({
         state, capacityMm, dailyLossMm, rainByDate, events, nowIso: now.toISOString(),
       });
       await set(balanceRef, consolidated);
 
       const humidity = humidityPctFromBalance(consolidated);
-      zoneStates.push(computeZoneDecision(zoneCfg, humidity));
+      const decision = computeZoneDecision(zoneCfg, humidity);
+      zoneStates.push(decision);
+      // reserveMm/capacityMm/irrigationDepthMmPerHour en plus du plan V2 —
+      // nécessaires côté UI pour projeter l'humidité en direct pendant un
+      // cycle en cours (estimateLiveHumidityPct), jamais écrits au ledger.
+      liveZoneStates.push({
+        ...decision,
+        reserveMm: consolidated.reserveMm,
+        capacityMm: consolidated.capacityMm,
+        irrigationDepthMmPerHour: zoneCfg.irrigationDepthMmPerHour ?? 5,
+      });
+    }
+
+    // Instantané live toujours à jour, indépendant du verrouillage du plan —
+    // l'UI doit pouvoir lire l'humidité/décision courante sans dépendre d'un
+    // plan daté figé (plan.zoneStates ne bouge plus une fois executing/done).
+    await set(ref(db, WATER_BALANCE_LIVE_PATH), {
+      updatedAt: now.toISOString(),
+      zoneStates: liveZoneStates,
+    });
+
+    if (planLocked) {
+      console.log(`[auto-schedule] bilan mis à jour (plan ${morningDate} verrouillé: ${existing.status}, non réécrit)`);
+      return;
     }
 
     const mode = autoConfig.enabled ? "executable" : "advisory";
@@ -535,6 +653,22 @@ async function checkAndExecuteSchedule() {
         const zone = zones[i];
         const zonePathPrefix = `${AUTO_SCHEDULE_PLANS_PATH}/${morningDate}/zones/${i}`;
 
+        // Barrière de sécurité fail-closed, revérifiée avant CHAQUE zone (pas
+        // une seule fois en tête de plan) : l'état des citernes peut se
+        // dégrader entre deux zones d'un même plan. Refus → aucun appel HA,
+        // zone et plan marqués en erreur motivée, reste du plan abandonné
+        // (les zones suivantes seraient refusées pour la même raison).
+        const gate = await checkIrrigationGate();
+        if (!gate.allowed) {
+          const reason = gate.reasons.join(" ; ");
+          await update(ref(db, zonePathPrefix), {
+            status: "error",
+            error: reason,
+            errorAt: new Date().toISOString(),
+          });
+          throw new Error(reason);
+        }
+
         // Marquer la zone en cours
         await update(ref(db, zonePathPrefix), {
           status: "executing",
@@ -603,8 +737,34 @@ async function checkAndExecuteSchedule() {
 }
 
 /**
+ * Récupère un plan resté bloqué au statut "executing" si le bridge a
+ * redémarré pendant une exécution auto (crash, déploiement). Après un tel
+ * redémarrage, l'état réel des vannes côté Home Assistant n'est plus fiable
+ * (setTimeout perdu, executingAutoZone remis à false en mémoire) : on bascule
+ * le plan en erreur motivée via resumeStuckExecutingPlan() pour qu'il ne
+ * reste jamais bloqué. Doit tourner AVANT le premier checkAndPlanSchedule —
+ * celui-ci n'écrase jamais un plan "executing"/"done".
+ */
+async function recoverStuckExecutingPlanOnStartup(config) {
+  const now = new Date();
+  const morningDate = getNextMorningDate(now, config.windowEndHour ?? 6);
+  const planRef = ref(db, `${AUTO_SCHEDULE_PLANS_PATH}/${morningDate}`);
+  const snap = await get(planRef);
+  const plan = snap.val();
+  if (!plan || plan.status !== "executing") return;
+
+  const recovery = resumeStuckExecutingPlan(now.toISOString());
+  await update(planRef, recovery);
+  console.warn(
+    `[auto-schedule] plan ${morningDate} bloqué en "executing" au démarrage — ` +
+    `récupéré en "${recovery.status}": ${recovery.reason}`
+  );
+}
+
+/**
  * Initialise l'auto-schedule :
  * - Crée la config par défaut si absente
+ * - Récupère un éventuel plan bloqué en "executing" après un redémarrage
  * - Surveille la config en temps réel : recalcule l'analyse à chaque changement,
  *   même si `enabled` est false (l'analyse ne dépend jamais de `enabled`)
  * - Lance la vérification/planification toutes les 5 min
@@ -617,8 +777,11 @@ async function initAutoSchedule() {
   const snap = await get(configRef);
   if (!snap.val()) {
     await set(configRef, DEFAULT_AUTO_CONFIG);
-    console.log("[auto-schedule] config par défaut créée (désactivée — activer depuis l'UI /eau)");
+    console.log("[auto-schedule] config par défaut créée (désactivée — activer depuis l'UI /arrosage)");
   }
+  autoConfig = snap.val() || DEFAULT_AUTO_CONFIG;
+
+  await recoverStuckExecutingPlanOnStartup(autoConfig);
 
   // Surveiller la config en temps réel. Recalcule immédiatement quand la config change.
   onValue(configRef, (snapshot) => {

@@ -632,6 +632,74 @@ export function computeManualConfirmationDelayMs(expectedConfirmAtIso: string, n
   return Math.max(0, new Date(expectedConfirmAtIso).getTime() - nowMs);
 }
 
+// ── V3.1: humidité honnête pendant un cycle en cours (jamais écrite au ledger) ─
+
+/**
+ * Projette l'humidité pendant un arrosage (manuel ou auto) en cours, à partir
+ * de la part déjà écoulée de l'apport prévu. Cette projection n'est JAMAIS
+ * écrite dans le bilan hydrique confirmé (WaterBalanceState) — elle sert
+ * uniquement à l'affichage ("estimation pendant l'arrosage"). Le ledger reste
+ * conservateur : seul le vrai événement confirmé à la fin du cycle fait foi.
+ */
+export function estimateLiveHumidityPct(params: {
+  confirmedState: Pick<WaterBalanceState, "reserveMm" | "capacityMm">;
+  mmPerHour: number;
+  startedAtIso: string;
+  plannedDurationMinutes: number;
+  nowMs: number;
+}): { pct: number; projectedMm: number } {
+  const { confirmedState, mmPerHour, startedAtIso, plannedDurationMinutes, nowMs } = params;
+  const startedMs = new Date(startedAtIso).getTime();
+  const elapsedMinutes = Math.max(0, Math.min(plannedDurationMinutes, (nowMs - startedMs) / 60000));
+  const projectedMm = (elapsedMinutes / 60) * mmPerHour;
+  const projectedReserve = clampMm(confirmedState.reserveMm + projectedMm, confirmedState.capacityMm);
+  const pct = confirmedState.capacityMm <= 0 ? 0 : Math.round((projectedReserve / confirmedState.capacityMm) * 100);
+  return { pct, projectedMm: Number(projectedMm.toFixed(2)) };
+}
+
+// ── V3.1: arrêt total — crédit partiel au lieu du plein tarif ─────────────────
+
+/**
+ * mm réellement délivrés par un arrosage manuel interrompu avant son terme
+ * (stop_all) : proportionnel au temps écoulé, jamais la durée complète
+ * planifiée. Utilisé pour ne jamais créditer de l'eau qui n'a pas coulé.
+ */
+export function computePartialAppliedMm(params: {
+  mmPerHour: number;
+  startedAtIso: string;
+  stoppedAtIso: string;
+  plannedDurationMinutes: number;
+}): number {
+  const { mmPerHour, startedAtIso, stoppedAtIso, plannedDurationMinutes } = params;
+  const startedMs = new Date(startedAtIso).getTime();
+  const stoppedMs = new Date(stoppedAtIso).getTime();
+  const elapsedMinutes = Math.max(0, Math.min(plannedDurationMinutes, (stoppedMs - startedMs) / 60000));
+  return Number(((elapsedMinutes / 60) * mmPerHour).toFixed(2));
+}
+
+// ── V3.1: reprise sûre après redémarrage du bridge ────────────────────────────
+
+export interface StuckPlanRecovery {
+  status: "error";
+  reason: string;
+  error: string;
+  errorAt: string;
+}
+
+/**
+ * Un plan trouvé encore au statut "executing" au démarrage du bridge signifie
+ * que le bridge a redémarré (crash/déploiement) pendant une exécution auto :
+ * l'état réel des vannes côté Home Assistant n'est plus fiable. Sortie sûre
+ * minimale : basculer le plan en erreur motivée pour qu'il ne reste jamais
+ * bloqué, et laisser le prochain cycle d'analyse (checkAndPlanSchedule)
+ * reprendre normalement — il n'écrase jamais un plan "executing"/"done" mais
+ * réécrit librement un plan "error".
+ */
+export function resumeStuckExecutingPlan(nowIso: string): StuckPlanRecovery {
+  const reason = "Plan interrompu par un redémarrage du bridge — état des vannes non fiable, arrêt de sécurité.";
+  return { status: "error", reason, error: reason, errorAt: nowIso };
+}
+
 // ── Legacy V1 computation (kept for retro-compat) ─────────────────────────────
 
 /**

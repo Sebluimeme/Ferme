@@ -384,7 +384,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       listenMeteo();
       // Les coordonnées des parcelles alimentent les prévisions Open-Meteo.
       listenPartiels();
-    } else if (pathname === "/source") {
+    } else if (pathname === "/eau") {
       listen<ReleverSource>("releves-source", (data) => ({ type: "SET_RELEVES_SOURCE", payload: data }));
     } else if (pathname === "/couts" || pathname === "/profits" || pathname === "/rapports") {
       listenTransactions();

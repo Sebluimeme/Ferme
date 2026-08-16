@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      // Ancienne page citernes/débit — /source est devenu /eau.
+      { source: "/source", destination: "/eau", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -14,6 +14,7 @@ import {
   normalizeCiterneStatus,
   normalizeCiternePayload,
   getBatteryAlert,
+  getLevelAlert,
   formatRelativeAge,
 } from "../src/lib/citerneEau.ts";
 
@@ -359,6 +360,61 @@ test("5 % → alerte red, seuil 5", () => {
 test("0 % → toujours seuil 5 (un seul niveau retourné, jamais 15+10+5 empilés)", () => {
   const alert = getBatteryAlert(0);
   assertEqual(alert.threshold, 5);
+});
+
+console.log("\n── getBatteryAlert — seuil d'avertissement personnalisé (réglages Citerne 1) ──\n");
+
+test("Seuil personnalisé à 25 % : 26 % → aucune alerte", () => {
+  assertEqual(getBatteryAlert(26, 25), null);
+});
+
+test("Seuil personnalisé à 25 % : 25 % → alerte amber", () => {
+  const alert = getBatteryAlert(25, 25);
+  assertEqual(alert.tone, "amber");
+});
+
+test("Seuil personnalisé n'affecte pas les paliers fixes 10 %/5 %", () => {
+  assertEqual(getBatteryAlert(10, 25).threshold, 10);
+  assertEqual(getBatteryAlert(5, 25).threshold, 5);
+});
+
+console.log("\n── classifyFreshness — ancienneté max personnalisée (réglages Citerne 1) ──\n");
+
+test("maxAgeHours par défaut (48h) : 47h → aging, 49h → stale", () => {
+  const now = new Date("2026-07-28T00:00:00Z").getTime();
+  assertEqual(classifyFreshness(new Date(now - 47 * 3600000).toISOString(), now), "aging");
+  assertEqual(classifyFreshness(new Date(now - 49 * 3600000).toISOString(), now), "stale");
+});
+
+test("maxAgeHours personnalisé à 72h : 49h → toujours aging", () => {
+  const now = new Date("2026-07-28T00:00:00Z").getTime();
+  assertEqual(classifyFreshness(new Date(now - 49 * 3600000).toISOString(), now, 72), "aging");
+});
+
+test("maxAgeHours personnalisé à 72h : 73h → stale", () => {
+  const now = new Date("2026-07-28T00:00:00Z").getTime();
+  assertEqual(classifyFreshness(new Date(now - 73 * 3600000).toISOString(), now, 72), "stale");
+});
+
+console.log("\n── getLevelAlert — seuil niveau bas (réglages Citerne 1) ─────────────────\n");
+
+test("null → aucune alerte", () => {
+  assertEqual(getLevelAlert(null, 20), null);
+});
+
+test("Au-dessus du seuil → aucune alerte", () => {
+  assertEqual(getLevelAlert(25, 20), null);
+});
+
+test("Égal au seuil → alerte", () => {
+  const alert = getLevelAlert(20, 20);
+  assertEqual(alert.tone, "red");
+});
+
+test("Sous le seuil → alerte", () => {
+  const alert = getLevelAlert(5, 20);
+  assertEqual(alert.tone, "red");
+  assert(alert.message.includes("20"), "message mentionne le seuil configuré");
 });
 
 // ─── Résumé ─────────────────────────────────────────────────────────────────

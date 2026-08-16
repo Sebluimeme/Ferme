@@ -104,17 +104,17 @@ export type Freshness = "fresh" | "aging" | "stale" | "unknown";
 /**
  * Classifies data freshness for a sensor that reports once per day.
  * - fresh:   <= 27h  (a day plus a few hours of slack for daily-report jitter)
- * - aging:   <= 48h  (missed one report cycle, worth a soft warning)
- * - stale:   > 48h   (missed multiple cycles, don't call it live)
+ * - aging:   <= maxAgeHours (default 48h; missed one report cycle, worth a soft warning)
+ * - stale:   > maxAgeHours  (missed multiple cycles, don't call it live)
  * - unknown: no timestamp available
  */
-export function classifyFreshness(lastUpdatedIso: string | null | undefined, nowMs: number): Freshness {
+export function classifyFreshness(lastUpdatedIso: string | null | undefined, nowMs: number, maxAgeHours = 48): Freshness {
   if (!lastUpdatedIso) return "unknown";
   const t = new Date(lastUpdatedIso).getTime();
   if (!Number.isFinite(t)) return "unknown";
   const ageHours = (nowMs - t) / (1000 * 60 * 60);
   if (ageHours <= 27) return "fresh";
-  if (ageHours <= 48) return "aging";
+  if (ageHours <= maxAgeHours) return "aging";
   return "stale";
 }
 
@@ -291,16 +291,34 @@ export interface BatteryAlert {
 }
 
 /**
- * Returns the single most severe battery alert for a percentage, or null above 15%.
- * Only one tier is ever returned (never stacked) so the UI never shows duplicate alerts
- * for the same reading.
+ * Returns the single most severe battery alert for a percentage, or null above the
+ * configured warning threshold (default 15%). Only one tier is ever returned (never
+ * stacked) so the UI never shows duplicate alerts for the same reading. The two lower
+ * tiers (10%, 5%) stay fixed reference points; `warningThresholdPct` only moves the
+ * point at which the soft (amber) warning starts appearing.
  */
-export function getBatteryAlert(pct: number | null): BatteryAlert | null {
+export function getBatteryAlert(pct: number | null, warningThresholdPct = 15): BatteryAlert | null {
   if (pct === null) return null;
   if (pct <= 5) return { threshold: 5, tone: "red", message: "Batterie critique (≤ 5 %) — remplacez-la dès que possible." };
   if (pct <= 10) return { threshold: 10, tone: "red", message: "Batterie faible (≤ 10 %) — prévoyez un remplacement rapide." };
-  if (pct <= 15) return { threshold: 15, tone: "amber", message: "Batterie sous 15 % — surveillez le capteur." };
+  if (pct <= warningThresholdPct) {
+    return { threshold: 15, tone: "amber", message: `Batterie sous ${warningThresholdPct} % — surveillez le capteur.` };
+  }
   return null;
+}
+
+// ── Level threshold alerts ───────────────────────────────────────────────────
+
+export interface LevelAlert {
+  tone: BatteryAlertTone;
+  message: string;
+}
+
+/** Returns a level alert when the tank's measured level (%) falls at or below the configured threshold. */
+export function getLevelAlert(pct: number | null, thresholdPct: number): LevelAlert | null {
+  if (pct === null) return null;
+  if (pct > thresholdPct) return null;
+  return { tone: "red", message: `Niveau bas (≤ ${thresholdPct} %) — surveillez la citerne.` };
 }
 
 /** Relative age label ("il y a 3 h") for a last-updated timestamp. */

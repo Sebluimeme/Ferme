@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 const VERSION_KEY = "ferme-app-version";
-const SAFE_AUTO_RELOAD_PATHS = new Set(["/", "/source"]);
+const SAFE_AUTO_RELOAD_PATHS = new Set(["/", "/eau"]);
 
 export default function RegisterSW() {
   useEffect(() => {

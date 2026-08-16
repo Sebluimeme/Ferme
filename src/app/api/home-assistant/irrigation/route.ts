@@ -49,28 +49,18 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Le lancement d'une zone (manuel ou auto) passe exclusivement par le bridge
+    // local (irrigation-ha/commands en Firebase, voir scripts/home-assistant-
+    // irrigation-bridge.mjs) : c'est le seul point qui applique la barrière de
+    // sécurité fail-closed (canStartIrrigation). Aucune action "run_zone" ici :
+    // elle contournerait ce garde-fou en appelant Home Assistant directement.
     const body = await request.json() as {
-      action?: "turn_on" | "turn_off" | "stop_all" | "run_zone";
+      action?: "turn_on" | "turn_off" | "stop_all";
       entityId?: string;
-      zone?: 1 | 2;
-      durationMinutes?: number;
     };
 
     if (body.action === "stop_all") {
       await haFetch("/api/services/script/arrosage_arret_total", { method: "POST", body: JSON.stringify({}) });
-      return NextResponse.json({ ok: true });
-    }
-
-    if (body.action === "run_zone") {
-      const zone = body.zone === 2 ? 2 : 1;
-      const duration = Math.max(1, Math.min(360, Math.round(Number(body.durationMinutes || 1))));
-      await haFetch("/api/services/script/arrosage_lancer_zone", {
-        method: "POST",
-        body: JSON.stringify({
-          vanne: `switch.sous_station_bat_a_electrovanne_${zone}`,
-          duree_minutes: duration,
-        }),
-      });
       return NextResponse.json({ ok: true });
     }
 
