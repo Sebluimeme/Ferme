@@ -1,6 +1,7 @@
-import { get, ref } from "firebase/database";
+import { get, limitToLast, query, ref } from "firebase/database";
 import { database } from "@/lib/firebase";
 import {
+  CITERNE_HISTORY_MAX_POINTS,
   normalizeCiterneHistory,
   type CiterneHistoryPoint,
 } from "@/lib/citerneHistory";
@@ -65,7 +66,10 @@ export async function loadCiterneHistory(tankId: TankId = 1): Promise<CiterneHis
     // Continue with the authenticated Firebase fallback.
   }
 
-  const snapshot = await get(ref(database, `integrations/citerne-${tankId}-history`));
+  const snapshot = await get(query(
+    ref(database, `integrations/citerne-${tankId}-history`),
+    limitToLast(CITERNE_HISTORY_MAX_POINTS),
+  ));
   if (!snapshot.exists()) return [];
   return normalizeCiterneHistory(snapshot.val());
 }

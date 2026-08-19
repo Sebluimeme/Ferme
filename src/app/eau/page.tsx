@@ -2,15 +2,15 @@
 
 import React, { useState, useMemo, useEffect, useCallback, useId } from "react";
 import {
-  LineChart,
+  CartesianGrid,
+  Legend,
   Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-  Legend,
 } from "recharts";
 import {
   Droplets,
@@ -33,12 +33,13 @@ import { ref, onValue, set as firebaseSet } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { useAppStore } from "@/store/store";
 import { useToast } from "@/components/Toast";
+import TankLevelHistoryChart from "@/components/TankLevelHistoryChart";
 import type { ReleverSource, ReleverSourceFormData, UniteDebit } from "@/types/source";
 import { EMPTY_FORM, fmtDebit, computeSourceStats, debitToLitresPerHour } from "@/types/source";
 import { createReleve, updateReleve, deleteReleve } from "@/services/source-service";
 import type { CiterneStatus, Freshness, TankId } from "@/lib/citerneEau";
 import { formatMeasurementDateTime, formatMetricValue, getBatteryAlert, getLevelAlert, classifyFreshness } from "@/lib/citerneEau";
-import { computeEstimatedFlows, type CiterneHistoryPoint, type EstimatedFlowPoint } from "@/lib/citerneHistory";
+import { buildWaterLevelChartData, computeEstimatedFlows, hasTraceableWaterLevelHistory, type CiterneHistoryPoint, type EstimatedFlowPoint } from "@/lib/citerneHistory";
 import { loadCiterneHistory, loadCiterneStatus } from "@/lib/citerneClient";
 
 interface CiterneAlertConfig {
@@ -504,6 +505,21 @@ function CiterneAlertSettingsCard({ config, saving, onSave }: {
   );
 }
 
+function WaterLevelHistoryChart({ tank1History, tank2History }: {
+  tank1History: CiterneHistoryPoint[];
+  tank2History: CiterneHistoryPoint[];
+}) {
+  const { data, hasTraceableHistory } = useMemo(() => {
+    const chartData = buildWaterLevelChartData(tank1History, tank2History);
+    return {
+      data: chartData,
+      hasTraceableHistory: hasTraceableWaterLevelHistory(chartData),
+    };
+  }, [tank1History, tank2History]);
+
+  return <TankLevelHistoryChart data={data} hasTraceableHistory={hasTraceableHistory} />;
+}
+
 /** Loads status + history for one tank and keeps it polled/refreshed; shared by both Citerne cards. */
 function useCiterneStatus(tankId: TankId) {
   const [data, setData] = useState<CiterneApiResponse | null>(null);
@@ -721,6 +737,8 @@ export default function EauPage() {
       </div>
 
       <CiterneAlertSettingsCard config={citerne1AlertConfig} saving={savingAlertConfig} onSave={handleSaveAlertConfig} />
+
+      <WaterLevelHistoryChart tank1History={tank1.history} tank2History={tank2.history} />
 
       {/* Débit de la source — relevés manuels */}
       <div className="pt-2">

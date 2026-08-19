@@ -8,7 +8,7 @@ import {
   type CiterneRawPayload,
   type TankId,
 } from "@/lib/citerneEau";
-import { normalizeCiterneHistory } from "@/lib/citerneHistory";
+import { buildCiterneHistoryRecord, CITERNE_HISTORY_READ_QUERY, normalizeCiterneHistory } from "@/lib/citerneHistory";
 import { readServerRtdb, writeServerRtdb } from "@/lib/firebaseRtdbServer";
 
 /**
@@ -105,12 +105,12 @@ export async function handleCiternePost(tankId: TankId, request: NextRequest): P
       return NextResponse.json({ ok: false, error: "Aucune mesure reconnue" }, { status: 400 });
     }
     await writeServerRtdb(cachePath(tankId), { payload, receivedAt });
-    if (status.volumeDisponible.value !== null) {
+    const historyRecord = buildCiterneHistoryRecord(tankId, status);
+    if (historyRecord) {
       const dayKey = receivedAt.slice(0, 10);
       await writeServerRtdb(`${historyPath(tankId)}/${dayKey}`, {
         receivedAt,
-        volumeLitres: status.volumeDisponible.value,
-        niveauPct: status.niveau.value,
+        ...historyRecord,
       });
     }
     return NextResponse.json({ ok: true, status, receivedAt });
@@ -121,8 +121,8 @@ export async function handleCiternePost(tankId: TankId, request: NextRequest): P
 
 export async function handleCiterneHistoryGet(tankId: TankId): Promise<NextResponse> {
   try {
-    const stored = await readServerRtdb<unknown>(historyPath(tankId));
-    const history = normalizeCiterneHistory(stored).slice(-180);
+    const stored = await readServerRtdb<unknown>(historyPath(tankId), CITERNE_HISTORY_READ_QUERY);
+    const history = normalizeCiterneHistory(stored);
     return NextResponse.json({ ok: true, history });
   } catch {
     return NextResponse.json(

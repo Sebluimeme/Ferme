@@ -24,15 +24,18 @@ async function getFirebaseIdToken(): Promise<string> {
   return data.idToken;
 }
 
-function rtdbUrl(path: string, idToken: string): string {
+function rtdbUrl(path: string, idToken: string, queryParams?: Record<string, string>): string {
   const url = new URL(`${getDatabaseUrl()}/${path}.json`);
   url.searchParams.set("auth", idToken);
+  for (const [key, value] of Object.entries(queryParams ?? {})) {
+    url.searchParams.set(key, value);
+  }
   return url.toString();
 }
 
-export async function readServerRtdb<T>(path: string): Promise<T | null> {
+export async function readServerRtdb<T>(path: string, queryParams?: Record<string, string>): Promise<T | null> {
   const idToken = await getFirebaseIdToken();
-  const response = await fetch(rtdbUrl(path, idToken), { cache: "no-store" });
+  const response = await fetch(rtdbUrl(path, idToken, queryParams), { cache: "no-store" });
   if (!response.ok) throw new Error(`Firebase a répondu ${response.status} pendant la lecture de ${path}`);
   return (await response.json()) as T | null;
 }
