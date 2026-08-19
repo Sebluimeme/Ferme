@@ -1,8 +1,10 @@
 import firebaseService from "@/lib/firebase-service";
-import type { Partiel, ActiviteFourrage } from "@/types/fourrage";
+import type { Partiel, ActiviteFourrage, DistributionFourrage, CheptelDistribution, UniteDistribution } from "@/types/fourrage";
+import { distributionDuJour } from "@/lib/fourrage-calculs";
 
 const PATH_PARTIELS = "partiels";
 const PATH_ACTIVITES = "activites-fourrage";
+const PATH_DISTRIBUTIONS = "distributions-fourrage";
 
 // ==================== Partiels ====================
 
@@ -60,4 +62,69 @@ export async function addBottesActivite(id: string, nombreBottes: number, poidsB
     updates.poidsTonne = (nombreBottes * poidsBotteKg) / 1000;
   }
   return firebaseService.update(PATH_ACTIVITES, id, updates);
+}
+
+// ==================== Distribution quotidienne (fourrage donné aux animaux) ====================
+
+export async function createDistribution(
+  data: Omit<DistributionFourrage, "id" | "dateCreation" | "derniereMAJ">
+) {
+  const payload: Record<string, unknown> = { ...data };
+  return firebaseService.create<Record<string, unknown>>(PATH_DISTRIBUTIONS, payload);
+}
+
+export async function updateDistribution(
+  id: string,
+  data: Partial<Omit<DistributionFourrage, "id" | "dateCreation" | "derniereMAJ">>
+) {
+  const updates: Record<string, unknown> = { ...data };
+  return firebaseService.update(PATH_DISTRIBUTIONS, id, updates);
+}
+
+export async function deleteDistribution(id: string) {
+  return firebaseService.delete(PATH_DISTRIBUTIONS, id);
+}
+
+/**
+ * Raccourci « +1 balle/botte » : incrémente l'entrée du jour pour ce cheptel
+ * si elle existe déjà (l'unité de l'entrée existante prime), sinon la crée
+ * avec `uniteSiNouvelle` (unité actuellement sélectionnée dans l'UI, qui
+ * retombe elle-même sur la dernière unité utilisée pour ce cheptel).
+ */
+export async function incrementerDistributionJour(
+  cheptel: CheptelDistribution,
+  uniteSiNouvelle: UniteDistribution,
+  distributionsExistantes: DistributionFourrage[],
+  date: string = new Date().toISOString().split("T")[0]
+) {
+  const existante = distributionDuJour(distributionsExistantes, cheptel, date);
+  if (existante) {
+    return firebaseService.update(PATH_DISTRIBUTIONS, existante.id, {
+      quantite: existante.quantite + 1,
+    });
+  }
+  return createDistribution({
+    dateDistribution: date,
+    cheptel,
+    unite: uniteSiNouvelle,
+    quantite: 1,
+  });
+}
+
+/**
+ * Fixe la quantité du jour pour un cheptel (saisie manuelle) — crée l'entrée
+ * si elle n'existe pas encore, sinon met à jour quantité et/ou unité.
+ */
+export async function definirDistributionJour(
+  cheptel: CheptelDistribution,
+  quantite: number,
+  unite: UniteDistribution,
+  distributionsExistantes: DistributionFourrage[],
+  date: string = new Date().toISOString().split("T")[0]
+) {
+  const existante = distributionDuJour(distributionsExistantes, cheptel, date);
+  if (existante) {
+    return firebaseService.update(PATH_DISTRIBUTIONS, existante.id, { quantite, unite });
+  }
+  return createDistribution({ dateDistribution: date, cheptel, unite, quantite });
 }

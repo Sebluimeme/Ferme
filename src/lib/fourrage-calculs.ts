@@ -186,3 +186,59 @@ export function donneesMensuellesRecoltes(
     return { mois, foin: foin || null, regain: regain || null };
   });
 }
+
+// ==================== Distribution quotidienne (consommation) ====================
+
+/**
+ * Forme minimale d'une entrée de distribution attendue par les calculs
+ * (structurelle, pas d'import — même logique que ActiviteCalc ci-dessus).
+ */
+export interface DistributionCalc {
+  dateDistribution: string; // ISO date (YYYY-MM-DD)
+  cheptel: string;
+  unite: string;
+  quantite: number;
+}
+
+export function distributionsDuCheptel<T extends DistributionCalc>(distributions: T[], cheptel: string): T[] {
+  return distributions.filter((d) => d.cheptel === cheptel);
+}
+
+/** Entrée existante pour un cheptel à une date donnée (une seule par jour). */
+export function distributionDuJour<T extends DistributionCalc>(
+  distributions: T[],
+  cheptel: string,
+  date: string
+): T | undefined {
+  return distributions.find((d) => d.cheptel === cheptel && d.dateDistribution === date);
+}
+
+/**
+ * Dernière unité (balle/botte) choisie pour ce cheptel — la plus récente par
+ * date de distribution, puis par date de dernière MAJ en cas d'égalité.
+ * `null` si aucune distribution enregistrée pour ce cheptel (l'appelant retombe
+ * alors sur une unité par défaut).
+ */
+export function derniereUniteCheptel<T extends DistributionCalc>(distributions: T[], cheptel: string): string | null {
+  const du = distributionsDuCheptel(distributions, cheptel);
+  if (du.length === 0) return null;
+  const plusRecente = [...du].sort((a, b) => b.dateDistribution.localeCompare(a.dateDistribution))[0];
+  return plusRecente.unite;
+}
+
+/** Total distribué pour un cheptel, toutes unités confondues (unités mélangées si l'éleveur en change). */
+export function totalDistribueCheptel<T extends DistributionCalc>(distributions: T[], cheptel: string): number {
+  return distributionsDuCheptel(distributions, cheptel).reduce((sum, d) => sum + (d.quantite ?? 0), 0);
+}
+
+/** Total distribué pour un cheptel sur une période [depuis, jusque] incluse (dates ISO). */
+export function totalDistribuePeriode<T extends DistributionCalc>(
+  distributions: T[],
+  cheptel: string,
+  depuis: string,
+  jusque: string
+): number {
+  return distributionsDuCheptel(distributions, cheptel)
+    .filter((d) => d.dateDistribution >= depuis && d.dateDistribution <= jusque)
+    .reduce((sum, d) => sum + (d.quantite ?? 0), 0);
+}

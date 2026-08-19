@@ -34,3 +34,25 @@ export interface ActiviteFourrage {
   dateCreation?: string;
   derniereMAJ?: string;
 }
+
+/** Cheptels suivis séparément pour la distribution quotidienne de fourrage. */
+export type CheptelDistribution = "ovin" | "bovin";
+
+/** Unité choisie par l'éleveur pour compter ce qui est distribué. */
+export type UniteDistribution = "balle" | "botte";
+
+/**
+ * Une entrée par cheptel et par jour : quantité de balles/bottes distribuées.
+ * Sert à calculer ensuite la consommation réelle par production (vs l'estimation
+ * théorique de getConsoKgJour), une fois croisée avec les effectifs actifs.
+ */
+export interface DistributionFourrage {
+  id: string;
+  dateDistribution: string; // ISO date (YYYY-MM-DD)
+  cheptel: CheptelDistribution;
+  unite: UniteDistribution;
+  quantite: number;
+  notes?: string;
+  dateCreation?: string;
+  derniereMAJ?: string;
+}

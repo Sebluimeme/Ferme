@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useAppStore } from "@/store/store";
 import KpiCard from "@/components/KpiCard";
 import Modal, { ConfirmModal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
-import type { ActiviteFourrage, Partiel } from "@/types/fourrage";
+import type { ActiviteFourrage, CheptelDistribution, Partiel, UniteDistribution } from "@/types/fourrage";
 import {
   origineActivite,
   estAchat,
@@ -18,6 +18,8 @@ import {
   rendementMoyen,
   rendementParParcelle,
   donneesMensuellesRecoltes,
+  derniereUniteCheptel,
+  distributionDuJour,
   type OrigineFourrage,
 } from "@/lib/fourrage-calculs";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -29,6 +31,8 @@ import {
   updateActivite,
   deleteActivite,
   addBottesActivite,
+  definirDistributionJour,
+  incrementerDistributionJour,
 } from "@/services/fourrage-service";
 
 // ==================== Types internes ====================
@@ -432,6 +436,19 @@ export default function FourragePage() {
   const [bottesModal, setBottesModal] = useState<ActiviteFourrage | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ActiviteFourrage | null>(null);
   const [saving, setSaving] = useState(false);
+  const [distributionSaving, setDistributionSaving] = useState<CheptelDistribution | null>(null);
+  const [unitesSelectionnees, setUnitesSelectionnees] = useState<Record<CheptelDistribution, UniteDistribution>>({
+    ovin: "botte",
+    bovin: "botte",
+  });
+  const { distributionsFourrage } = state;
+
+  useEffect(() => {
+    setUnitesSelectionnees({
+      ovin: (derniereUniteCheptel(distributionsFourrage, "ovin") as UniteDistribution | null) ?? "botte",
+      bovin: (derniereUniteCheptel(distributionsFourrage, "bovin") as UniteDistribution | null) ?? "botte",
+    });
+  }, [distributionsFourrage]);
 
   // KPIs
   const now = new Date();
@@ -593,6 +610,66 @@ export default function FourragePage() {
     }
   };
 
+  const dateDuJour = new Date().toISOString().slice(0, 10);
+  const distributionAujourdhui = (cheptel: CheptelDistribution) =>
+    distributionDuJour(distributionsFourrage, cheptel, dateDuJour);
+
+  const handleIncrementDistribution = async (cheptel: CheptelDistribution) => {
+    setDistributionSaving(cheptel);
+    try {
+      const result = await incrementerDistributionJour(
+        cheptel,
+        unitesSelectionnees[cheptel],
+        distributionsFourrage,
+        dateDuJour
+      );
+      if (!result.success) showToast({ type: "error", title: "Distribution non enregistrée", message: result.error });
+    } finally {
+      setDistributionSaving(null);
+    }
+  };
+
+  const handleQuantiteDistribution = async (cheptel: CheptelDistribution, valeur: string) => {
+    if (valeur.trim() === "") return;
+    const quantite = Number(valeur);
+    if (!Number.isFinite(quantite) || quantite < 0) {
+      showToast({ type: "error", title: "Quantité invalide", message: "Indiquez un nombre positif ou nul." });
+      return;
+    }
+    setDistributionSaving(cheptel);
+    try {
+      const result = await definirDistributionJour(
+        cheptel,
+        quantite,
+        unitesSelectionnees[cheptel],
+        distributionsFourrage,
+        dateDuJour
+      );
+      if (!result.success) showToast({ type: "error", title: "Distribution non enregistrée", message: result.error });
+    } finally {
+      setDistributionSaving(null);
+    }
+  };
+
+  const handleUniteChange = async (cheptel: CheptelDistribution, unite: UniteDistribution) => {
+    setUnitesSelectionnees((current) => ({ ...current, [cheptel]: unite }));
+    const distribution = distributionAujourdhui(cheptel);
+    if (!distribution) return;
+    setDistributionSaving(cheptel);
+    try {
+      const result = await definirDistributionJour(
+        cheptel,
+        distribution.quantite,
+        unite,
+        distributionsFourrage,
+        dateDuJour
+      );
+      if (!result.success) showToast({ type: "error", title: "Unité non enregistrée", message: result.error });
+    } finally {
+      setDistributionSaving(null);
+    }
+  };
+
   return (
     <div>
       {/* En-tête */}
@@ -646,6 +723,76 @@ export default function FourragePage() {
           valueColorClass="text-purple-600"
         />
       </div>
+
+      {/* Distribution quotidienne */}
+      <section className="bg-white rounded-xl shadow-sm border border-stone-100 p-5 mb-8" aria-labelledby="distribution-quotidienne-title">
+        <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 mb-4">
+          <div>
+            <h2 id="distribution-quotidienne-title" className="text-base font-semibold text-stone-800">Distribution du jour</h2>
+            <p className="text-xs text-stone-500 mt-0.5">Saisissez séparément le foin donné aux moutons et aux bovins.</p>
+          </div>
+          <span className="text-xs text-stone-400">{formatDate(dateDuJour)}</span>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {(["ovin", "bovin"] as CheptelDistribution[]).map((cheptel) => {
+            const distribution = distributionAujourdhui(cheptel);
+            const estEnregistrement = distributionSaving === cheptel;
+            const label = cheptel === "ovin" ? "Moutons" : "Bovins";
+            const unite = unitesSelectionnees[cheptel];
+            return (
+              <div key={cheptel} className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 className="font-semibold text-stone-800">{label}</h3>
+                  <span className="text-xs text-stone-500">{distribution ? "Saisie enregistrée" : "Aucune saisie"}</span>
+                </div>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-end">
+                  <label className="block text-xs font-medium text-stone-600">
+                    Quantité distribuée
+                    <input
+                      key={`${cheptel}-${distribution?.id ?? "nouveau"}-${distribution?.quantite ?? 0}`}
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputMode="numeric"
+                      defaultValue={distribution?.quantite ?? ""}
+                      onBlur={(event) => handleQuantiteDistribution(cheptel, event.target.value)}
+                      disabled={estEnregistrement}
+                      className="mt-1 block w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:cursor-wait"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleIncrementDistribution(cheptel)}
+                    disabled={estEnregistrement}
+                    className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-wait disabled:opacity-60"
+                    aria-label={`Ajouter une ${unite} pour les ${label.toLowerCase()}`}
+                  >
+                    +1 {unite}
+                  </button>
+                </div>
+                <fieldset className="mt-3">
+                  <legend className="text-xs font-medium text-stone-600 mb-1">Unité</legend>
+                  <div className="flex gap-2">
+                    {(["botte", "balle"] as UniteDistribution[]).map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        disabled={estEnregistrement}
+                        onClick={() => handleUniteChange(cheptel, option)}
+                        aria-pressed={unite === option}
+                        className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-wait ${unite === option ? "border-brand-600 bg-brand-50 text-brand-700" : "border-stone-300 bg-white text-stone-600 hover:bg-stone-100"}`}
+                      >
+                        {option === "botte" ? "Botte" : "Balle"}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+                <p className="mt-3 text-xs text-stone-500">La dernière unité utilisée pour ce cheptel est conservée.</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Objectif foin */}
       {objectifFoinT > 0 && (

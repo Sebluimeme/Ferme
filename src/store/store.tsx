@@ -8,7 +8,7 @@ import type { Unsubscribe } from "firebase/database";
 import type { User } from "firebase/auth";
 import type { Vehicle, MaintenanceAlert, MaintenanceEntry, MeterReading } from "@/types/vehicle";
 import type { Task } from "@/types/task";
-import type { Partiel, ActiviteFourrage } from "@/types/fourrage";
+import type { Partiel, ActiviteFourrage, DistributionFourrage } from "@/types/fourrage";
 import type { Ruche, RecolteMiel, VenteMiel } from "@/types/apiculture";
 import type { Transaction } from "@/types/comptabilite";
 import type { ReleverSource } from "@/types/source";
@@ -95,6 +95,7 @@ interface AppState {
   taches: Task[];
   partiels: Partiel[];
   activitesFourrage: ActiviteFourrage[];
+  distributionsFourrage: DistributionFourrage[];
   ruches: Ruche[];
   recolteMiel: RecolteMiel[];
   ventesMiel: VenteMiel[];
@@ -123,6 +124,7 @@ type Action =
   | { type: "SET_TACHES"; payload: Task[] }
   | { type: "SET_PARTIELS"; payload: Partiel[] }
   | { type: "SET_ACTIVITES_FOURRAGE"; payload: ActiviteFourrage[] }
+  | { type: "SET_DISTRIBUTIONS_FOURRAGE"; payload: DistributionFourrage[] }
   | { type: "SET_RUCHES"; payload: Ruche[] }
   | { type: "SET_RECOLTE_MIEL"; payload: RecolteMiel[] }
   | { type: "SET_VENTES_MIEL"; payload: VenteMiel[] }
@@ -170,6 +172,7 @@ const initialState: AppState = {
   taches: [],
   partiels: [],
   activitesFourrage: [],
+  distributionsFourrage: [],
   ruches: [],
   recolteMiel: [],
   ventesMiel: [],
@@ -223,6 +226,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, partiels: action.payload };
     case "SET_ACTIVITES_FOURRAGE":
       return { ...state, activitesFourrage: action.payload };
+    case "SET_DISTRIBUTIONS_FOURRAGE":
+      return { ...state, distributionsFourrage: action.payload };
     case "SET_RUCHES":
       return { ...state, ruches: action.payload };
     case "SET_RECOLTE_MIEL":
@@ -319,6 +324,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const listenTaches = () => listen<Task>("taches", (data) => ({ type: "SET_TACHES", payload: data }));
     const listenPartiels = () => listen<Partiel>("partiels", (data) => ({ type: "SET_PARTIELS", payload: data }));
     const listenActivitesFourrage = () => listen<ActiviteFourrage>("activites-fourrage", (data) => ({ type: "SET_ACTIVITES_FOURRAGE", payload: data }));
+    const listenDistributionsFourrage = () => listen<DistributionFourrage>("distributions-fourrage", (data) => ({ type: "SET_DISTRIBUTIONS_FOURRAGE", payload: data }));
     const listenMeteo = () => listen<WeatherReading>("weather-readings", (data) => ({ type: "SET_WEATHER_READINGS", payload: data }));
     // animaux-chaleurs/{animalId}/{chaleurId} : structure imbriquée par animal, à aplatir en liste unique.
     const listenChaleursGlobal = () => {
@@ -363,6 +369,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (pathname === "/fourrage") {
         listenAnimaux();
         listenActivitesFourrage();
+        listenDistributionsFourrage();
       }
     } else if (pathname === "/paturage") {
       listenPartiels();
