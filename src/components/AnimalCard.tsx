@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { Animal } from "@/store/store";
 import { getAnimalIcon, getAnimalLabel, getAnimalBorderColor, getAnimalBgColor, formatAgeFromBirthDate, formatNumber } from "@/lib/utils";
 import { GestationBadge } from "@/components/GestationAlerts";
@@ -31,11 +32,13 @@ export default function AnimalCard({ animal, onEdit, onDelete, onClick }: Animal
         onClick={() => onClick?.(animal)}
       >
         {animal.photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={animal.photoUrl}
             alt={animal.nom || animal.numeroBoucle || "Photo"}
-            className="absolute inset-0 w-full h-full object-cover"
+            fill
+            sizes="(min-width: 640px) 160px, 144px"
+            quality={60}
+            className="object-cover"
           />
         ) : (
           <div className={`absolute inset-0 flex items-center justify-center ${getAnimalBgColor(animal.type)}`}>

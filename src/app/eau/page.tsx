@@ -527,11 +527,11 @@ function useCiterneStatus(tankId: TankId) {
   const [refreshing, setRefreshing] = useState(false);
   const [history, setHistory] = useState<CiterneHistoryPoint[]>([]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     try {
       const [status, tankHistory] = await Promise.all([
-        loadCiterneStatus(tankId),
-        loadCiterneHistory(tankId).catch(() => [] as CiterneHistoryPoint[]),
+        loadCiterneStatus(tankId, { force }),
+        loadCiterneHistory(tankId, { force }).catch(() => [] as CiterneHistoryPoint[]),
       ]);
       setData({ ok: true, status, updatedAt: new Date().toISOString() });
       setHistory(tankHistory);
@@ -559,9 +559,10 @@ function useCiterneStatus(tankId: TankId) {
     };
   }, [load]);
 
+  // Bypasses the short client cache: an explicit tap must always perform a real check.
   const refresh = useCallback(() => {
     setRefreshing(true);
-    load();
+    load(true);
   }, [load]);
 
   return { data, loading, refreshing, history, refresh };

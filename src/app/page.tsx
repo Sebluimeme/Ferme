@@ -79,9 +79,9 @@ export default function DashboardPage() {
   const latestWeather = weatherStats.latest;
 
   const [citerne, setCiterne] = useState<CiterneSummaryResponse | null>(null);
-  const loadCiterne = useCallback(async () => {
+  const loadCiterne = useCallback(async (force = false) => {
     try {
-      const status = await loadCiterneStatus();
+      const status = await loadCiterneStatus(1, { force });
       setCiterne({ ok: true, status, updatedAt: new Date().toISOString() });
     } catch (error) {
       setCiterne({ ok: false, error: error instanceof Error ? error.message : "Erreur réseau" });
@@ -331,7 +331,7 @@ export default function DashboardPage() {
 
       {citerne && !citerneStatus?.hasData && (
         <button
-          onClick={() => void loadCiterne()}
+          onClick={() => void loadCiterne(true)}
           className="w-full rounded-xl border border-amber-200 bg-amber-50 p-4 text-left hover:bg-amber-100 transition-colors"
         >
           <div className="flex items-center gap-3">

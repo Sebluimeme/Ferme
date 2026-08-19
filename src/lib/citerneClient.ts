@@ -12,6 +12,7 @@ import {
   type CiterneStatus,
   type TankId,
 } from "@/lib/citerneEau";
+import { KeyedRequestCache, type RequestCacheOptions } from "@/lib/requestCache";
 
 interface CiterneApiSuccess {
   ok: true;
@@ -32,10 +33,33 @@ function historyApiPath(tankId: TankId): string {
 }
 
 /**
+ * The MQTT relay reports each tank at most once a day (see classifyFreshness
+ * in citerneEau.ts), so a cache this short can never mask a real update or
+ * delay error/staleness detection — it stays far below the 5-minute poll
+ * interval, so every automatic poll still performs a real check. It only
+ * absorbs the repeated bursts measured across the home/eau/arrosage pages
+ * (2 tanks × status+history, ~0.45–0.49s each, cache:no-store) when they
+ * mount together or in quick succession during the same client session.
+ */
+export const CITERNE_CACHE_TTL_MS = 60_000;
+
+const statusCache = new KeyedRequestCache<TankId, CiterneStatus>(CITERNE_CACHE_TTL_MS);
+const historyCache = new KeyedRequestCache<TankId, CiterneHistoryPoint[]>(CITERNE_CACHE_TTL_MS);
+
+export type LoadCiterneOptions = RequestCacheOptions;
+
+/**
  * Reads the Vercel API first, then Firebase directly for authenticated PWA users.
  * This keeps the tank visible even if one delivery path is unavailable on the phone.
+ * Wrapped in a short TTL + in-flight cache (see CITERNE_CACHE_TTL_MS): concurrent
+ * callers share one network round-trip, and `options.force` (explicit user refresh)
+ * bypasses the cached value while still joining any request already in flight.
  */
-export async function loadCiterneStatus(tankId: TankId = 1): Promise<CiterneStatus> {
+export async function loadCiterneStatus(tankId: TankId = 1, options: LoadCiterneOptions = {}): Promise<CiterneStatus> {
+  return statusCache.get(tankId, () => fetchCiterneStatus(tankId), options);
+}
+
+async function fetchCiterneStatus(tankId: TankId): Promise<CiterneStatus> {
   try {
     const response = await fetch(statusApiPath(tankId), { cache: "no-store" });
     const json = (await response.json()) as CiterneApiSuccess | { ok: false; error?: string };
@@ -57,7 +81,11 @@ export async function loadCiterneStatus(tankId: TankId = 1): Promise<CiterneStat
   return status;
 }
 
-export async function loadCiterneHistory(tankId: TankId = 1): Promise<CiterneHistoryPoint[]> {
+export async function loadCiterneHistory(tankId: TankId = 1, options: LoadCiterneOptions = {}): Promise<CiterneHistoryPoint[]> {
+  return historyCache.get(tankId, () => fetchCiterneHistory(tankId), options);
+}
+
+async function fetchCiterneHistory(tankId: TankId): Promise<CiterneHistoryPoint[]> {
   try {
     const response = await fetch(historyApiPath(tankId), { cache: "no-store" });
     const json = (await response.json()) as { ok?: boolean; history?: unknown };
