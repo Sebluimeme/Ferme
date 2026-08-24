@@ -10,7 +10,7 @@
 // ─── Constantes (miroir de src/lib/reproduction.ts) ───────────────────────────
 
 const GESTATION_DAYS_DEFAULT = {
-  ovin: 152,
+  ovin: 147,
   caprin: 150,
   porcin: 114,
   bovin: 283,

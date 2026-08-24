@@ -57,10 +57,11 @@ export interface WeatherStats {
   temperatureMaxC: number | null;
   humidityAvgPct: number | null;
   windMaxKmh: number | null;
-  rainTodayMm: number;
-  rain7DaysMm: number;
-  rain30DaysMm: number;
-  rainYearMm: number;
+  // null = aucun relevé exploitable sur la période (pas une mesure à 0 mm).
+  rainTodayMm: number | null;
+  rain7DaysMm: number | null;
+  rain30DaysMm: number | null;
+  rainYearMm: number | null;
   dryDays: number;
 }
 
@@ -69,7 +70,8 @@ export interface WeatherDailyPoint {
   temperatureAvgC: number | null;
   temperatureMinC: number | null;
   temperatureMaxC: number | null;
-  rainMm: number;
+  // null = aucun relevé de pluie exploitable ce jour-là (pas une mesure à 0 mm).
+  rainMm: number | null;
   windMaxKmh: number | null;
   humidityAvgPct: number | null;
 }
@@ -80,7 +82,9 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function sumRain(readings: WeatherReading[], since: Date, until = new Date()): number {
+// Retourne null quand aucun relevé exploitable ne couvre la période : une
+// absence de mesure ne doit jamais être confondue avec une vraie mesure à 0 mm.
+function sumRain(readings: WeatherReading[], since: Date, until = new Date()): number | null {
   const byDay = new Map<string, number>();
 
   readings.forEach((reading) => {
@@ -91,6 +95,7 @@ function sumRain(readings: WeatherReading[], since: Date, until = new Date()): n
     byDay.set(date, Math.max(byDay.get(date) ?? 0, reading.rainTotalMm));
   });
 
+  if (byDay.size === 0) return null;
   return [...byDay.values()].reduce((sum, rain) => sum + rain, 0);
 }
 
@@ -126,7 +131,9 @@ export function computeWeatherStats(readings: WeatherReading[], now = new Date()
   const daily = aggregateWeatherByDay(sorted);
   let dryDays = 0;
   for (const point of [...daily].reverse()) {
-    if (point.rainMm > 0.2) break;
+    // Un jour sans relevé de pluie exploitable est inconnu, jamais "sec" :
+    // on ne peut pas prolonger la série sans données pour le prouver.
+    if (point.rainMm === null || point.rainMm > 0.2) break;
     dryDays += 1;
   }
 
@@ -157,15 +164,14 @@ export function aggregateWeatherByDay(readings: WeatherReading[]): WeatherDailyP
     .map(([date, values]) => {
       const temps = values.map((reading) => reading.temperatureC).filter(isFiniteNumber);
       const wind = values.map((reading) => reading.windGustKmh ?? reading.windSpeedKmh).filter(isFiniteNumber);
+      const dayRainValues = values.map((reading) => reading.rainTotalMm).filter(isFiniteNumber);
       return {
         date,
         temperatureAvgC: avg(values.map((reading) => reading.temperatureC)),
         temperatureMinC: temps.length ? Math.min(...temps) : null,
         temperatureMaxC: temps.length ? Math.max(...temps) : null,
-        rainMm: values
-          .map((reading) => reading.rainTotalMm)
-          .filter(isFiniteNumber)
-          .reduce((max, rain) => Math.max(max, rain), 0),
+        // null = aucun relevé de pluie exploitable ce jour-là (pas une mesure à 0 mm).
+        rainMm: dayRainValues.length ? dayRainValues.reduce((max, rain) => Math.max(max, rain), 0) : null,
         windMaxKmh: wind.length ? Math.max(...wind) : null,
         humidityAvgPct: avg(values.map((reading) => reading.humidityPct)),
       };

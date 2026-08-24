@@ -9,6 +9,7 @@
     "lint": "next lint",
     "test": "node scripts/test-reproduction.mjs",
     "test:irrigation": "node --experimental-strip-types scripts/test-irrigation-scheduler.mjs",
+    "test:weather": "node --experimental-strip-types scripts/test-weather-stats.mjs",
     "test:request-cache": "node --experimental-strip-types scripts/test-request-cache.mjs",
     "ha:bridge": "node --experimental-strip-types scripts/home-assistant-irrigation-bridge.mjs"
   },

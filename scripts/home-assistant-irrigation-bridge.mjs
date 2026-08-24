@@ -30,6 +30,18 @@
  * `canExecutePlan()` (défense supplémentaire : refuse tout plan qui n'est
  * pas explicitement mode="executable").
  *
+ * Collecte météo (indépendante de la page /meteo) :
+ * - Ce bridge tourne en continu comme service systemd (ferme-ha-bridge),
+ *   donc c'est ici — pas dans un navigateur — que la météo doit être
+ *   collectée pour ne jamais dépendre d'un onglet /meteo ouvert.
+ * - Toutes les WEATHER_BRIDGE_POLL_MS (def. 5 min), interroge Weather
+ *   Underground via fetchWeatherUndergroundReading (même logique que
+ *   /api/weather/import, partagée depuis src/lib/weatherUnderground.ts)
+ *   et écrit le relevé dans weather-readings/{id}.
+ * - Optionnel : si WEATHER_UNDERGROUND_STATION_ID/API_KEY sont absents du
+ *   .env.local, la collecte est désactivée (log au démarrage) ; le reste
+ *   du bridge (irrigation) continue de fonctionner normalement.
+ *
  * Usage : npm run ha:bridge
  */
 import { initializeApp } from "firebase/app";
@@ -62,6 +74,7 @@ import {
 } from "../src/lib/irrigationScheduler.ts";
 import { getCiterneEntityIds, normalizeCiterneStatus } from "../src/lib/citerneEau.ts";
 import { canStartIrrigation, metersToCentimeters } from "../src/lib/irrigationSafety.ts";
+import { fetchWeatherUndergroundReading } from "../src/lib/weatherUnderground.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, "..");
@@ -169,6 +182,11 @@ const env = readEnv();
 const haBaseUrl = requireEnv(env, "HOME_ASSISTANT_URL").replace(/\/$/, "");
 const haToken = requireEnv(env, "HOME_ASSISTANT_TOKEN");
 const pollMs = Number(env.HA_BRIDGE_POLL_MS || 10000);
+
+// Collecte météo — optionnelle, ne bloque jamais le reste du bridge si absente.
+const weatherStationId = env.WEATHER_UNDERGROUND_STATION_ID || "";
+const weatherApiKey = env.WEATHER_UNDERGROUND_API_KEY || "";
+const weatherPollMs = Number(env.WEATHER_BRIDGE_POLL_MS || 5 * 60 * 1000);
 
 const firebaseConfig = {
   apiKey: requireEnv(env, "NEXT_PUBLIC_FIREBASE_API_KEY"),
@@ -803,6 +821,31 @@ async function initAutoSchedule() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Collecte météo (Weather Underground → weather-readings)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Interroge Weather Underground et écrit le relevé dans weather-readings/{id}.
+ * Ne dépend d'aucune page ouverte : ce bridge tourne en continu (service
+ * systemd ferme-ha-bridge), c'est donc la source d'alimentation primaire.
+ * La page /meteo garde son propre import (bouton + auto-refresh visible)
+ * comme déclencheur secondaire, mais l'application n'en dépend plus.
+ */
+async function collectWeather() {
+  try {
+    const result = await fetchWeatherUndergroundReading(weatherStationId, weatherApiKey);
+    if (!result.success) {
+      console.error(`[weather] collecte échouée: ${result.error}`);
+      return;
+    }
+    await set(ref(db, `${WEATHER_READINGS_PATH}/${result.reading.id}`), result.reading);
+    console.log(`[weather] relevé enregistré: ${result.reading.timestamp}`);
+  } catch (error) {
+    console.error("[weather] collecte échouée:", error instanceof Error ? error.message : error);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Main
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -819,6 +862,15 @@ async function main() {
   // Auto-schedule
   await initAutoSchedule();
   console.log("[bridge] auto-schedule initialisé");
+
+  // Collecte météo
+  if (weatherStationId && weatherApiKey) {
+    console.log(`[weather] collecte activée, toutes les ${Math.round(weatherPollMs / 1000)}s`);
+    await collectWeather();
+    setInterval(() => collectWeather(), weatherPollMs);
+  } else {
+    console.log("[weather] WEATHER_UNDERGROUND_STATION_ID/API_KEY absents — collecte désactivée");
+  }
 }
 
 main().catch((error) => {

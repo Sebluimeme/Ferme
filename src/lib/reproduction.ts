@@ -5,7 +5,7 @@ import type { Animal } from "@/store/store";
  * Valeurs moyennes usuelles en élevage — modifiables par animal via `dureeGestationJours`.
  */
 export const GESTATION_DAYS_DEFAULT: Record<Animal["type"], number> = {
-  ovin: 152,   // ~5 mois (brebis)
+  ovin: 147,   // ~5 mois (brebis)
   caprin: 150, // ~5 mois (chèvre)
   porcin: 114, // règle des « 3-3-3 » (truie)
   bovin: 283,  // ~9,5 mois (vache)
