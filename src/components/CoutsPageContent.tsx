@@ -206,16 +206,21 @@ function TransactionForm({
   );
 }
 
-// ─── Modal ajout avance ──────────────────────────────────────────────────────
+// ─── Modal avance / remboursement ────────────────────────────────────────────
 // Volontairement minimal : seul le montant est demandé. La date (jour même),
 // le payeur (choisi via le bouton Sébastien/Benjamin cliqué) et les autres
-// champs comptables sont préremplis, sans formulaire détaillé à saisir.
-function AvanceModal({ isOpen, onClose, payeur, onAdd }: {
-  isOpen: boolean; onClose: () => void; payeur: FarmCreditor | null; onAdd: (montant: string) => Promise<void>;
+// champs comptables sont préremplis, sans formulaire détaillé à saisir. Le
+// blocage métier (impossible de rembourser au-delà du solde) reste appliqué
+// côté service (validateNoNegativeDebt dans createTransaction) et remonté ici
+// via toast en cas de dépassement.
+function DebtEntryModal({ isOpen, onClose, kind, payeur, dette, onAdd }: {
+  isOpen: boolean; onClose: () => void; kind: "avance" | "remboursement";
+  payeur: FarmCreditor | null; dette?: number; onAdd: (montant: string) => Promise<void>;
 }) {
   const [montant, setMontant] = useState("");
   const [loading, setLoading] = useState(false);
   const montantValide = !!montant && !isNaN(parseFloat(montant)) && parseFloat(montant) > 0;
+  const label = kind === "avance" ? "Avance" : "Remboursement";
 
   const handleSubmit = async () => {
     if (!montantValide) return;
@@ -228,7 +233,7 @@ function AvanceModal({ isOpen, onClose, payeur, onAdd }: {
   const handleClose = () => { setMontant(""); onClose(); };
 
   return (
-    <Modal isOpen={isOpen && !!payeur} onClose={handleClose} title={payeur ? `Avance pour ${creditorLabel(payeur)}` : "Avance"} size="small">
+    <Modal isOpen={isOpen && !!payeur} onClose={handleClose} title={payeur ? `${label} pour ${creditorLabel(payeur)}` : label} size="small">
       <div className="space-y-3">
         <div>
           <label className={labelClass}>Montant (€) *</label>
@@ -240,7 +245,9 @@ function AvanceModal({ isOpen, onClose, payeur, onAdd }: {
             className={inputClass}
           />
           <p className="text-[11px] text-stone-400 mt-1">
-            Enregistrée à la date d&apos;aujourd&apos;hui, comme avance {payeur ? creditorLabel(payeur) : ""} vers la ferme.
+            {kind === "avance"
+              ? `Enregistrée à la date d'aujourd'hui, comme avance ${payeur ? creditorLabel(payeur) : ""} vers la ferme.`
+              : `Enregistré à la date d'aujourd'hui, comme remboursement de la ferme vers ${payeur ? creditorLabel(payeur) : ""}${dette != null ? ` (solde actuel : ${fmt(dette)} €)` : ""}.`}
           </p>
         </div>
         <div className="flex gap-2 justify-end">
@@ -312,6 +319,7 @@ export default function CoutsPageContent() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string; storagePath?: string } | null>(null);
   const [addModal, setAddModal] = useState<null | "production" | "categorie" | "sousCategorie">(null);
   const [avancePayeur, setAvancePayeur] = useState<FarmCreditor | null>(null);
+  const [remboursementPayeur, setRemboursementPayeur] = useState<FarmCreditor | null>(null);
 
   const [search, setSearch]       = useState("");
   const [filterOp, setFilterOp]   = useState("");
@@ -424,6 +432,30 @@ export default function CoutsPageContent() {
     }
   };
 
+  const handleAddRemboursement = async (montant: string) => {
+    if (!remboursementPayeur) return;
+    const payeur = remboursementPayeur;
+    const data: TransactionFormData = {
+      ...EMPTY_TRANSACTION_FORM,
+      date: new Date().toISOString().split("T")[0],
+      nature: "remboursement",
+      operation: "Revenus",
+      production: "Ferme",
+      categorie: "Remboursement",
+      sousCategorie: "Remboursement personnel depuis Revolut",
+      produit: `Remboursement ${creditorLabel(payeur)} depuis Revolut`,
+      payeur,
+      montant,
+    };
+    const res = await createTransaction(data, undefined, transactions);
+    if (res.success) {
+      showToast({ type: "success", title: "Remboursement ajouté" });
+      setRemboursementPayeur(null);
+    } else {
+      showToast({ type: "error", title: res.error || "Erreur" });
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     const res = await deleteTransaction(deleteTarget.id, deleteTarget.storagePath);
@@ -501,21 +533,7 @@ export default function CoutsPageContent() {
                 </button>
                 <button
                   disabled={dette <= 0}
-                  onClick={() => {
-                  setForm({
-                    ...EMPTY_TRANSACTION_FORM,
-                    date: new Date().toISOString().split("T")[0],
-                    nature: "remboursement",
-                    operation: "Revenus",
-                    production: "Ferme",
-                    categorie: "Remboursement",
-                    sousCategorie: "Remboursement personnel depuis Revolut",
-                    produit: `Remboursement ${creditorLabel(payeur)} depuis Revolut`,
-                    payeur,
-                  });
-                  setEditTarget(null);
-                  setShowModal(true);
-                }}
+                  onClick={() => setRemboursementPayeur(payeur)}
                   className="flex items-center gap-2 px-3 py-2 bg-amber-600 text-white text-[13px] font-medium rounded-lg hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer whitespace-nowrap"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -815,7 +833,11 @@ export default function CoutsPageContent() {
       </Modal>
 
       {/* Modal avance — montant seul */}
-      <AvanceModal isOpen={!!avancePayeur} onClose={() => setAvancePayeur(null)} payeur={avancePayeur} onAdd={handleAddAvance} />
+      <DebtEntryModal isOpen={!!avancePayeur} onClose={() => setAvancePayeur(null)} kind="avance" payeur={avancePayeur} onAdd={handleAddAvance} />
+
+      {/* Modal remboursement — montant seul, plafonné au solde par validateNoNegativeDebt */}
+      <DebtEntryModal isOpen={!!remboursementPayeur} onClose={() => setRemboursementPayeur(null)} kind="remboursement"
+        payeur={remboursementPayeur} dette={remboursementPayeur ? dettes[remboursementPayeur] : undefined} onAdd={handleAddRemboursement} />
 
       {/* Modal suppression */}
       <ConfirmModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
