@@ -10,7 +10,7 @@ import type { Vehicle, MaintenanceAlert, MaintenanceEntry, MeterReading } from "
 import type { Task } from "@/types/task";
 import type { Partiel, ActiviteFourrage, DistributionFourrage } from "@/types/fourrage";
 import type { Ruche, RecolteMiel, VenteMiel } from "@/types/apiculture";
-import type { Transaction } from "@/types/comptabilite";
+import { isOperatingTransaction, type Transaction } from "@/types/comptabilite";
 import type { ReleverSource } from "@/types/source";
 import type { SejourPaturage } from "@/types/paturage";
 import type { PleinCarburant } from "@/types/carburant";
@@ -142,9 +142,11 @@ type Action =
 function computeStats(animaux: Animal[], couts: Transaction[] = []): Stats {
   const thisYear = new Date().getFullYear().toString();
   const revenus = couts
+    .filter(isOperatingTransaction)
     .filter((t) => t.operation === "Revenus" && t.date?.startsWith(thisYear))
     .reduce((sum, t) => sum + t.montant, 0);
   const depenses = couts
+    .filter(isOperatingTransaction)
     .filter((t) => t.operation === "Dépenses" && t.date?.startsWith(thisYear))
     .reduce((sum, t) => sum + t.montant, 0);
   return {

@@ -1,7 +1,8 @@
 import firebaseService from "@/lib/firebase-service";
-import type { Transaction, TransactionFormData } from "@/types/comptabilite";
+import { validateNoNegativeDebt, type Transaction, type TransactionFormData } from "@/types/comptabilite";
 
 const PATH = "transactions";
+type TransactionPayload = Omit<Transaction, "id" | "dateCreation" | "derniereMAJ">;
 
 // ==================== Catégories dynamiques dans Firebase ====================
 // Stockées sous "comptabilite-config/categories" comme un objet { productions: [], categories: [], sousCategories: [] }
@@ -30,11 +31,16 @@ const DEFAULT_CONFIG: CategoriesConfig = {
   ],
   categories: [
     "Animaux",
+    "Avance",
     "Charges",
     "Immobilisation",
     "Engins",
+    "Remboursement",
+    "Ventes",
   ],
   sousCategories: [
+    "SY",
+    "BY",
     "Cheptel",
     "Nourritures",
     "Parc",
@@ -55,13 +61,28 @@ const DEFAULT_CONFIG: CategoriesConfig = {
     "CAC",
     "Semences",
     "Cotisation",
+    "Avance personnelle vers Revolut",
+    "Remboursement personnel depuis Revolut",
   ],
   payeurs: ["SY", "BY", "revolut"],
 };
 
+function mergeUnique(existing: string[] | undefined, defaults: string[]): string[] {
+  return Array.from(new Set([...(existing || []), ...defaults])).sort();
+}
+
+function normalizeConfig(config: CategoriesConfig): CategoriesConfig {
+  return {
+    productions: mergeUnique(config.productions, DEFAULT_CONFIG.productions),
+    categories: mergeUnique(config.categories, DEFAULT_CONFIG.categories),
+    sousCategories: mergeUnique(config.sousCategories, DEFAULT_CONFIG.sousCategories),
+    payeurs: mergeUnique(config.payeurs, DEFAULT_CONFIG.payeurs),
+  };
+}
+
 export async function getCategoriesConfig(): Promise<CategoriesConfig> {
   const result = await firebaseService.getById<CategoriesConfig>(CONFIG_PATH, "categories");
-  if (result.success && result.data) return result.data;
+  if (result.success && result.data) return normalizeConfig(result.data);
   // Initialiser avec les valeurs par défaut
   await firebaseService.create(CONFIG_PATH, { ...DEFAULT_CONFIG, id: "categories" } as unknown as Record<string, unknown>);
   return DEFAULT_CONFIG;
@@ -94,10 +115,11 @@ export async function addSousCategorie(sousCategorie: string, currentConfig: Cat
 
 // ==================== CRUD Transactions ====================
 
-function parseFormData(data: TransactionFormData): Record<string, unknown> {
+function parseFormData(data: TransactionFormData): TransactionPayload {
+  const nature = data.nature || "exploitation";
   return {
     date: data.date,
-    operation: data.operation,
+    operation: nature === "avance" ? "Dépenses" : nature === "remboursement" ? "Revenus" : data.operation,
     production: data.production.trim(),
     categorie: data.categorie.trim(),
     sousCategorie: data.sousCategorie.trim(),
@@ -107,6 +129,7 @@ function parseFormData(data: TransactionFormData): Record<string, unknown> {
     ...(data.quantite ? { quantite: parseFloat(data.quantite) } : {}),
     payeur: data.payeur,
     montant: Math.abs(parseFloat(data.montant)),
+    nature,
   };
 }
 
@@ -120,13 +143,24 @@ export function validateTransactionData(data: TransactionFormData): { valid: boo
   if (!data.produit.trim()) errors.push("Le produit/description est obligatoire");
   if (!data.montant || isNaN(parseFloat(data.montant)) || parseFloat(data.montant) <= 0)
     errors.push("Le montant doit être un nombre positif");
+  if ((data.nature === "avance" || data.nature === "remboursement") && !["SY", "BY"].includes(data.payeur)) {
+    errors.push("Seuls Sébastien (SY) et Benjamin (BY) peuvent être avanceurs ou remboursés ; Revolut est le compte de la ferme.");
+  }
   return { valid: errors.length === 0, errors };
 }
 
-export async function createTransaction(data: TransactionFormData, pieceJointe?: File) {
+async function getDebtReferenceTransactions(existingTransactions?: Transaction[]): Promise<Transaction[]> {
+  if (existingTransactions) return existingTransactions;
+  const result = await firebaseService.getAll<Transaction>(PATH);
+  return result.success && result.data ? result.data : [];
+}
+
+export async function createTransaction(data: TransactionFormData, pieceJointe?: File, existingTransactions?: Transaction[]) {
   const validation = validateTransactionData(data);
   if (!validation.valid) return { success: false, error: validation.errors.join(", ") };
   const parsed = parseFormData(data);
+  const debtValidation = validateNoNegativeDebt({ ...parsed, id: "" }, await getDebtReferenceTransactions(existingTransactions));
+  if (!debtValidation.valid) return { success: false, error: debtValidation.error };
   if (pieceJointe) {
     const { uploadFile } = await import("@/lib/firebase-storage");
     const path = `transactions/${Date.now()}_${pieceJointe.name}`;
@@ -135,13 +169,15 @@ export async function createTransaction(data: TransactionFormData, pieceJointe?:
       parsed.pieceJointe = { url: res.url, storagePath: path, nom: pieceJointe.name };
     }
   }
-  return firebaseService.create(PATH, parsed);
+  return firebaseService.create(PATH, parsed as unknown as Record<string, unknown>);
 }
 
-export async function updateTransaction(id: string, data: TransactionFormData, pieceJointe?: File, ancienStoragePath?: string) {
+export async function updateTransaction(id: string, data: TransactionFormData, pieceJointe?: File, ancienStoragePath?: string, existingTransactions?: Transaction[]) {
   const validation = validateTransactionData(data);
   if (!validation.valid) return { success: false, error: validation.errors.join(", ") };
-  const parsed = parseFormData(data);
+  const parsed = { ...parseFormData(data), id };
+  const debtValidation = validateNoNegativeDebt(parsed as Transaction, await getDebtReferenceTransactions(existingTransactions));
+  if (!debtValidation.valid) return { success: false, error: debtValidation.error };
   if (pieceJointe) {
     const { uploadFile, deleteFile } = await import("@/lib/firebase-storage");
     // Supprimer l'ancienne pièce jointe si elle existe
@@ -152,7 +188,7 @@ export async function updateTransaction(id: string, data: TransactionFormData, p
       parsed.pieceJointe = { url: res.url, storagePath: path, nom: pieceJointe.name };
     }
   }
-  return firebaseService.update(PATH, id, parsed);
+  return firebaseService.update(PATH, id, parsed as unknown as Record<string, unknown>);
 }
 
 export async function deleteTransaction(id: string, storagePath?: string) {

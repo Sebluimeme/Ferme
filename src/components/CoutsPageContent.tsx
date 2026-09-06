@@ -19,8 +19,13 @@ import {
 } from "@/services/comptabilite-service";
 import {
   computeStats,
+  computeCreditorBalances,
+  creditorLabel,
   formatDate,
   EMPTY_TRANSACTION_FORM,
+  getTransactionNature,
+  isFarmCreditor,
+  isOperatingTransaction,
   type Transaction,
   type TransactionFormData,
 } from "@/types/comptabilite";
@@ -61,19 +66,60 @@ function TransactionForm({
   onAddSousCategorie: () => void;
 }) {
   const set = (field: keyof TransactionFormData) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-      setForm({ ...form, [field]: e.target.value });
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      if (field === "nature") {
+        if (value === "avance") {
+          setForm({
+            ...form,
+            nature: "avance",
+            operation: "Dépenses",
+            production: form.production || "Ferme",
+            categorie: "Avance",
+            sousCategorie: "Avance personnelle vers Revolut",
+            produit: form.produit || "Avance personnelle vers Revolut",
+            payeur: isFarmCreditor(form.payeur) ? form.payeur : "SY",
+          });
+          return;
+        }
+        if (value === "remboursement") {
+          setForm({
+            ...form,
+            nature: "remboursement",
+            operation: "Revenus",
+            production: form.production || "Ferme",
+            categorie: "Remboursement",
+            sousCategorie: "Remboursement personnel depuis Revolut",
+            produit: form.produit || "Remboursement personnel depuis Revolut",
+            payeur: isFarmCreditor(form.payeur) ? form.payeur : "SY",
+          });
+          return;
+        }
+      }
+      setForm({ ...form, [field]: value });
+    };
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className={labelClass}>Type d'écriture *</label>
+          <select value={form.nature} onChange={set("nature")} className={selectClass}>
+            <option value="exploitation">Dépense ou recette d'exploitation</option>
+            <option value="avance">Avance personnelle vers Revolut</option>
+            <option value="remboursement">Remboursement personnel depuis Revolut</option>
+          </select>
+          <p className="text-[11px] text-stone-400 mt-1">
+            Les avances/remboursements ajustent la dette, pas le résultat d'exploitation.
+          </p>
+        </div>
         <div>
           <label className={labelClass}>Date *</label>
           <input type="date" value={form.date} onChange={set("date")} className={inputClass} />
         </div>
         <div>
           <label className={labelClass}>Opération *</label>
-          <select value={form.operation} onChange={set("operation")} className={selectClass}>
+          <select value={form.operation} onChange={set("operation")} disabled={form.nature !== "exploitation"} className={selectClass}>
             <option value="Dépenses">Dépenses</option>
             <option value="Revenus">Revenus</option>
           </select>
@@ -232,15 +278,8 @@ export default function CoutsPageContent() {
 
   const stats = useMemo(() => computeStats(transactions), [transactions]);
 
-  // Dettes ferme envers les avanceurs (SY, BY, etc.) : dépenses payées par eux - remboursements reçus
-  const dettes = useMemo(() => {
-    const avanceurs = ["SY", "BY"];
-    return avanceurs.map((payeur) => {
-      const avances = transactions.filter((t) => t.payeur === payeur && t.operation === "Dépenses").reduce((s, t) => s + t.montant, 0);
-      const remboursements = transactions.filter((t) => t.payeur === payeur && t.operation === "Revenus").reduce((s, t) => s + t.montant, 0);
-      return { payeur, dette: avances - remboursements };
-    }).filter((d) => d.dette > 0);
-  }, [transactions]);
+  const dettes = useMemo(() => computeCreditorBalances(transactions), [transactions]);
+  const financeTransactions = useMemo(() => transactions.filter((t) => !isOperatingTransaction(t)), [transactions]);
 
   const filtered = useMemo(() => {
     let list = filterTransactions(transactions, {
@@ -257,6 +296,7 @@ export default function CoutsPageContent() {
   const parProduction = useMemo(() => {
     const map: Record<string, { depenses: number; revenus: number }> = {};
     transactions.forEach((t) => {
+      if (!isOperatingTransaction(t)) return;
       if (!map[t.production]) map[t.production] = { depenses: 0, revenus: 0 };
       if (t.operation === "Dépenses") map[t.production].depenses += t.montant;
       else map[t.production].revenus += t.montant;
@@ -284,7 +324,7 @@ export default function CoutsPageContent() {
       categorie: t.categorie, sousCategorie: t.sousCategorie, produit: t.produit,
       remarque: t.remarque || "", fournisseur: t.fournisseur || "",
       quantite: t.quantite != null ? String(t.quantite) : "",
-      payeur: t.payeur, montant: String(t.montant),
+      payeur: t.payeur, montant: String(t.montant), nature: getTransactionNature(t),
     });
     setShowModal(true);
   };
@@ -294,8 +334,8 @@ export default function CoutsPageContent() {
   const handleSave = async () => {
     setFormLoading(true);
     const res = editTarget
-      ? await updateTransaction(editTarget.id, form, pieceJointeFile ?? undefined, editTarget.pieceJointe?.storagePath)
-      : await createTransaction(form, pieceJointeFile ?? undefined);
+      ? await updateTransaction(editTarget.id, form, pieceJointeFile ?? undefined, editTarget.pieceJointe?.storagePath, transactions)
+      : await createTransaction(form, pieceJointeFile ?? undefined, transactions);
     setFormLoading(false);
     if (res.success) {
       showToast(editTarget ? { type: "success", title: "Transaction modifiée" } : { type: "success", title: "Transaction ajoutée" });
@@ -331,7 +371,7 @@ export default function CoutsPageContent() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-semibold text-stone-900 tracking-[-0.3px]">Comptabilité</h1>
-          <p className="text-[13px] text-stone-400 mt-0.5">Suivi des dépenses et revenus de la ferme</p>
+          <p className="text-[13px] text-stone-400 mt-0.5">Exploitation séparée des avances et remboursements personnels</p>
         </div>
         <button onClick={openAdd}
           className="flex items-center gap-2 px-4 py-2 bg-stone-900 text-white text-[13px] font-medium rounded-lg hover:bg-stone-700 transition-colors cursor-pointer">
@@ -342,10 +382,10 @@ export default function CoutsPageContent() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard label="Dépenses" value={`${fmt(stats.totalDepenses, 0)} €`} icon={<TrendingDown className="w-3.5 h-3.5 text-red-500" />} />
-        <KpiCard label="Revenus" value={`${fmt(stats.totalRevenus, 0)} €`} icon={<TrendingUp className="w-3.5 h-3.5 text-brand-500" />} />
+        <KpiCard label="Dépenses exploitation" value={`${fmt(stats.totalDepenses, 0)} €`} icon={<TrendingDown className="w-3.5 h-3.5 text-red-500" />} />
+        <KpiCard label="Recettes exploitation" value={`${fmt(stats.totalRevenus, 0)} €`} icon={<TrendingUp className="w-3.5 h-3.5 text-brand-500" />} />
         <KpiCard
-          label="Balance"
+          label="Résultat exploitation"
           value={`${stats.balance >= 0 ? "+" : ""}${fmt(stats.balance, 0)} €`}
           icon={<Scale className="w-3.5 h-3.5" />}
         />
@@ -353,42 +393,75 @@ export default function CoutsPageContent() {
       </div>
 
       {/* Dettes SY / BY */}
-      {dettes.length > 0 && (
+      <div className="bg-white border border-stone-200 rounded-xl p-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <h2 className="text-[14px] font-semibold text-stone-800">Avances et remboursements</h2>
+            <p className="text-[12px] text-stone-400">Revolut est le compte de la ferme ; seules les dettes envers Sébastien et Benjamin sont suivies.</p>
+          </div>
+          <span className="text-[11px] text-stone-400">{financeTransactions.length} écriture{financeTransactions.length > 1 ? "s" : ""} hors exploitation</span>
+        </div>
         <div className="flex flex-col sm:flex-row gap-3">
-          {dettes.map(({ payeur, dette }) => (
-            <div key={payeur} className="flex-1 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
+          {(["SY", "BY"] as const).map((payeur) => {
+            const dette = dettes[payeur];
+            return (
+            <div key={payeur} className="flex-1 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[12px] font-semibold uppercase tracking-wide text-amber-700">
-                  Dette ferme → {payeur === "SY" ? "Sébastien" : payeur === "BY" ? "Benjamin" : payeur}
+                  Dette ferme → {creditorLabel(payeur)}
                 </p>
                 <p className="text-[22px] font-bold font-mono text-amber-900 mt-0.5">
                   {fmt(dette)} €
                 </p>
               </div>
-              <button
-                onClick={() => {
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    setForm({
+                      ...EMPTY_TRANSACTION_FORM,
+                      date: new Date().toISOString().split("T")[0],
+                      nature: "avance",
+                      operation: "Dépenses",
+                      production: "Ferme",
+                      categorie: "Avance",
+                      sousCategorie: "Avance personnelle vers Revolut",
+                      produit: `Avance ${creditorLabel(payeur)} vers Revolut`,
+                      payeur,
+                    });
+                    setEditTarget(null);
+                    setShowModal(true);
+                  }}
+                  className="px-3 py-2 bg-white text-amber-800 border border-amber-200 text-[13px] font-medium rounded-lg hover:bg-amber-100 transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  Avance
+                </button>
+                <button
+                  disabled={dette <= 0}
+                  onClick={() => {
                   setForm({
                     ...EMPTY_TRANSACTION_FORM,
                     date: new Date().toISOString().split("T")[0],
+                    nature: "remboursement",
                     operation: "Revenus",
                     production: "Ferme",
                     categorie: "Remboursement",
-                    sousCategorie: payeur,
-                    produit: `Remboursement ${payeur === "SY" ? "Sébastien" : payeur === "BY" ? "Benjamin" : payeur}`,
+                    sousCategorie: "Remboursement personnel depuis Revolut",
+                    produit: `Remboursement ${creditorLabel(payeur)} depuis Revolut`,
                     payeur,
                   });
                   setEditTarget(null);
                   setShowModal(true);
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white text-[13px] font-medium rounded-lg hover:bg-amber-700 transition-colors cursor-pointer whitespace-nowrap"
+                  className="flex items-center gap-2 px-3 py-2 bg-amber-600 text-white text-[13px] font-medium rounded-lg hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer whitespace-nowrap"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Rembourser
               </button>
+              </div>
             </div>
-          ))}
+          );})}
         </div>
-      )}
+      </div>
 
       {/* Onglets */}
       <div className="flex items-center gap-1 p-1 bg-stone-200/60 rounded-lg w-fit">

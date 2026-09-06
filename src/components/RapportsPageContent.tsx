@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useAppStore } from "@/store/store";
-import { computeStats, type Transaction } from "@/types/comptabilite";
+import { computeCreditorBalances, computeStats, creditorLabel, isOperatingTransaction, type Transaction } from "@/types/comptabilite";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -90,35 +90,37 @@ export default function RapportsPageContent() {
   }, [transactions, selectedProd, selectedAnnee]);
 
   const stats = useMemo(() => computeStats(filtered), [filtered]);
+  const dettes = useMemo(() => computeCreditorBalances(filtered), [filtered]);
+  const filteredOperating = useMemo(() => filtered.filter(isOperatingTransaction), [filtered]);
 
   // ── Dépenses par catégorie ────────────────────────────────────────────────
   const depensesParCategorie = useMemo(() => {
     const map: Record<string, number> = {};
-    filtered.filter((t) => t.operation === "Dépenses").forEach((t) => {
+    filteredOperating.filter((t) => t.operation === "Dépenses").forEach((t) => {
       map[t.categorie] = (map[t.categorie] || 0) + t.montant;
     });
     return Object.entries(map)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
-  }, [filtered]);
+  }, [filteredOperating]);
 
   const totalDepCat = depensesParCategorie.reduce((s, d) => s + d.value, 0);
 
   // ── Revenus par catégorie ──────────────────────────────────────────────────
   const revenusParCategorie = useMemo(() => {
     const map: Record<string, number> = {};
-    filtered.filter((t) => t.operation === "Revenus").forEach((t) => {
+    filteredOperating.filter((t) => t.operation === "Revenus").forEach((t) => {
       map[t.categorie] = (map[t.categorie] || 0) + t.montant;
     });
     return Object.entries(map)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
-  }, [filtered]);
+  }, [filteredOperating]);
 
   // ── Évolution mensuelle ───────────────────────────────────────────────────
   const parMois = useMemo(() => {
     const map: Record<string, { depenses: number; revenus: number }> = {};
-    filtered.forEach((t) => {
+    filteredOperating.forEach((t) => {
       const mois = t.date.substring(0, 7);
       if (!map[mois]) map[mois] = { depenses: 0, revenus: 0 };
       if (t.operation === "Dépenses") map[mois].depenses += t.montant;
@@ -127,7 +129,7 @@ export default function RapportsPageContent() {
     return Object.entries(map)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([mois, d]) => ({ mois: fmtMois(mois), ...d }));
-  }, [filtered]);
+  }, [filteredOperating]);
 
   const moyenneMensuelle = parMois.length > 0
     ? parMois.reduce((s, m) => s + m.depenses, 0) / parMois.length
@@ -136,7 +138,7 @@ export default function RapportsPageContent() {
   // ── Top produits (dépenses) ───────────────────────────────────────────────
   const topProduits = useMemo(() => {
     const map: Record<string, { total: number; count: number; categorie: string }> = {};
-    filtered.filter((t) => t.operation === "Dépenses").forEach((t) => {
+    filteredOperating.filter((t) => t.operation === "Dépenses").forEach((t) => {
       if (!map[t.produit]) map[t.produit] = { total: 0, count: 0, categorie: t.categorie };
       map[t.produit].total += t.montant;
       map[t.produit].count += 1;
@@ -145,7 +147,7 @@ export default function RapportsPageContent() {
       .map(([produit, d]) => ({ produit, ...d }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 7);
-  }, [filtered]);
+  }, [filteredOperating]);
 
   // ── Coût par tête ─────────────────────────────────────────────────────────
   const coutParTete = useMemo(() => {
@@ -171,7 +173,7 @@ export default function RapportsPageContent() {
       {/* En-tête */}
       <div>
         <h1 className="text-[22px] font-semibold text-stone-900 tracking-[-0.3px]">Analyse financière</h1>
-        <p className="text-[13px] text-stone-400 mt-0.5">Visualisez les dépenses et revenus par production</p>
+        <p className="text-[13px] text-stone-400 mt-0.5">Résultat d'exploitation séparé des avances et remboursements</p>
       </div>
 
       {/* Filtres */}
@@ -210,14 +212,23 @@ export default function RapportsPageContent() {
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard label="Dépenses" value={`${fmt(stats.totalDepenses)} €`} icon={<TrendingDown className="w-3.5 h-3.5 text-red-500" />} />
-            <KpiCard label="Revenus" value={`${fmt(stats.totalRevenus)} €`} icon={<TrendingUp className="w-3.5 h-3.5 text-green-600" />} />
+            <KpiCard label="Dépenses exploitation" value={`${fmt(stats.totalDepenses)} €`} icon={<TrendingDown className="w-3.5 h-3.5 text-red-500" />} />
+            <KpiCard label="Recettes exploitation" value={`${fmt(stats.totalRevenus)} €`} icon={<TrendingUp className="w-3.5 h-3.5 text-green-600" />} />
             <KpiCard
-              label="Balance"
+              label="Résultat exploitation"
               value={`${stats.balance >= 0 ? "+" : ""}${fmt(stats.balance)} €`}
               icon={<Scale className="w-3.5 h-3.5" />}
             />
             <KpiCard label="Transactions" value={stats.nbTransactions} icon={<Receipt className="w-3.5 h-3.5" />} />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {(["SY", "BY"] as const).map((payeur) => (
+              <div key={payeur} className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Dette ferme → {creditorLabel(payeur)}</p>
+                <p className="text-[22px] font-bold font-mono text-amber-900 mt-0.5">{fmt(dettes[payeur], 2)} €</p>
+              </div>
+            ))}
           </div>
 
           {/* Coût par tête */}
