@@ -26,6 +26,7 @@ import {
   getTransactionNature,
   isFarmCreditor,
   isOperatingTransaction,
+  type FarmCreditor,
   type Transaction,
   type TransactionFormData,
 } from "@/types/comptabilite";
@@ -205,6 +206,58 @@ function TransactionForm({
   );
 }
 
+// ─── Modal ajout avance ──────────────────────────────────────────────────────
+// Volontairement minimal : seul le montant est demandé. La date (jour même),
+// le payeur (choisi via le bouton Sébastien/Benjamin cliqué) et les autres
+// champs comptables sont préremplis, sans formulaire détaillé à saisir.
+function AvanceModal({ isOpen, onClose, payeur, onAdd }: {
+  isOpen: boolean; onClose: () => void; payeur: FarmCreditor | null; onAdd: (montant: string) => Promise<void>;
+}) {
+  const [montant, setMontant] = useState("");
+  const [loading, setLoading] = useState(false);
+  const montantValide = !!montant && !isNaN(parseFloat(montant)) && parseFloat(montant) > 0;
+
+  const handleSubmit = async () => {
+    if (!montantValide) return;
+    setLoading(true);
+    await onAdd(montant);
+    setMontant("");
+    setLoading(false);
+  };
+
+  const handleClose = () => { setMontant(""); onClose(); };
+
+  return (
+    <Modal isOpen={isOpen && !!payeur} onClose={handleClose} title={payeur ? `Avance pour ${creditorLabel(payeur)}` : "Avance"} size="small">
+      <div className="space-y-3">
+        <div>
+          <label className={labelClass}>Montant (€) *</label>
+          <input
+            type="number" min="0" step="0.01" value={montant}
+            onChange={(e) => setMontant(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+            placeholder="Ex: 150.00" autoFocus
+            className={inputClass}
+          />
+          <p className="text-[11px] text-stone-400 mt-1">
+            Enregistrée à la date d&apos;aujourd&apos;hui, comme avance {payeur ? creditorLabel(payeur) : ""} vers la ferme.
+          </p>
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button onClick={handleClose}
+            className="px-4 py-2 text-[13px] bg-stone-100 text-stone-700 border border-stone-200 rounded-lg hover:bg-stone-200 cursor-pointer transition-colors">
+            Annuler
+          </button>
+          <button onClick={handleSubmit} disabled={loading || !montantValide}
+            className="px-4 py-2 text-[13px] font-medium text-white bg-stone-900 rounded-lg disabled:opacity-40 cursor-pointer hover:bg-stone-700 transition-colors">
+            {loading ? "..." : "Ajouter"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ─── Modal ajout valeur ──────────────────────────────────────────────────────
 function AddValueModal({ isOpen, onClose, label, onAdd }: {
   isOpen: boolean; onClose: () => void; label: string; onAdd: (v: string) => Promise<void>;
@@ -258,6 +311,7 @@ export default function CoutsPageContent() {
   const [formLoading, setFormLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string; storagePath?: string } | null>(null);
   const [addModal, setAddModal] = useState<null | "production" | "categorie" | "sousCategorie">(null);
+  const [avancePayeur, setAvancePayeur] = useState<FarmCreditor | null>(null);
 
   const [search, setSearch]       = useState("");
   const [filterOp, setFilterOp]   = useState("");
@@ -346,6 +400,30 @@ export default function CoutsPageContent() {
     }
   };
 
+  const handleAddAvance = async (montant: string) => {
+    if (!avancePayeur) return;
+    const payeur = avancePayeur;
+    const data: TransactionFormData = {
+      ...EMPTY_TRANSACTION_FORM,
+      date: new Date().toISOString().split("T")[0],
+      nature: "avance",
+      operation: "Dépenses",
+      production: "Ferme",
+      categorie: "Avance",
+      sousCategorie: "Avance personnelle vers Revolut",
+      produit: `Avance ${creditorLabel(payeur)} vers Revolut`,
+      payeur,
+      montant,
+    };
+    const res = await createTransaction(data, undefined, transactions);
+    if (res.success) {
+      showToast({ type: "success", title: "Avance ajoutée" });
+      setAvancePayeur(null);
+    } else {
+      showToast({ type: "error", title: res.error || "Erreur" });
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     const res = await deleteTransaction(deleteTarget.id, deleteTarget.storagePath);
@@ -416,21 +494,7 @@ export default function CoutsPageContent() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => {
-                    setForm({
-                      ...EMPTY_TRANSACTION_FORM,
-                      date: new Date().toISOString().split("T")[0],
-                      nature: "avance",
-                      operation: "Dépenses",
-                      production: "Ferme",
-                      categorie: "Avance",
-                      sousCategorie: "Avance personnelle vers Revolut",
-                      produit: `Avance ${creditorLabel(payeur)} vers Revolut`,
-                      payeur,
-                    });
-                    setEditTarget(null);
-                    setShowModal(true);
-                  }}
+                  onClick={() => setAvancePayeur(payeur)}
                   className="px-3 py-2 bg-white text-amber-800 border border-amber-200 text-[13px] font-medium rounded-lg hover:bg-amber-100 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   Avance
@@ -749,6 +813,9 @@ export default function CoutsPageContent() {
           )}
         </div>
       </Modal>
+
+      {/* Modal avance — montant seul */}
+      <AvanceModal isOpen={!!avancePayeur} onClose={() => setAvancePayeur(null)} payeur={avancePayeur} onAdd={handleAddAvance} />
 
       {/* Modal suppression */}
       <ConfirmModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
