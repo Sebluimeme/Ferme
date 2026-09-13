@@ -6,7 +6,13 @@ import { useAppStore } from "@/store/store";
 import KpiCard from "@/components/KpiCard";
 import Modal, { ConfirmModal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
-import type { ActiviteFourrage, CheptelDistribution, Partiel, UniteDistribution } from "@/types/fourrage";
+import type {
+  ActiviteFourrage,
+  CheptelDistribution,
+  DistributionFourrage,
+  Partiel,
+  UniteDistribution,
+} from "@/types/fourrage";
 import {
   origineActivite,
   estAchat,
@@ -23,6 +29,7 @@ import {
   type OrigineFourrage,
 } from "@/lib/fourrage-calculs";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts";
+import { Trash2 } from "lucide-react";
 
 const ParcelSelectorMap = dynamic(() => import("@/components/ParcelSelectorMap"), { ssr: false });
 const WeatherWidget = dynamic(() => import("@/components/WeatherWidget"), { ssr: false });
@@ -32,7 +39,7 @@ import {
   deleteActivite,
   addBottesActivite,
   definirDistributionJour,
-  incrementerDistributionJour,
+  deleteDistribution,
 } from "@/services/fourrage-service";
 
 // ==================== Types internes ====================
@@ -81,6 +88,9 @@ const ORIGINE_COLORS: Record<OrigineFourrage, string> = {
   recolte: "bg-stone-100 text-stone-600",
   achat: "bg-sky-100 text-sky-800",
 };
+
+const dateLocaleISO = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
 // ==================== Formulaire activité ====================
 
@@ -437,18 +447,34 @@ export default function FourragePage() {
   const [deleteTarget, setDeleteTarget] = useState<ActiviteFourrage | null>(null);
   const [saving, setSaving] = useState(false);
   const [distributionSaving, setDistributionSaving] = useState<CheptelDistribution | null>(null);
+  const [distributionDeleteTarget, setDistributionDeleteTarget] = useState<DistributionFourrage | null>(null);
+  const [distributionDeleting, setDistributionDeleting] = useState<string | null>(null);
+  const [quantitesDistribution, setQuantitesDistribution] = useState<Record<CheptelDistribution, string>>({
+    ovin: "1",
+    bovin: "1",
+  });
   const [unitesSelectionnees, setUnitesSelectionnees] = useState<Record<CheptelDistribution, UniteDistribution>>({
     ovin: "botte",
     bovin: "botte",
   });
   const { distributionsFourrage } = state;
 
+  const dateDuJour = dateLocaleISO(new Date());
+
   useEffect(() => {
     setUnitesSelectionnees({
-      ovin: (derniereUniteCheptel(distributionsFourrage, "ovin") as UniteDistribution | null) ?? "botte",
-      bovin: (derniereUniteCheptel(distributionsFourrage, "bovin") as UniteDistribution | null) ?? "botte",
+      ovin: distributionDuJour(distributionsFourrage, "ovin", dateDuJour)?.unite
+        ?? (derniereUniteCheptel(distributionsFourrage, "ovin") as UniteDistribution | null)
+        ?? "botte",
+      bovin: distributionDuJour(distributionsFourrage, "bovin", dateDuJour)?.unite
+        ?? (derniereUniteCheptel(distributionsFourrage, "bovin") as UniteDistribution | null)
+        ?? "botte",
     });
-  }, [distributionsFourrage]);
+    setQuantitesDistribution({
+      ovin: distributionDuJour(distributionsFourrage, "ovin", dateDuJour)?.quantite.toString() ?? "1",
+      bovin: distributionDuJour(distributionsFourrage, "bovin", dateDuJour)?.quantite.toString() ?? "1",
+    });
+  }, [dateDuJour, distributionsFourrage]);
 
   // KPIs
   const now = new Date();
@@ -492,6 +518,15 @@ export default function FourragePage() {
     (a, b) => new Date(b.dateActivite).getTime() - new Date(a.dateActivite).getTime()
   );
 
+  const distributionsTriees = useMemo(
+    () => [...distributionsFourrage].sort((a, b) => {
+      const parDate = b.dateDistribution.localeCompare(a.dateDistribution);
+      if (parDate !== 0) return parDate;
+      return (b.derniereMAJ ?? b.dateCreation ?? "").localeCompare(a.derniereMAJ ?? a.dateCreation ?? "");
+    }),
+    [distributionsFourrage]
+  );
+
   // Analytics foin / regain — récoltes uniquement, les achats en sont exclus
   const totalFoinT = totalTonnes(recoltesDeType(activitesFourrage, "foin"));
   const totalRegainT = totalTonnes(recoltesDeType(activitesFourrage, "regain"));
@@ -519,6 +554,9 @@ export default function FourragePage() {
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+  const formatQuantiteDistribution = (quantite: number, unite: UniteDistribution) =>
+    `${quantite} ${unite}${quantite > 1 ? "s" : ""}`;
 
   // Handlers
   /** Champs communs création/édition — un achat n'a jamais de parcelle. */
@@ -610,30 +648,13 @@ export default function FourragePage() {
     }
   };
 
-  const dateDuJour = new Date().toISOString().slice(0, 10);
   const distributionAujourdhui = (cheptel: CheptelDistribution) =>
     distributionDuJour(distributionsFourrage, cheptel, dateDuJour);
 
-  const handleIncrementDistribution = async (cheptel: CheptelDistribution) => {
-    setDistributionSaving(cheptel);
-    try {
-      const result = await incrementerDistributionJour(
-        cheptel,
-        unitesSelectionnees[cheptel],
-        distributionsFourrage,
-        dateDuJour
-      );
-      if (!result.success) showToast({ type: "error", title: "Distribution non enregistrée", message: result.error });
-    } finally {
-      setDistributionSaving(null);
-    }
-  };
-
-  const handleQuantiteDistribution = async (cheptel: CheptelDistribution, valeur: string) => {
-    if (valeur.trim() === "") return;
-    const quantite = Number(valeur);
-    if (!Number.isFinite(quantite) || quantite < 0) {
-      showToast({ type: "error", title: "Quantité invalide", message: "Indiquez un nombre positif ou nul." });
+  const handleSaveDistribution = async (cheptel: CheptelDistribution) => {
+    const quantite = Number(quantitesDistribution[cheptel]);
+    if (!Number.isInteger(quantite) || quantite < 1) {
+      showToast({ type: "error", title: "Quantité invalide", message: "Indiquez un nombre entier d'au moins 1." });
       return;
     }
     setDistributionSaving(cheptel);
@@ -645,28 +666,38 @@ export default function FourragePage() {
         distributionsFourrage,
         dateDuJour
       );
-      if (!result.success) showToast({ type: "error", title: "Distribution non enregistrée", message: result.error });
+      if (result.success) {
+        const label = cheptel === "ovin" ? "les moutons" : "les bovins";
+        showToast({
+          type: "success",
+          title: "Distribution enregistrée",
+          message: `${formatQuantiteDistribution(quantite, unitesSelectionnees[cheptel])} pour ${label}.`,
+        });
+      } else {
+        showToast({ type: "error", title: "Distribution non enregistrée", message: result.error });
+      }
     } finally {
       setDistributionSaving(null);
     }
   };
 
-  const handleUniteChange = async (cheptel: CheptelDistribution, unite: UniteDistribution) => {
+  const handleUniteChange = (cheptel: CheptelDistribution, unite: UniteDistribution) => {
     setUnitesSelectionnees((current) => ({ ...current, [cheptel]: unite }));
-    const distribution = distributionAujourdhui(cheptel);
-    if (!distribution) return;
-    setDistributionSaving(cheptel);
+  };
+
+  const handleDeleteDistribution = async () => {
+    if (!distributionDeleteTarget) return;
+    setDistributionDeleting(distributionDeleteTarget.id);
     try {
-      const result = await definirDistributionJour(
-        cheptel,
-        distribution.quantite,
-        unite,
-        distributionsFourrage,
-        dateDuJour
-      );
-      if (!result.success) showToast({ type: "error", title: "Unité non enregistrée", message: result.error });
+      const result = await deleteDistribution(distributionDeleteTarget.id);
+      if (result.success) {
+        showToast({ type: "success", title: "Distribution supprimée" });
+      } else {
+        showToast({ type: "error", title: "Suppression impossible", message: result.error });
+      }
     } finally {
-      setDistributionSaving(null);
+      setDistributionDeleting(null);
+      setDistributionDeleteTarget(null);
     }
   };
 
@@ -729,7 +760,7 @@ export default function FourragePage() {
         <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 mb-4">
           <div>
             <h2 id="distribution-quotidienne-title" className="text-base font-semibold text-stone-800">Distribution du jour</h2>
-            <p className="text-xs text-stone-500 mt-0.5">Saisissez séparément le foin donné aux moutons et aux bovins.</p>
+            <p className="text-xs text-stone-500 mt-0.5">Indiquez la quantité, choisissez l&apos;unité, puis confirmez avec le bouton Enregistrer.</p>
           </div>
           <span className="text-xs text-stone-400">{formatDate(dateDuJour)}</span>
         </div>
@@ -740,36 +771,39 @@ export default function FourragePage() {
             const label = cheptel === "ovin" ? "Moutons" : "Bovins";
             const unite = unitesSelectionnees[cheptel];
             return (
-              <div key={cheptel} className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+              <form
+                key={cheptel}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handleSaveDistribution(cheptel);
+                }}
+                className="rounded-lg border border-stone-200 bg-stone-50 p-4"
+              >
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <h3 className="font-semibold text-stone-800">{label}</h3>
-                  <span className="text-xs text-stone-500">{distribution ? "Saisie enregistrée" : "Aucune saisie"}</span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${distribution ? "bg-green-100 text-green-700" : "bg-stone-200 text-stone-600"}`}>
+                    {distribution
+                      ? `${formatQuantiteDistribution(distribution.quantite, distribution.unite)} enregistrée${distribution.quantite > 1 ? "s" : ""}`
+                      : "Rien d'enregistré"}
+                  </span>
                 </div>
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-end">
-                  <label className="block text-xs font-medium text-stone-600">
-                    Quantité distribuée
-                    <input
-                      key={`${cheptel}-${distribution?.id ?? "nouveau"}-${distribution?.quantite ?? 0}`}
-                      type="number"
-                      min="0"
-                      step="1"
-                      inputMode="numeric"
-                      defaultValue={distribution?.quantite ?? ""}
-                      onBlur={(event) => handleQuantiteDistribution(cheptel, event.target.value)}
-                      disabled={estEnregistrement}
-                      className="mt-1 block w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:cursor-wait"
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => handleIncrementDistribution(cheptel)}
+                <label className="block text-xs font-medium text-stone-600">
+                  Nombre de bottes ou de balles distribuées
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    inputMode="numeric"
+                    required
+                    value={quantitesDistribution[cheptel]}
+                    onChange={(event) => setQuantitesDistribution((current) => ({
+                      ...current,
+                      [cheptel]: event.target.value,
+                    }))}
                     disabled={estEnregistrement}
-                    className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-wait disabled:opacity-60"
-                    aria-label={`Ajouter une ${unite} pour les ${label.toLowerCase()}`}
-                  >
-                    +1 {unite}
-                  </button>
-                </div>
+                    className="mt-1 block w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-base font-semibold text-stone-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:cursor-wait"
+                  />
+                </label>
                 <fieldset className="mt-3">
                   <legend className="text-xs font-medium text-stone-600 mb-1">Unité</legend>
                   <div className="flex gap-2">
@@ -787,10 +821,79 @@ export default function FourragePage() {
                     ))}
                   </div>
                 </fieldset>
-                <p className="mt-3 text-xs text-stone-500">La dernière unité utilisée pour ce cheptel est conservée.</p>
-              </div>
+                <button
+                  type="submit"
+                  disabled={estEnregistrement}
+                  className="mt-4 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {estEnregistrement
+                    ? "Enregistrement..."
+                    : distribution
+                      ? "Mettre à jour la distribution"
+                      : "Enregistrer la distribution"}
+                </button>
+                <p className="mt-2 text-center text-xs text-stone-500">
+                  Les changements ne sont enregistrés qu&apos;après ce clic.
+                </p>
+              </form>
             );
           })}
+        </div>
+
+        <div className="mt-6 border-t border-stone-200 pt-5" aria-labelledby="historique-distributions-title">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h3 id="historique-distributions-title" className="font-semibold text-stone-800">Historique des distributions</h3>
+              <p className="mt-0.5 text-xs text-stone-500">Les distributions enregistrées apparaissent ici immédiatement.</p>
+            </div>
+            {distributionsTriees.length > 0 && (
+              <span className="shrink-0 text-xs text-stone-400">
+                {distributionsTriees.length} saisie{distributionsTriees.length > 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+
+          {distributionsTriees.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-4 py-6 text-center">
+              <p className="text-sm font-medium text-stone-600">Aucune distribution enregistrée</p>
+              <p className="mt-1 text-xs text-stone-400">La première distribution apparaîtra ici après son enregistrement.</p>
+            </div>
+          ) : (
+            <div className="max-h-80 overflow-y-auto rounded-lg border border-stone-200 bg-white">
+              <ul className="divide-y divide-stone-100">
+                {distributionsTriees.map((distribution) => {
+                  const label = distribution.cheptel === "ovin" ? "Moutons" : "Bovins";
+                  return (
+                    <li key={distribution.id} className="flex items-center gap-3 px-3 py-3 sm:px-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-stone-900">
+                            {formatQuantiteDistribution(distribution.quantite, distribution.unite)}
+                          </span>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${distribution.cheptel === "ovin" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"}`}>
+                            {label}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-stone-500">
+                          {distribution.dateDistribution === dateDuJour ? "Aujourd'hui" : formatDate(distribution.dateDistribution)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDistributionDeleteTarget(distribution)}
+                        disabled={distributionDeleting === distribution.id}
+                        className="shrink-0 rounded-lg p-2 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-wait disabled:opacity-50"
+                        aria-label={`Supprimer la distribution de ${formatQuantiteDistribution(distribution.quantite, distribution.unite)} pour ${label.toLowerCase()}`}
+                        title="Supprimer cette distribution"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
       </section>
 
@@ -1118,6 +1221,19 @@ export default function FourragePage() {
         onConfirm={handleDelete}
         title="Supprimer l'activité"
         message={`Êtes-vous sûr de vouloir supprimer cette activité <strong>${deleteTarget ? TYPE_LABELS[deleteTarget.typeActivite] : ""}</strong> du ${deleteTarget ? formatDate(deleteTarget.dateActivite) : ""} ?`}
+        confirmText="Supprimer"
+        danger
+      />
+
+      {/* Modal suppression d'une distribution */}
+      <ConfirmModal
+        isOpen={!!distributionDeleteTarget}
+        onClose={() => setDistributionDeleteTarget(null)}
+        onConfirm={handleDeleteDistribution}
+        title="Supprimer la distribution"
+        message={distributionDeleteTarget
+          ? `Supprimer la distribution de <strong>${formatQuantiteDistribution(distributionDeleteTarget.quantite, distributionDeleteTarget.unite)}</strong> pour ${distributionDeleteTarget.cheptel === "ovin" ? "les moutons" : "les bovins"} du ${formatDate(distributionDeleteTarget.dateDistribution)} ?`
+          : ""}
         confirmText="Supprimer"
         danger
       />

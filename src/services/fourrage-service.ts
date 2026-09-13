@@ -86,34 +86,8 @@ export async function deleteDistribution(id: string) {
 }
 
 /**
- * Raccourci « +1 balle/botte » : incrémente l'entrée du jour pour ce cheptel
- * si elle existe déjà (l'unité de l'entrée existante prime), sinon la crée
- * avec `uniteSiNouvelle` (unité actuellement sélectionnée dans l'UI, qui
- * retombe elle-même sur la dernière unité utilisée pour ce cheptel).
- */
-export async function incrementerDistributionJour(
-  cheptel: CheptelDistribution,
-  uniteSiNouvelle: UniteDistribution,
-  distributionsExistantes: DistributionFourrage[],
-  date: string = new Date().toISOString().split("T")[0]
-) {
-  const existante = distributionDuJour(distributionsExistantes, cheptel, date);
-  if (existante) {
-    return firebaseService.update(PATH_DISTRIBUTIONS, existante.id, {
-      quantite: existante.quantite + 1,
-    });
-  }
-  return createDistribution({
-    dateDistribution: date,
-    cheptel,
-    unite: uniteSiNouvelle,
-    quantite: 1,
-  });
-}
-
-/**
- * Fixe la quantité du jour pour un cheptel (saisie manuelle) — crée l'entrée
- * si elle n'existe pas encore, sinon met à jour quantité et/ou unité.
+ * Enregistre explicitement la quantité du jour pour un cheptel : crée l'entrée
+ * si elle n'existe pas encore, sinon met à jour la quantité et l'unité.
  */
 export async function definirDistributionJour(
   cheptel: CheptelDistribution,
