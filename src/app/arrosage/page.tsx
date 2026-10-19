@@ -794,7 +794,7 @@ export default function ArrosagePage() {
   const gateReasons = gate && !gate.allowed ? gate.reasons : [];
 
   return (
-    <div className="min-h-full -m-4 bg-[radial-gradient(circle_at_top_left,#dcfce7_0,transparent_34rem),linear-gradient(180deg,#f8faf7,#eef4ec)] p-4 sm:-m-6 sm:p-6">
+    <div className="legacy-irrigation-surface min-h-full -m-4 bg-[radial-gradient(circle_at_top_left,#dcfce7_0,transparent_34rem),linear-gradient(180deg,#f8faf7,#eef4ec)] p-4 sm:-m-6 sm:p-6">
       <div className="mx-auto max-w-5xl space-y-5">
         <div className="flex items-center justify-between gap-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1.5 text-xs font-black text-brand-700 ring-1 ring-brand-100">

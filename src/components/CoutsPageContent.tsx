@@ -116,7 +116,7 @@ export default function CoutsPageContent() {
 
   return <div className={`${farmStyles.theme} ${styles.page}`}>
     <header className={styles.header}>
-      <div><p className={styles.eyebrow}>LA FERME TABOUCHE</p><h1>Coûts</h1><p className={styles.subtitle}>Achats, recettes et répartition</p></div>
+      <div><h1>Coûts</h1><p className={styles.subtitle}>Achats et recettes</p></div>
       <Button variant="ghost" aria-label="Autres actions" onClick={() => setPanel("more")}><MoreHorizontal aria-hidden="true" /></Button>
     </header>
     {message && <div className={styles.noticeRow}><Notice tone={message.tone}>{message.text}</Notice><Button variant="ghost" aria-label="Masquer le message" onClick={() => setMessage(null)}><X aria-hidden="true" /></Button></div>}
@@ -125,7 +125,7 @@ export default function CoutsPageContent() {
       <div className={styles.summaryHeading}><span>Dépenses</span><Button variant="ghost" onClick={() => setPanel("filters")}>{filters.annee || "Toutes les années"}<SlidersHorizontal aria-hidden="true" /></Button></div>
       <p className={styles.bigAmount}>{loading ? "…" : money(stats.totalDepenses)}</p>
       <p className={styles.secondary}>{hasFilters ? "Pour la sélection affichée" : "Hors avances et remboursements"}</p>
-      <div className={styles.summaryDetails}><div><span>Recettes</span><strong>{money(stats.totalRevenus)}</strong></div><div><span>Solde des opérations</span><strong>{money(stats.balance)}</strong></div></div>
+      <div className={styles.summaryDetails}><div><span>Recettes</span><strong>{money(stats.totalRevenus)}</strong></div><div><span>Solde</span><strong>{money(stats.balance)}</strong></div></div>
     </Card>
     {unassigned > 0 && <Notice tone="warning">{money(unassigned)} restent à affecter à une production. Ces dépenses sont déjà comprises dans le total.</Notice>}
     <div className={styles.toolbar}><div className={styles.search}><Search aria-hidden="true" /><input aria-label="Rechercher une écriture" placeholder="Fournisseur, achat, matériel…" value={search} onChange={e => setSearch(e.target.value)} /></div><Button aria-label={`Filtres${activeFilterCount ? ` : ${activeFilterCount} actifs` : ""}`} onClick={() => setPanel("filters")}><SlidersHorizontal aria-hidden="true" />{activeFilterCount || ""}</Button></div>

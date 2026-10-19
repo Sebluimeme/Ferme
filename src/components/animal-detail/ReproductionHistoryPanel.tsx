@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CalendarDays, HeartPulse, PawPrint, type LucideIcon } from "lucide-react";
 import Modal from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import {
@@ -24,7 +25,7 @@ type TimelineItem = {
   date: string;
   label: string;
   detail?: string;
-  icon: string;
+  icon: LucideIcon;
   source: "active-saillie" | "chaleur" | "history";
   sourceId?: string;
 };
@@ -40,7 +41,7 @@ export default function ReproductionHistoryPanel({ history, chaleurs, animal }: 
       date: animal.dateSaillie,
       label: "Saillie / insémination en cours",
       detail: "Suivi de gestation actif",
-      icon: "🐑",
+      icon: PawPrint,
       source: "active-saillie" as const,
     }] : []),
     ...chaleurs.map((entry) => ({
@@ -48,7 +49,7 @@ export default function ReproductionHistoryPanel({ history, chaleurs, animal }: 
       date: entry.date,
       label: "Chaleur observée",
       detail: entry.note,
-      icon: "🔥",
+      icon: HeartPulse,
       source: "chaleur" as const,
       sourceId: entry.id,
     })),
@@ -59,7 +60,7 @@ export default function ReproductionHistoryPanel({ history, chaleurs, animal }: 
         date: entry.date,
         label: entry.sujet,
         detail: entry.description,
-        icon: /mise bas/i.test(entry.sujet) ? "🍼" : "🐑",
+        icon: /mise bas/i.test(entry.sujet) ? CalendarDays : PawPrint,
         source: "history" as const,
         sourceId: entry.id,
       })),
@@ -106,7 +107,7 @@ export default function ReproductionHistoryPanel({ history, chaleurs, animal }: 
         <ol className="space-y-1">
           {items.map((item) => (
             <li key={item.id} className="flex gap-3 border-b border-stone-100 py-3 last:border-b-0">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600/10" aria-hidden="true">{item.icon}</span>
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600/10" aria-hidden="true"><item.icon size={20} /></span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
                   <span className="text-base font-medium text-stone-800">{item.label}</span>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
+import { CalendarDays } from "lucide-react";
 import { useAppStore, type Animal } from "@/store/store";
 import { getGestationDurationDays, calculateEstimatedBirthDate, formatGestationDate } from "@/lib/reproduction";
 
@@ -276,7 +277,7 @@ export default function AnimalForm({ animal, formRef }: AnimalFormProps) {
       {selectedSexe === "F" && (
         <div className="rounded-xl border border-brand-600/20 bg-brand-600/5 p-4">
           <div className="mb-3">
-            <h3 className="text-sm font-semibold text-stone-800">🍼 Reproduction — insémination / saillie</h3>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-stone-800"><CalendarDays size={18} className="shrink-0" aria-hidden="true" />Reproduction — insémination / saillie</h3>
             <p className="text-xs text-stone-500">
               Renseignez la date pour obtenir une estimation automatique de mise bas. Une alerte s&apos;affichera
               sur la fiche et en haut de la liste quelques jours avant le terme.

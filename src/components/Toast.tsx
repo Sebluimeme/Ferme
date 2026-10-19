@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback } from "react";
+import styles from "./Toast.module.css";
+import { CheckCircle2, CircleAlert, Info, TriangleAlert, X, type LucideIcon } from "lucide-react";
 
 interface Toast {
   id: number;
@@ -19,11 +21,11 @@ export function useToast() {
   return context;
 }
 
-const icons: Record<string, string> = {
-  success: "\u2713",
-  error: "\u2717",
-  warning: "\u26A0",
-  info: "\u2139",
+const icons: Record<Toast["type"], LucideIcon> = {
+  success: CheckCircle2,
+  error: CircleAlert,
+  warning: TriangleAlert,
+  info: Info,
 };
 
 const borderColors: Record<string, string> = {
@@ -53,25 +55,28 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed top-[80px] right-4 z-[1070] flex flex-col gap-2 max-w-[400px]">
-        {toasts.map((toast) => (
+      <div className={styles.region}>
+        {toasts.map((toast) => { const Icon = icons[toast.type]; return (
           <div
             key={toast.id}
-            className={`flex items-start gap-3 px-4 py-3 bg-white rounded-xl shadow-lg border-l-4 ${borderColors[toast.type]} slide-in-right min-w-[300px]`}
+            role={toast.type === "error" ? "alert" : "status"}
+            className={`${styles.toast} ${borderColors[toast.type]}`}
           >
-            <span className="text-xl shrink-0">{icons[toast.type]}</span>
-            <div className="flex-1">
-              {toast.title && <div className="font-semibold text-sm">{toast.title}</div>}
-              {toast.message && <div className="text-sm text-stone-600">{toast.message}</div>}
+            <Icon className={styles.icon} aria-hidden="true" />
+            <div className={styles.content}>
+              {toast.title && <div className={styles.title}>{toast.title}</div>}
+              {toast.message && <div className={styles.message}>{toast.message}</div>}
             </div>
             <button
               onClick={() => removeToast(toast.id)}
-              className="text-stone-400 hover:text-stone-700 text-lg shrink-0 cursor-pointer"
+              type="button"
+              aria-label="Fermer le message"
+              className={styles.close}
             >
-              &times;
+              <X size={22} aria-hidden="true" />
             </button>
           </div>
-        ))}
+        ); })}
       </div>
     </ToastContext.Provider>
   );

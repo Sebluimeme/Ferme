@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
+import styles from "./AppFrame.module.css";
 import { usePathname } from "next/navigation";
 import { useAppStore } from "@/store/store";
 import {
@@ -23,6 +25,7 @@ import {
   Fuel,
   CloudSun,
   HeartPulse,
+  X,
 } from "lucide-react";
 
 const sections = [
@@ -78,98 +81,69 @@ const sections = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { state, closeSidebar } = useAppStore();
-
-  const handleLogout = async () => {
-    const { logout } = await import("@/lib/auth-service");
-    await logout();
-  };
-
-  return (
-    <>
-      {/* Overlay mobile */}
-      {state.sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-[1029] lg:hidden"
-          onClick={closeSidebar}
-        />
-      )}
-
-      <aside
-        className={[
-          "w-[220px] bg-stone-950 flex flex-col shrink-0",
-          "border-r border-stone-800/60",
-          "fixed top-0 left-0 z-[1030]",
-          "transition-transform duration-200",
-          state.sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-        ].join(" ")}
-        style={{
-          height: "100dvh",
-          paddingTop: "env(safe-area-inset-top, 0px)",
-          paddingLeft: "env(safe-area-inset-left, 0px)",
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        }}
-      >
-        {/* Logo */}
-        <div className="px-4 py-5 border-b border-stone-800/60 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center shrink-0">
-              <Wheat className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <p className="text-[13px] font-semibold text-white leading-none">La Ferme</p>
-              <p className="text-[11px] text-stone-500 leading-none mt-0.5">Tabouche</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-5">
-          {sections.map((section) => (
-            <div key={section.title}>
-              <p className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-stone-400">
-                {section.title}
-              </p>
-              <div className="space-y-0.5">
-                {section.items.map((item) => {
-                  const isActive = pathname === item.route;
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.route}
-                      href={item.route}
-                      onClick={closeSidebar}
-                      className={[
-                        "flex items-center gap-2.5 px-2 py-1.5 rounded-md",
-                        "text-[13px] font-medium transition-colors no-underline",
-                        isActive
-                          ? "bg-stone-800 text-white"
-                          : "text-stone-400 hover:text-stone-100 hover:bg-stone-800/50",
-                      ].join(" ")}
-                    >
-                      <Icon className={`w-[15px] h-[15px] shrink-0 ${isActive ? "text-brand-400" : ""}`} />
-                      <span>{item.label}</span>
-                      {isActive && (
-                        <ChevronRight className="w-3 h-3 text-stone-600 ml-auto" />
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
-
-        {/* Footer */}
-        <div className="px-3 py-4 border-t border-stone-800/60 shrink-0">
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2.5 px-2 py-1.5 w-full rounded-md text-[13px] text-stone-500 hover:text-stone-300 hover:bg-stone-800/50 transition-colors cursor-pointer"
-          >
-            <LogOut className="w-[15px] h-[15px]" />
-            Déconnexion
-          </button>
-        </div>
-      </aside>
-    </>
-  );
+  const menuRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!state.sidebarOpen) return;
+    const desktop = window.matchMedia("(min-width: 1024px)");
+    if (desktop.matches) { closeSidebar(); return; }
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    // Opening changes visibility as well as transform. Let the browser apply
+    // that style before focusing; no timer tied to the animation duration.
+    let focusFrame = 0;
+    const openingFrame = requestAnimationFrame(() => {
+      focusFrame = requestAnimationFrame(() => {
+        if (!desktop.matches && !menuRef.current?.contains(document.activeElement)) {
+          menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+        }
+      });
+    });
+    const onViewportChange = (event: MediaQueryListEvent) => {
+      if (!event.matches) return;
+      document.body.style.overflow = overflow;
+      // The mobile close button disappears on desktop; keep keyboard focus on
+      // a visible navigation item instead of leaving it on a hidden control.
+      const active = document.activeElement as HTMLElement | null;
+      if (!active?.getClientRects().length) {
+        const target = menuRef.current?.querySelector<HTMLAnchorElement>('a[aria-current="page"]')
+          || menuRef.current?.querySelector<HTMLAnchorElement>("a[href]");
+        target?.focus({ preventScroll: true });
+      }
+      closeSidebar();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (desktop.matches) return;
+      if (event.key === "Escape") { event.preventDefault(); closeSidebar(); }
+      if (event.key !== "Tab") return;
+      const elements = Array.from(menuRef.current?.querySelectorAll<HTMLElement>("a[href],button") || []).filter(e => e.getClientRects().length);
+      const first = elements[0], last = elements[elements.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    desktop.addEventListener("change", onViewportChange);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      cancelAnimationFrame(openingFrame);
+      cancelAnimationFrame(focusFrame);
+      desktop.removeEventListener("change", onViewportChange);
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+      if (previous?.isConnected && previous.getClientRects().length) previous.focus({ preventScroll: true });
+    };
+  }, [state.sidebarOpen, closeSidebar]);
+  const handleLogout = async () => { const { logout } = await import("@/lib/auth-service"); await logout(); };
+  return <>
+    {state.sidebarOpen && <div className={styles.backdrop} onClick={closeSidebar} aria-hidden="true" />}
+    <aside id="farm-navigation" ref={menuRef} data-modal-root={state.sidebarOpen ? "true" : undefined} className={`${styles.sidebar} ${state.sidebarOpen ? styles.sidebarOpen : ""}`} aria-label="Menu de la ferme">
+      <div className={styles.sidebarHeader}><span className={styles.brand}><Wheat aria-hidden="true" /><span>La Ferme</span></span><button type="button" className={`${styles.iconButton} ${styles.mobileControl}`} onClick={closeSidebar} aria-label="Fermer le menu"><X aria-hidden="true" /></button></div>
+      <nav className={styles.sidebarNav} aria-label="Toutes les rubriques">
+        {sections.map(section => <section key={section.title} className={styles.sidebarSection}>
+          <h2 className={styles.sidebarTitle}>{section.title}</h2>
+          {section.items.map(item => { const Icon = item.icon; const active = pathname === item.route || (item.route !== "/" && pathname.startsWith(item.route + "/") && item.route !== "/fourrage"); return <Link key={item.route} href={item.route} onClick={closeSidebar} className={styles.sidebarLink} aria-current={active ? "page" : undefined}><Icon aria-hidden="true" /><span>{item.label}</span></Link>; })}
+        </section>)}
+      </nav>
+      <div className={styles.sidebarFooter}><button type="button" onClick={handleLogout} className={`${styles.sidebarLink} ${styles.logout}`}><LogOut aria-hidden="true" />Déconnexion</button></div>
+    </aside>
+  </>;
 }

@@ -7,14 +7,18 @@ import Sidebar from "./Sidebar";
 import BottomNav from "./BottomNav";
 import PullToRefresh from "./PullToRefresh";
 import { Wheat } from "lucide-react";
+import { usePathname } from "next/navigation";
+import styles from "./AppFrame.module.css";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const { state } = useAppStore();
+  const pathname = usePathname();
+  const modernPage = pathname === "/couts" || pathname === "/reproduction";
 
   if (state.authLoading) {
     return (
-      <div className="min-h-[100dvh] bg-stone-950 flex items-center justify-center"
-        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      <div className="min-h-[100dvh] flex items-center justify-center"
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)", background: "var(--farm-bg)", color: "var(--farm-text)" }}>
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-brand-600 flex items-center justify-center">
             <Wheat className="w-6 h-6 text-white" />
@@ -38,27 +42,24 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex bg-stone-100 w-screen overflow-hidden" style={{ minHeight: "100dvh" }}>
+    <div className={styles.shell}>
       <PullToRefresh />
 
       {/* Sidebar desktop fixe */}
       <Sidebar />
 
       {/* Contenu principal */}
-      <div className="flex flex-col flex-1 min-w-0 lg:ml-[220px] min-h-[100dvh]">
+      <div className={styles.content}>
         {/* Navbar — padding top pour safe area iOS */}
-        <div style={{ paddingTop: "env(safe-area-inset-top, 0px)" }} className="bg-white border-b border-stone-200 sticky top-0 z-[1020]">
+        <div className={styles.top}>
           <Navbar />
         </div>
 
         {/* Contenu — padding bottom pour la BottomNav + safe area */}
         <main
-          className="flex-1 overflow-y-auto overflow-x-hidden w-full max-w-full p-4 md:p-6 lg:p-8 lg:pb-8"
-          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 3.75rem)" }}
+          className={`${styles.main} ${modernPage ? "" : "legacy-content"}`}
         >
-          <div className="lg:pb-0" style={{ paddingBottom: 0 }}>
-            {children}
-          </div>
+          {children}
         </main>
       </div>
 

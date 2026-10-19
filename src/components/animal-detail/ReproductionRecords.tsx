@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { HeartPulse, PawPrint } from "lucide-react";
 import { useToast } from "@/components/Toast";
 import Modal from "@/components/Modal";
 import { addChaleur, deleteChaleur, type ChaleurEntry } from "@/services/animal-detail-service";
@@ -228,7 +229,7 @@ export default function ReproductionRecords({ animal, chaleurs }: ReproductionRe
           </div>
         ) : (
           <div className="text-center py-8 text-stone-400">
-            <div className="text-4xl mb-2">🐑</div>
+            <PawPrint size={28} className="mx-auto mb-2" aria-hidden="true" />
             <p>Aucune saillie enregistrée</p>
           </div>
         )}
@@ -248,7 +249,7 @@ export default function ReproductionRecords({ animal, chaleurs }: ReproductionRe
 
         {sortedChaleurs.length === 0 ? (
           <div className="text-center py-12 text-stone-400">
-            <div className="text-4xl mb-2">🔥</div>
+            <HeartPulse size={28} className="mx-auto mb-2" aria-hidden="true" />
             <p>Aucune chaleur enregistrée</p>
           </div>
         ) : (

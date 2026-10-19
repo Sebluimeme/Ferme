@@ -1,14 +1,15 @@
 "use client";
 
 import { useMemo } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { CalendarDays, ChevronRight, HeartPulse, PawPrint } from "lucide-react";
 import { useAppStore, type Animal } from "@/store/store";
 import { getGestationAlert, getHeatAlert, formatGestationMessage, formatHeatMessage } from "@/lib/reproduction";
 import { groupChaleursByAnimal } from "@/components/HeatAlerts";
-import { getAnimalIcon } from "@/lib/utils";
+import { Card, Notice, farmStyles } from "@/components/ui/FarmUI";
+import styles from "./ReproductionPage.module.css";
 
 export default function ReproductionPage() {
-  const router = useRouter();
   const { state } = useAppStore();
   const { animaux, chaleurs, loading } = state;
 
@@ -33,90 +34,69 @@ export default function ReproductionPage() {
       .sort((a, b) => a.alert.joursRestants - b.alert.joursRestants);
   }, [animaux]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-stone-400 text-lg">Chargement...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="fade-in">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-stone-900">Reproduction</h1>
-        <p className="text-stone-500 text-sm mt-1">Chaleurs et mises bas à venir, tous animaux confondus</p>
-      </div>
+    <div className={`${farmStyles.theme} ${styles.page}`}>
+      <header className={styles.header}>
+        <h1>Reproduction</h1>
+        <p>Chaleurs et mises bas à venir, tous animaux confondus.</p>
+      </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Chaleurs à venir */}
-        <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
-          <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-stone-100">
-            <span>🔥</span>
-            <span className="text-[13px] font-semibold text-stone-800">
-              Prochaines chaleurs {upcomingHeats.length > 0 && `(${upcomingHeats.length})`}
-            </span>
-          </div>
-          {upcomingHeats.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <p className="text-[13px] text-stone-400">Aucune chaleur à venir</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-stone-100">
-              {upcomingHeats.map(({ animal, alert }) => (
-                <div
-                  key={animal.id}
-                  onClick={() => router.push(`/animaux/${animal.id}`)}
-                  className="flex items-center gap-3 px-5 py-3 hover:bg-stone-50 cursor-pointer transition-colors"
-                >
-                  <span className="text-lg shrink-0">{getAnimalIcon(animal.type)}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium text-stone-800 truncate">
-                      {animal.nom || animal.numeroBoucle || "Animal"}
-                    </p>
-                    <p className="text-[11px] text-stone-400 mt-0.5">{formatHeatMessage(alert)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      {loading ? <Notice>Chargement du suivi de reproduction…</Notice> : <>
+        <div className={styles.sections}>
+          <Card className={styles.section} role="region" aria-labelledby="upcoming-heats-heading">
+            <header className={styles.sectionHeader}>
+              <HeartPulse aria-hidden="true" />
+              <h2 id="upcoming-heats-heading">Prochaines chaleurs</h2>
+              <span className={styles.count} aria-label={`${upcomingHeats.length} chaleur${upcomingHeats.length > 1 ? "s" : ""} à venir`}>{upcomingHeats.length}</span>
+            </header>
+            {upcomingHeats.length === 0 ? (
+              <p className={styles.empty}>Aucune chaleur à venir.</p>
+            ) : (
+              <ul className={styles.list}>
+                {upcomingHeats.map(({ animal, alert }) => (
+                  <li key={animal.id}>
+                    <Link href={`/animaux/${animal.id}`} className={styles.animalLink}>
+                      <PawPrint className={styles.animalIcon} aria-hidden="true" />
+                      <span className={styles.animalDetails}>
+                        <span className={styles.animalName}>{animal.nom || animal.numeroBoucle || "Animal"}</span>
+                        <span className={styles.prediction}>{formatHeatMessage(alert)}</span>
+                      </span>
+                      <ChevronRight className={styles.chevron} aria-hidden="true" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
 
-        {/* Mises bas à venir */}
-        <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
-          <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-stone-100">
-            <span>🍼</span>
-            <span className="text-[13px] font-semibold text-stone-800">
-              Prochaines mises bas {upcomingBirths.length > 0 && `(${upcomingBirths.length})`}
-            </span>
-          </div>
-          {upcomingBirths.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <p className="text-[13px] text-stone-400">Aucune mise bas à venir</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-stone-100">
-              {upcomingBirths.map(({ animal, alert }) => (
-                <div
-                  key={animal.id}
-                  onClick={() => router.push(`/animaux/${animal.id}`)}
-                  className="flex items-center gap-3 px-5 py-3 hover:bg-stone-50 cursor-pointer transition-colors"
-                >
-                  <span className="text-lg shrink-0">{getAnimalIcon(animal.type)}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium text-stone-800 truncate">
-                      {animal.nom || animal.numeroBoucle || "Animal"}
-                    </p>
-                    <p className={`text-[11px] mt-0.5 ${alert.enRetard ? "text-red-500" : "text-stone-400"}`}>
-                      {formatGestationMessage(alert)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <Card className={styles.section} role="region" aria-labelledby="upcoming-births-heading">
+            <header className={styles.sectionHeader}>
+              <CalendarDays aria-hidden="true" />
+              <h2 id="upcoming-births-heading">Prochaines mises bas</h2>
+              <span className={styles.count} aria-label={`${upcomingBirths.length} mise${upcomingBirths.length > 1 ? "s" : ""} bas à venir`}>{upcomingBirths.length}</span>
+            </header>
+            {upcomingBirths.length === 0 ? (
+              <p className={styles.empty}>Aucune mise bas à venir.</p>
+            ) : (
+              <ul className={styles.list}>
+                {upcomingBirths.map(({ animal, alert }) => (
+                  <li key={animal.id}>
+                    <Link href={`/animaux/${animal.id}`} className={styles.animalLink}>
+                      <PawPrint className={styles.animalIcon} aria-hidden="true" />
+                      <span className={styles.animalDetails}>
+                        <span className={styles.animalName}>{animal.nom || animal.numeroBoucle || "Animal"}</span>
+                        <span className={`${styles.prediction} ${alert.enRetard ? styles.overdue : ""}`}>{formatGestationMessage(alert)}</span>
+                      </span>
+                      <ChevronRight className={styles.chevron} aria-hidden="true" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
         </div>
-      </div>
+        <p className={styles.help}>Les prévisions dépendent des observations et des saillies renseignées dans les fiches des animaux.</p>
+      </>}
     </div>
   );
 }

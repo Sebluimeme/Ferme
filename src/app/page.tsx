@@ -9,7 +9,6 @@ import { getVehicleStats } from "@/services/vehicle-service";
 import { getUrgentTasks, getTaskStats, getDaysUntilDue } from "@/services/task-service";
 import { getGestationAlert, getHeatAlert, formatGestationDate } from "@/lib/reproduction";
 import { groupChaleursByAnimal } from "@/components/HeatAlerts";
-import { getAnimalIcon } from "@/lib/utils";
 import KpiCard from "@/components/KpiCard";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Animal } from "@/store/store";
@@ -18,6 +17,8 @@ import { formatFreshnessLabel, formatMetricValue, formatRelativeAge } from "@/li
 import { loadCiterneStatus } from "@/lib/citerneClient";
 import {
   PawPrint,
+  CalendarDays,
+  HeartPulse,
   Truck,
   Wallet,
   ClipboardList,
@@ -224,7 +225,7 @@ export default function DashboardPage() {
           {upcomingHeats.length > 0 && (
             <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
               <div className="flex items-center justify-between px-5 py-3.5 border-b border-stone-100">
-                <span className="text-[13px] font-semibold text-stone-800">⚠️ Prochaines chaleurs</span>
+                <span className="flex items-center gap-2 text-[13px] font-semibold text-stone-800"><HeartPulse size={18} className="shrink-0" aria-hidden="true" />Prochaines chaleurs</span>
                 <button
                   onClick={() => router.push("/reproduction")}
                   className="text-[12px] text-brand-600 hover:underline font-medium cursor-pointer"
@@ -239,7 +240,7 @@ export default function DashboardPage() {
                     onClick={() => router.push(`/animaux/${animal.id}`)}
                     className="flex items-center gap-3 px-5 py-3 hover:bg-stone-50 cursor-pointer transition-colors"
                   >
-                    <span className="text-lg shrink-0">{getAnimalIcon(animal.type)}</span>
+                    <PawPrint size={20} className="shrink-0" aria-hidden="true" />
                     <p className="flex-1 min-w-0 text-[13px] font-medium text-stone-800 truncate">
                       {animal.nom || animal.numeroBoucle || "Animal"}
                     </p>
@@ -253,7 +254,7 @@ export default function DashboardPage() {
           {upcomingBirths.length > 0 && (
             <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
               <div className="flex items-center justify-between px-5 py-3.5 border-b border-stone-100">
-                <span className="text-[13px] font-semibold text-stone-800">🍼 Prochaines mises bas</span>
+                <span className="flex items-center gap-2 text-[13px] font-semibold text-stone-800"><CalendarDays size={18} className="shrink-0" aria-hidden="true" />Prochaines mises bas</span>
                 <button
                   onClick={() => router.push("/reproduction")}
                   className="text-[12px] text-brand-600 hover:underline font-medium cursor-pointer"
@@ -268,7 +269,7 @@ export default function DashboardPage() {
                     onClick={() => router.push(`/animaux/${animal.id}`)}
                     className="flex items-center gap-3 px-5 py-3 hover:bg-stone-50 cursor-pointer transition-colors"
                   >
-                    <span className="text-lg shrink-0">{getAnimalIcon(animal.type)}</span>
+                    <PawPrint size={20} className="shrink-0" aria-hidden="true" />
                     <p className="flex-1 min-w-0 text-[13px] font-medium text-stone-800 truncate">
                       {animal.nom || animal.numeroBoucle || "Animal"}
                     </p>
@@ -284,7 +285,7 @@ export default function DashboardPage() {
       {latestWeather && (
         <button
           onClick={() => router.push("/meteo")}
-          className="w-full bg-gradient-to-br from-sky-50 to-white border border-sky-100 rounded-xl p-4 text-left hover:border-sky-200 hover:shadow-sm transition-all"
+          className="legacy-weather-surface w-full bg-gradient-to-br from-sky-50 to-white border border-sky-100 rounded-xl p-4 text-left hover:border-sky-200 hover:shadow-sm transition-all"
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">

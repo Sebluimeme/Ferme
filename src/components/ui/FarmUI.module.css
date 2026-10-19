@@ -1,19 +1,4 @@
 .theme {
-  --farm-bg: #f5f5f7;
-  --farm-surface: #fff;
-  --farm-input: #f5f5f7;
-  --farm-text: #1d1d1f;
-  --farm-muted: #5c5c63;
-  --farm-border: #c7c7cc;
-  --farm-accent: #237549;
-  --farm-on-accent: #fff;
-  --farm-soft: #eaf4ed;
-  --farm-danger: #b42318;
-  --farm-danger-bg: #fff0ed;
-  --farm-warning: #854d0e;
-  --farm-warning-bg: #fff5de;
-  --farm-shadow: 0 12px 40px #0000001a;
-  color-scheme: light;
   color: var(--farm-text);
   font-family: -apple-system, BlinkMacSystemFont, "Roboto", "Segoe UI", sans-serif;
   font-size: 17px;
@@ -71,8 +56,5 @@
 .spinner { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes appear { from { opacity: .5; transform: translateY(16px); } to { opacity: 1; transform: none; } }
-@media (prefers-color-scheme: dark) {
-  .theme { --farm-bg: #111113; --farm-surface: #1c1c1e; --farm-input: #29292d; --farm-text: #f5f5f7; --farm-muted: #b8b8c0; --farm-border: #63636a; --farm-accent: #78d99a; --farm-on-accent: #102116; --farm-soft: #213b2b; --farm-danger: #ffb4ab; --farm-danger-bg: #44231f; --farm-warning: #f5c35a; --farm-warning-bg: #3f321a; --farm-shadow: 0 12px 40px #0006; color-scheme: dark; }
-}
 @media (prefers-reduced-motion: reduce) { .button { transition: none; } .sheet, .spinner { animation: none; } }
 @media (min-width: 700px) { .overlay { padding: 24px; align-items: center; } .sheet { border-radius: 28px; } }

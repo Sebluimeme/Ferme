@@ -195,7 +195,7 @@ function WindCompass({ reading }: { reading: WeatherReading | null }) {
       </div>
 
       <div className="mt-5 flex items-center justify-center">
-        <div className="relative h-52 w-52 max-w-full rounded-full bg-[radial-gradient(circle_at_center,#ffffff_0%,#ffffff_31%,#eff8ff_32%,#f8fbff_68%,#ffffff_69%)] shadow-[inset_0_0_0_1px_rgba(14,165,233,0.12),inset_0_14px_34px_rgba(14,165,233,0.10)]">
+        <div className="legacy-wind-compass relative h-52 w-52 max-w-full rounded-full bg-[radial-gradient(circle_at_center,#ffffff_0%,#ffffff_31%,#eff8ff_32%,#f8fbff_68%,#ffffff_69%)] shadow-[inset_0_0_0_1px_rgba(14,165,233,0.12),inset_0_14px_34px_rgba(14,165,233,0.10)]">
           <div className="absolute inset-4 rounded-full border border-sky-100/80" />
           <div className="absolute inset-10 rounded-full border border-dashed border-sky-200/90" />
           <span className="absolute left-1/2 top-3 -translate-x-1/2 text-[11px] font-bold text-sky-700">N</span>
@@ -511,7 +511,7 @@ export default function MeteoPage() {
 
   return (
     <div className="space-y-5 fade-in pb-6">
-      <div className="relative overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-5 md:p-7 shadow-sm">
+      <div className="legacy-weather-surface relative overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-emerald-50 p-5 md:p-7 shadow-sm">
         <div className="absolute right-[-50px] top-[-70px] w-48 h-48 rounded-full bg-sky-200/30 blur-2xl" />
         <div className="absolute right-16 bottom-[-80px] w-56 h-56 rounded-full bg-emerald-200/30 blur-2xl" />
         <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-5">

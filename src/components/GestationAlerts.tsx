@@ -5,7 +5,7 @@ import type { Animal } from "@/store/store";
 import { useAppStore } from "@/store/store";
 import { useToast } from "@/components/Toast";
 import { clearGestationSuivi } from "@/services/animal-service";
-import { getAnimalIcon } from "@/lib/utils";
+import { CalendarDays, PawPrint } from "lucide-react";
 import {
   getGestationAlert,
   formatGestationMessage,
@@ -24,7 +24,7 @@ export function GestationBadge({ animal }: { animal: Animal }) {
       }`}
       title={formatGestationMessage(alert)}
     >
-      <span>🍼</span>
+      <CalendarDays size={15} className="shrink-0" aria-hidden="true" />
       <span className="truncate">{formatGestationMessage(alert)}</span>
     </div>
   );
@@ -57,7 +57,7 @@ export function GestationAlertCard({ animal }: { animal: Animal }) {
         alert.enRetard ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"
       }`}
     >
-      <div className="text-2xl shrink-0">🍼</div>
+      <CalendarDays size={24} className="shrink-0" aria-hidden="true" />
       <div className="flex-1 min-w-0">
         <div className={`font-semibold text-sm sm:text-base ${alert.enRetard ? "text-red-800" : "text-amber-900"}`}>
           {alert.enRetard ? "⚠️ Naissance en retard sur l'estimation" : "Attention, prochaine naissance prévue"}
@@ -99,7 +99,7 @@ export function UpcomingBirthsBanner({ scope }: { scope?: Animal["type"] }) {
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 mb-6">
       <div className="font-semibold text-sm text-amber-900 mb-2 flex items-center gap-2">
-        <span>🍼</span>
+        <CalendarDays size={18} className="shrink-0" aria-hidden="true" />
         <span>
           Prochaines naissances{scope ? "" : " (tous animaux)"} — {upcoming.length}
         </span>
@@ -107,7 +107,7 @@ export function UpcomingBirthsBanner({ scope }: { scope?: Animal["type"] }) {
       <div className="flex flex-col gap-1.5">
         {upcoming.map(({ animal, alert }) => (
           <div key={animal.id} className="text-sm text-amber-900 flex items-center gap-2">
-            <span>{getAnimalIcon(animal.type)}</span>
+            <PawPrint size={18} className="shrink-0" aria-hidden="true" />
             <span className="font-medium">{animal.nom || animal.numeroBoucle || "Animal"}</span>
             <span className="text-amber-700">
               — {alert.enRetard ? "en retard" : `prévue le ${formatGestationDate(alert.dateEstimee)}`}

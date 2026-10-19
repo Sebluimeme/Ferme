@@ -2,7 +2,7 @@
 
 import type { Animal } from "@/store/store";
 import { useAppStore } from "@/store/store";
-import { getAnimalIcon } from "@/lib/utils";
+import { HeartPulse, PawPrint } from "lucide-react";
 import { getHeatAlert, formatGestationDate, type HeatAlert } from "@/lib/reproduction";
 import type { ChaleurEntry } from "@/services/animal-detail-service";
 
@@ -39,7 +39,7 @@ export function UpcomingHeatsBanner({ scope }: { scope?: Animal["type"] }) {
   return (
     <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 mb-6">
       <div className="font-semibold text-sm text-rose-900 mb-2 flex items-center gap-2">
-        <span>🔥</span>
+        <HeartPulse size={18} className="shrink-0" aria-hidden="true" />
         <span>
           Prochaines chaleurs{scope ? "" : " (tous animaux)"} — {upcoming.length}
         </span>
@@ -47,7 +47,7 @@ export function UpcomingHeatsBanner({ scope }: { scope?: Animal["type"] }) {
       <div className="flex flex-col gap-1.5">
         {upcoming.map(({ animal, alert }) => (
           <div key={animal.id} className="text-sm text-rose-900 flex items-center gap-2">
-            <span>{getAnimalIcon(animal.type)}</span>
+            <PawPrint size={18} className="shrink-0" aria-hidden="true" />
             <span className="font-medium">{animal.nom || animal.numeroBoucle || "Animal"}</span>
             <span className="text-rose-700">
               — prévue le {formatGestationDate(alert.dateEstimee)}
