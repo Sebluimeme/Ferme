@@ -54,6 +54,9 @@ import {
   update,
   onValue,
   serverTimestamp,
+  query,
+  orderByChild,
+  startAt,
 } from "firebase/database";
 import { readFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -123,6 +126,13 @@ const WATER_BALANCE_LIVE_PATH   = "irrigation-ha/water-balance/live";   // insta
 const WATER_BALANCE_EVENTS_PATH = "irrigation-ha/water-balance/events"; // ledger idempotent par zone
 const WATER_BALANCE_PENDING_PATH = "irrigation-ha/water-balance/pending-manual"; // confirmations manuelles en attente (survit à un redémarrage)
 const WEATHER_READINGS_PATH     = "weather-readings";
+// Fenêtre météo utilisée par l'analyse. Relire tout l'historique toutes les
+// 5 min coûtait ~2,4 Go/jour de bande passante RTDB : on garde un listener sur
+// la fenêtre (le serveur n'envoie ensuite que les nouveaux relevés). Le bilan
+// hydrique n'intègre que les deltas de pluie par date et la pluie utile ne
+// regarde que 7 jours.
+const WEATHER_LOOKBACK_DAYS     = 14;
+const WEATHER_LOOKBACK_MS       = WEATHER_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
 
 // ── Default auto-schedule config V2 ──────────────────────────────────────────
 const DEFAULT_AUTO_CONFIG = {
@@ -493,6 +503,40 @@ function watchCommands() {
 let autoConfig = null;
 let executingAutoZone = false;
 
+let recentWeatherReadings = {};
+let resolveWeatherReady;
+let rejectWeatherReady;
+const weatherReady = new Promise((resolve, reject) => {
+  resolveWeatherReady = resolve;
+  rejectWeatherReady = reject;
+});
+
+/**
+ * Écoute les relevés météo des WEATHER_LOOKBACK_DAYS derniers jours. Le premier
+ * snapshot arrive une seule fois au démarrage ; ensuite seuls les ajouts
+ * transitent sur le réseau.
+ */
+function startWeatherListener() {
+  const since = new Date(Date.now() - WEATHER_LOOKBACK_MS).toISOString();
+  onValue(
+    query(ref(db, WEATHER_READINGS_PATH), orderByChild("timestamp"), startAt(since)),
+    (snapshot) => {
+      recentWeatherReadings = snapshot.val() || {};
+      resolveWeatherReady();
+    },
+    (err) => {
+      console.error("[weather] listener:", err instanceof Error ? err.message : err);
+      rejectWeatherReady(err);
+    }
+  );
+}
+
+async function getRecentWeatherReadings(now) {
+  await weatherReady;
+  const since = new Date(now.getTime() - WEATHER_LOOKBACK_MS).toISOString();
+  return Object.values(recentWeatherReadings).filter((r) => (r?.timestamp ?? "") >= since);
+}
+
 /**
  * Recalcule en permanence l'analyse d'arrosage : bilan hydrique par zone,
  * décision par zone, et plan (conseil si auto OFF, exécutable si auto ON).
@@ -521,8 +565,7 @@ async function checkAndPlanSchedule() {
 
     // Lire les données météo mesurées (jamais de prévision) : totaux journaliers
     // pour le bilan hydrique + pluie utile récente pour le garde-fou "forte pluie".
-    const weatherSnap = await get(ref(db, WEATHER_READINGS_PATH));
-    const weatherData = Object.values(weatherSnap.val() || {});
+    const weatherData = await getRecentWeatherReadings(now);
     const rainByDate = buildDailyRainTotals(weatherData);
     const recentRainMm = computeRecentRainMm(weatherData, now.getTime());
 
@@ -800,6 +843,7 @@ async function initAutoSchedule() {
   autoConfig = snap.val() || DEFAULT_AUTO_CONFIG;
 
   await recoverStuckExecutingPlanOnStartup(autoConfig);
+  startWeatherListener();
 
   // Surveiller la config en temps réel. Recalcule immédiatement quand la config change.
   onValue(configRef, (snapshot) => {

@@ -1,6 +1,9 @@
 {
   "rules": {
     ".read": "auth != null && (auth.uid === 'aQoINupmsyav3G9icalNStDPRx42' || auth.uid === 'jvZj9yeYFlV2xssKeQMuLenYT152')",
-    ".write": "auth != null && (auth.uid === 'aQoINupmsyav3G9icalNStDPRx42' || auth.uid === 'jvZj9yeYFlV2xssKeQMuLenYT152')"
+    ".write": "auth != null && (auth.uid === 'aQoINupmsyav3G9icalNStDPRx42' || auth.uid === 'jvZj9yeYFlV2xssKeQMuLenYT152')",
+    "weather-readings": {
+      ".indexOn": ["timestamp"]
+    }
   }
 }
