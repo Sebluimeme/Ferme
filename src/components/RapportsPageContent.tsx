@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useAppStore } from "@/store/store";
 import { computeCreditorBalances, computeStats, creditorLabel, isOperatingTransaction, type Transaction } from "@/types/comptabilite";
+import { expandPurchaseAllocations } from "@/types/purchase-invoice";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -63,7 +64,8 @@ function CustomTooltip({ active, payload, label }: {
 
 export default function RapportsPageContent() {
   const { state } = useAppStore();
-  const transactions = (state.couts as Transaction[]) || [];
+  const canonicalTransactions = (state.couts as Transaction[]) || [];
+  const transactions = useMemo(() => expandPurchaseAllocations(canonicalTransactions), [canonicalTransactions]);
   const animaux = state.animaux || [];
 
   // Productions disponibles
@@ -90,7 +92,10 @@ export default function RapportsPageContent() {
   }, [transactions, selectedProd, selectedAnnee]);
 
   const stats = useMemo(() => computeStats(filtered), [filtered]);
-  const dettes = useMemo(() => computeCreditorBalances(filtered), [filtered]);
+  // Les affectations servent aux analyses ; une facture reste une seule transaction.
+  const transactionCount = useMemo(() => new Set(filtered.map((transaction) => transaction.factureId || transaction.id)).size, [filtered]);
+  // Une dette ne se filtre pas par production : cela exclurait notamment ses remboursements.
+  const dettes = useMemo(() => computeCreditorBalances(canonicalTransactions), [canonicalTransactions]);
   const filteredOperating = useMemo(() => filtered.filter(isOperatingTransaction), [filtered]);
 
   // ── Dépenses par catégorie ────────────────────────────────────────────────
@@ -137,14 +142,14 @@ export default function RapportsPageContent() {
 
   // ── Top produits (dépenses) ───────────────────────────────────────────────
   const topProduits = useMemo(() => {
-    const map: Record<string, { total: number; count: number; categorie: string }> = {};
+    const map: Record<string, { total: number; achats: Set<string>; categorie: string }> = Object.create(null);
     filteredOperating.filter((t) => t.operation === "Dépenses").forEach((t) => {
-      if (!map[t.produit]) map[t.produit] = { total: 0, count: 0, categorie: t.categorie };
+      if (!map[t.produit]) map[t.produit] = { total: 0, achats: new Set(), categorie: t.categorie };
       map[t.produit].total += t.montant;
-      map[t.produit].count += 1;
+      map[t.produit].achats.add(t.factureId || t.id);
     });
     return Object.entries(map)
-      .map(([produit, d]) => ({ produit, ...d }))
+      .map(([produit, d]) => ({ produit, total: d.total, categorie: d.categorie, count: d.achats.size }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 7);
   }, [filteredOperating]);
@@ -219,14 +224,15 @@ export default function RapportsPageContent() {
               value={`${stats.balance >= 0 ? "+" : ""}${fmt(stats.balance)} €`}
               icon={<Scale className="w-3.5 h-3.5" />}
             />
-            <KpiCard label="Transactions" value={stats.nbTransactions} icon={<Receipt className="w-3.5 h-3.5" />} />
+            <KpiCard label="Transactions" value={transactionCount} icon={<Receipt className="w-3.5 h-3.5" />} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {(["SY", "BY"] as const).map((payeur) => (
               <div key={payeur} className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Dette ferme → {creditorLabel(payeur)}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Dette globale ferme → {creditorLabel(payeur)}</p>
                 <p className="text-[22px] font-bold font-mono text-amber-900 mt-0.5">{fmt(dettes[payeur], 2)} €</p>
+                <p className="text-[11px] text-amber-800 mt-1">Toutes périodes et productions, après remboursements</p>
               </div>
             ))}
           </div>

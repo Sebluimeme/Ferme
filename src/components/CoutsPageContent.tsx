@@ -1,869 +1,181 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { onValue, ref } from "firebase/database";
+import { Plus, Search, SlidersHorizontal, MoreHorizontal, Receipt, Paperclip, ChevronRight, Tractor, ArrowUpRight, X, Trash2 } from "lucide-react";
+import { database } from "@/lib/firebase";
 import { useAppStore } from "@/store/store";
-import Modal, { ConfirmModal } from "@/components/Modal";
-import { useToast } from "@/components/Toast";
-import KpiCard from "@/components/KpiCard";
-import {
-  createTransaction,
-  updateTransaction,
-  deleteTransaction,
-  searchTransactions,
-  filterTransactions,
-  getCategoriesConfig,
-  addProduction,
-  addCategorie,
-  addSousCategorie,
-  type CategoriesConfig,
-} from "@/services/comptabilite-service";
-import {
-  computeStats,
-  computeCreditorBalances,
-  creditorLabel,
-  formatDate,
-  EMPTY_TRANSACTION_FORM,
-  getTransactionNature,
-  isFarmCreditor,
-  isOperatingTransaction,
-  type FarmCreditor,
-  type Transaction,
-  type TransactionFormData,
-} from "@/types/comptabilite";
-import {
-  Plus,
-  Search,
-  Pencil,
-  Trash2,
-  TrendingDown,
-  TrendingUp,
-  Scale,
-  Receipt,
-  Paperclip,
-} from "lucide-react";
+import { Button, Card, Field, Notice, Sheet, farmStyles } from "@/components/ui/FarmUI";
+import PurchaseInvoiceEditor from "@/components/purchases/PurchaseInvoiceEditor";
+import { FinanceEntryEditor, DebtEntryEditor } from "@/components/purchases/FinanceEntryEditor";
+import { getCategoriesConfig, deleteTransaction, searchTransactions, filterTransactions, type CategoriesConfig } from "@/services/comptabilite-service";
+import { deletePurchaseInvoice } from "@/services/purchase-invoice-service";
+import { expandPurchaseAllocations, isPurchaseInvoice, type PurchaseInvoice } from "@/types/purchase-invoice";
+import { computeStats, computeCreditorBalances, creditorLabel, formatDate, isOperatingTransaction, type Transaction, type FarmCreditor } from "@/types/comptabilite";
+import type { Vehicle } from "@/types/vehicle";
+import styles from "./CoutsPageContent.module.css";
 
-// ─── Styles helpers ─────────────────────────────────────────────────────────
-const inputClass =
-  "w-full px-3 py-2 text-[13px] bg-stone-50 border border-stone-200 rounded-lg text-stone-800 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 focus:bg-white transition-all";
-const labelClass = "text-[11px] font-semibold uppercase tracking-wide text-stone-400 mb-1 block";
-const selectClass =
-  "w-full px-3 py-2 text-[13px] bg-stone-50 border border-stone-200 rounded-lg text-stone-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 focus:bg-white transition-all";
+const money = (amount: number) => amount.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b, "fr"));
+const vehicleName = (v: Vehicle) => v.nom || [v.marque, v.modele].filter(Boolean).join(" ") || v.plaqueImmatriculation || "Matériel sans nom";
+const payerName = (payer: string) => payer === "SY" ? "Sébastien" : payer === "BY" ? "Benjamin" : payer.toLowerCase() === "revolut" ? "Ferme · Revolut" : payer;
+const emptyFilters = { operation: "", production: "", categorie: "", payeur: "", annee: "", vehicleId: "" };
 
-// Formate un montant sans espace insécable (\u202F) qui casse le rendu mobile
-function fmt(n: number, decimals = 2): string {
-  return n.toLocaleString("fr-FR", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
-    .replace(/\u202F/g, "\u00A0"); // remplace narrow no-break space par espace normal
-}
-
-// ─── Formulaire transaction ──────────────────────────────────────────────────
-function TransactionForm({
-  form, setForm, config, onAddProduction, onAddCategorie, onAddSousCategorie,
-}: {
-  form: TransactionFormData;
-  setForm: (f: TransactionFormData) => void;
-  config: CategoriesConfig;
-  onAddProduction: () => void;
-  onAddCategorie: () => void;
-  onAddSousCategorie: () => void;
-}) {
-  const set = (field: keyof TransactionFormData) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-      const value = e.target.value;
-      if (field === "nature") {
-        if (value === "avance") {
-          setForm({
-            ...form,
-            nature: "avance",
-            operation: "Dépenses",
-            production: form.production || "Ferme",
-            categorie: "Avance",
-            sousCategorie: "Avance personnelle vers Revolut",
-            produit: form.produit || "Avance personnelle vers Revolut",
-            payeur: isFarmCreditor(form.payeur) ? form.payeur : "SY",
-          });
-          return;
-        }
-        if (value === "remboursement") {
-          setForm({
-            ...form,
-            nature: "remboursement",
-            operation: "Revenus",
-            production: form.production || "Ferme",
-            categorie: "Remboursement",
-            sousCategorie: "Remboursement personnel depuis Revolut",
-            produit: form.produit || "Remboursement personnel depuis Revolut",
-            payeur: isFarmCreditor(form.payeur) ? form.payeur : "SY",
-          });
-          return;
-        }
-      }
-      setForm({ ...form, [field]: value });
-    };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className={labelClass}>Type d'écriture *</label>
-          <select value={form.nature} onChange={set("nature")} className={selectClass}>
-            <option value="exploitation">Dépense ou recette d'exploitation</option>
-            <option value="avance">Avance personnelle vers Revolut</option>
-            <option value="remboursement">Remboursement personnel depuis Revolut</option>
-          </select>
-          <p className="text-[11px] text-stone-400 mt-1">
-            Les avances/remboursements ajustent la dette, pas le résultat d'exploitation.
-          </p>
-        </div>
-        <div>
-          <label className={labelClass}>Date *</label>
-          <input type="date" value={form.date} onChange={set("date")} className={inputClass} />
-        </div>
-        <div>
-          <label className={labelClass}>Opération *</label>
-          <select value={form.operation} onChange={set("operation")} disabled={form.nature !== "exploitation"} className={selectClass}>
-            <option value="Dépenses">Dépenses</option>
-            <option value="Revenus">Revenus</option>
-          </select>
-        </div>
-      </div>
-
-      <div>
-        <label className={labelClass}>Production *</label>
-        <div className="flex gap-2">
-          <select value={form.production} onChange={set("production")} className={`${selectClass} flex-1`}>
-            <option value="">— Sélectionner —</option>
-            {config.productions.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <button type="button" onClick={onAddProduction}
-            className="px-3 py-2 text-[12px] font-medium bg-stone-100 text-stone-600 border border-stone-200 rounded-lg hover:bg-stone-200 cursor-pointer whitespace-nowrap transition-colors">
-            + Ajouter
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className={labelClass}>Catégorie *</label>
-          <div className="flex gap-2">
-            <select value={form.categorie} onChange={set("categorie")} className={`${selectClass} flex-1`}>
-              <option value="">— Sélectionner —</option>
-              {config.categories.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <button type="button" onClick={onAddCategorie}
-              className="px-2.5 py-2 text-[12px] font-medium bg-stone-100 text-stone-600 border border-stone-200 rounded-lg hover:bg-stone-200 cursor-pointer transition-colors">
-              +
-            </button>
-          </div>
-        </div>
-        <div>
-          <label className={labelClass}>Sous-catégorie *</label>
-          <div className="flex gap-2">
-            <select value={form.sousCategorie} onChange={set("sousCategorie")} className={`${selectClass} flex-1`}>
-              <option value="">— Sélectionner —</option>
-              {config.sousCategories.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <button type="button" onClick={onAddSousCategorie}
-              className="px-2.5 py-2 text-[12px] font-medium bg-stone-100 text-stone-600 border border-stone-200 rounded-lg hover:bg-stone-200 cursor-pointer transition-colors">
-              +
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <label className={labelClass}>Produit / Description *</label>
-        <input type="text" value={form.produit} onChange={set("produit")} placeholder="Ex: Pellet porc 25kg" className={inputClass} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className={labelClass}>Fournisseur</label>
-          <input type="text" value={form.fournisseur} onChange={set("fournisseur")} placeholder="Ex: CAC COLMAR" className={inputClass} />
-        </div>
-        <div>
-          <label className={labelClass}>Référence / Remarque</label>
-          <input type="text" value={form.remarque} onChange={set("remarque")} placeholder="Ex: FVC5080688" className={inputClass} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <label className={labelClass}>Quantité</label>
-          <input type="number" min="0" step="0.01" value={form.quantite} onChange={set("quantite")} placeholder="Ex: 5" className={inputClass} />
-        </div>
-        <div>
-          <label className={labelClass}>{form.operation === "Revenus" ? "Bénéficiaire" : "Payeur"}</label>
-          <select value={form.payeur} onChange={set("payeur")} className={selectClass}>
-            {config.payeurs.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={labelClass}>Montant (€) *</label>
-          <input type="number" min="0" step="0.01" value={form.montant} onChange={set("montant")} placeholder="Ex: 150.00" className={inputClass} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Modal avance / remboursement ────────────────────────────────────────────
-// Volontairement minimal : seul le montant est demandé. La date (jour même),
-// le payeur (choisi via le bouton Sébastien/Benjamin cliqué) et les autres
-// champs comptables sont préremplis, sans formulaire détaillé à saisir. Le
-// blocage métier (impossible de rembourser au-delà du solde) reste appliqué
-// côté service (validateNoNegativeDebt dans createTransaction) et remonté ici
-// via toast en cas de dépassement.
-function DebtEntryModal({ isOpen, onClose, kind, payeur, dette, onAdd }: {
-  isOpen: boolean; onClose: () => void; kind: "avance" | "remboursement";
-  payeur: FarmCreditor | null; dette?: number; onAdd: (montant: string) => Promise<void>;
-}) {
-  const [montant, setMontant] = useState("");
-  const [loading, setLoading] = useState(false);
-  const montantValide = !!montant && !isNaN(parseFloat(montant)) && parseFloat(montant) > 0;
-  const label = kind === "avance" ? "Avance" : "Remboursement";
-
-  const handleSubmit = async () => {
-    if (!montantValide) return;
-    setLoading(true);
-    await onAdd(montant);
-    setMontant("");
-    setLoading(false);
-  };
-
-  const handleClose = () => { setMontant(""); onClose(); };
-
-  return (
-    <Modal isOpen={isOpen && !!payeur} onClose={handleClose} title={payeur ? `${label} pour ${creditorLabel(payeur)}` : label} size="small">
-      <div className="space-y-3">
-        <div>
-          <label className={labelClass}>Montant (€) *</label>
-          <input
-            type="number" min="0" step="0.01" value={montant}
-            onChange={(e) => setMontant(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            placeholder="Ex: 150.00" autoFocus
-            className={inputClass}
-          />
-          <p className="text-[11px] text-stone-400 mt-1">
-            {kind === "avance"
-              ? `Enregistrée à la date d'aujourd'hui, comme avance ${payeur ? creditorLabel(payeur) : ""} vers la ferme.`
-              : `Enregistré à la date d'aujourd'hui, comme remboursement de la ferme vers ${payeur ? creditorLabel(payeur) : ""}${dette != null ? ` (solde actuel : ${fmt(dette)} €)` : ""}.`}
-          </p>
-        </div>
-        <div className="flex gap-2 justify-end">
-          <button onClick={handleClose}
-            className="px-4 py-2 text-[13px] bg-stone-100 text-stone-700 border border-stone-200 rounded-lg hover:bg-stone-200 cursor-pointer transition-colors">
-            Annuler
-          </button>
-          <button onClick={handleSubmit} disabled={loading || !montantValide}
-            className="px-4 py-2 text-[13px] font-medium text-white bg-stone-900 rounded-lg disabled:opacity-40 cursor-pointer hover:bg-stone-700 transition-colors">
-            {loading ? "..." : "Ajouter"}
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-// ─── Modal ajout valeur ──────────────────────────────────────────────────────
-function AddValueModal({ isOpen, onClose, label, onAdd }: {
-  isOpen: boolean; onClose: () => void; label: string; onAdd: (v: string) => Promise<void>;
-}) {
-  const [value, setValue] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async () => {
-    if (!value.trim()) return;
-    setLoading(true);
-    await onAdd(value.trim());
-    setValue(""); setLoading(false); onClose();
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={() => { setValue(""); onClose(); }} title={`Ajouter : ${label}`} size="small">
-      <div className="space-y-3">
-        <input
-          type="text" value={value} onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-          placeholder={`Nouvelle ${label.toLowerCase()}`} autoFocus
-          className={inputClass}
-        />
-        <div className="flex gap-2 justify-end">
-          <button onClick={() => { setValue(""); onClose(); }}
-            className="px-4 py-2 text-[13px] bg-stone-100 text-stone-700 border border-stone-200 rounded-lg hover:bg-stone-200 cursor-pointer transition-colors">
-            Annuler
-          </button>
-          <button onClick={handleSubmit} disabled={loading || !value.trim()}
-            className="px-4 py-2 text-[13px] font-medium text-white bg-stone-900 rounded-lg disabled:opacity-40 cursor-pointer hover:bg-stone-700 transition-colors">
-            {loading ? "..." : "Ajouter"}
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-// ─── Page principale ─────────────────────────────────────────────────────────
 export default function CoutsPageContent() {
   const { state } = useAppStore();
-  const { showToast } = useToast();
-  const transactions = (state.couts as Transaction[]) || [];
-
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [config, setConfig] = useState<CategoriesConfig>({ productions: [], categories: [], sousCategories: [], payeurs: ["SY", "BY", "revolut"] });
-  const [configLoading, setConfigLoading] = useState(true);
-
-  const [showModal, setShowModal] = useState(false);
-  const [editTarget, setEditTarget] = useState<Transaction | null>(null);
-  const [form, setForm] = useState<TransactionFormData>(EMPTY_TRANSACTION_FORM);
-  const [formLoading, setFormLoading] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string; storagePath?: string } | null>(null);
-  const [addModal, setAddModal] = useState<null | "production" | "categorie" | "sousCategorie">(null);
-  const [avancePayeur, setAvancePayeur] = useState<FarmCreditor | null>(null);
-  const [remboursementPayeur, setRemboursementPayeur] = useState<FarmCreditor | null>(null);
-
-  const [search, setSearch]       = useState("");
-  const [filterOp, setFilterOp]   = useState("");
-  const [filterProd, setFilterProd] = useState("");
-  const [filterCat, setFilterCat] = useState("");
-  const [filterPayeur, setFilterPayeur] = useState("");
-  const [filterAnnee, setFilterAnnee]   = useState("");
-  const [tab, setTab] = useState<"liste" | "par-production">("liste");
+  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState(emptyFilters);
+  const [view, setView] = useState<"ecritures" | "productions" | "materiel">("ecritures");
+  const [panel, setPanel] = useState<"filters" | "more" | "financing" | null>(null);
+  const [invoiceEditor, setInvoiceEditor] = useState<PurchaseInvoice | "new" | null>(null);
+  const [legacyEditor, setLegacyEditor] = useState<Transaction | "revenue" | "new" | null>(null);
+  const [debtEditor, setDebtEditor] = useState<{ kind: "avance" | "remboursement"; payeur: FarmCreditor } | null>(null);
+  const [selected, setSelected] = useState<Transaction | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Transaction | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const deleting = useRef(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [message, setMessage] = useState<{ tone: "success" | "warning" | "error"; text: string } | null>(null);
 
   useEffect(() => {
-    getCategoriesConfig().then((cfg) => { setConfig(cfg); setConfigLoading(false); });
-  }, []);
+    if (!state.user) return;
+    let active = true;
+    getCategoriesConfig().then(value => { if (active) setConfig(value); }).catch(() => { if (active) setLoadError("Les choix de classement n’ont pas pu être chargés. Réessayez avec du réseau."); });
+    const unsubTransactions = onValue(ref(database, "transactions"), snapshot => {
+      const entries = snapshot.val() || {};
+      setTransactions(Object.entries(entries).map(([key, value]) => ({ ...(value as Transaction), id: key })));
+      setLoading(false); setLoadError("");
+    }, () => { setLoading(false); setLoadError("Impossible de charger les écritures. Les dernières données affichées sont conservées."); });
+    const unsubVehicles = onValue(ref(database, "vehicules"), snapshot => {
+      setVehicles(Object.entries(snapshot.val() || {}).map(([key, value]) => ({ ...(value as Vehicle), id: key })));
+    }, () => setMessage({ tone: "warning", text: "La liste du matériel n’a pas pu être actualisée." }));
+    return () => { active = false; unsubTransactions(); unsubVehicles(); };
+  }, [state.user]);
 
-  const refreshConfig = useCallback(async () => {
-    const cfg = await getCategoriesConfig();
-    setConfig(cfg);
-  }, []);
-
-  const stats = useMemo(() => computeStats(transactions), [transactions]);
-
-  const dettes = useMemo(() => computeCreditorBalances(transactions), [transactions]);
-  const financeTransactions = useMemo(() => transactions.filter((t) => !isOperatingTransaction(t)), [transactions]);
-
-  const filtered = useMemo(() => {
-    let list = filterTransactions(transactions, {
-      operation: filterOp || undefined,
-      production: filterProd || undefined,
-      categorie: filterCat || undefined,
-      payeur: filterPayeur || undefined,
-      annee: filterAnnee || undefined,
-    });
-    if (search) list = searchTransactions(list, search);
-    return list.sort((a, b) => b.date.localeCompare(a.date));
-  }, [transactions, filterOp, filterProd, filterCat, filterPayeur, filterAnnee, search]);
-
-  const parProduction = useMemo(() => {
-    const map: Record<string, { depenses: number; revenus: number }> = {};
-    transactions.forEach((t) => {
-      if (!isOperatingTransaction(t)) return;
-      if (!map[t.production]) map[t.production] = { depenses: 0, revenus: 0 };
-      if (t.operation === "Dépenses") map[t.production].depenses += t.montant;
-      else map[t.production].revenus += t.montant;
-    });
-    return Object.entries(map)
-      .map(([production, d]) => ({ production, ...d, balance: d.revenus - d.depenses }))
-      .sort((a, b) => a.balance - b.balance);
-  }, [transactions]);
-
-  const annees = useMemo(() => {
-    const s = new Set(transactions.map((t) => t.date.substring(0, 4)));
-    return Array.from(s).sort().reverse();
-  }, [transactions]);
-
-  const openAdd = () => {
-    setForm({ ...EMPTY_TRANSACTION_FORM, date: new Date().toISOString().split("T")[0] });
-    setEditTarget(null);
-    setShowModal(true);
-  };
-
-  const openEdit = (t: Transaction) => {
-    setEditTarget(t);
-    setForm({
-      date: t.date, operation: t.operation, production: t.production,
-      categorie: t.categorie, sousCategorie: t.sousCategorie, produit: t.produit,
-      remarque: t.remarque || "", fournisseur: t.fournisseur || "",
-      quantite: t.quantite != null ? String(t.quantite) : "",
-      payeur: t.payeur, montant: String(t.montant), nature: getTransactionNature(t),
-    });
-    setShowModal(true);
-  };
-
-  const [pieceJointeFile, setPieceJointeFile] = useState<File | null>(null);
-
-  const handleSave = async () => {
-    setFormLoading(true);
-    const res = editTarget
-      ? await updateTransaction(editTarget.id, form, pieceJointeFile ?? undefined, editTarget.pieceJointe?.storagePath, transactions)
-      : await createTransaction(form, pieceJointeFile ?? undefined, transactions);
-    setFormLoading(false);
-    if (res.success) {
-      showToast(editTarget ? { type: "success", title: "Transaction modifiée" } : { type: "success", title: "Transaction ajoutée" });
-      setPieceJointeFile(null);
-      setShowModal(false);
-    } else {
-      showToast({ type: "error", title: res.error || "Erreur" });
+  const analysis = useMemo(() => expandPurchaseAllocations(transactions), [transactions]);
+  const matching = (rows: Transaction[]) => {
+    let result = filterTransactions(rows, filters);
+    if (filters.vehicleId) result = result.filter(row => row.vehicleId === filters.vehicleId);
+    if (search.trim()) {
+      const q = search.trim().toLocaleLowerCase("fr");
+      result = result.filter(row => searchTransactions([row], q).length > 0 || row.vehicleLabel?.toLocaleLowerCase("fr").includes(q) || ("reference" in row && String(row.reference || "").toLocaleLowerCase("fr").includes(q)));
     }
+    return result;
+  };
+  // La sélection analytique ne remplace jamais les enregistrements originaux.
+  const filteredAnalysis = matching(analysis);
+  const filtered = transactions.map(transaction => ({ transaction, lines: matching(expandPurchaseAllocations([transaction])) }))
+    .filter(item => item.lines.length > 0).sort((a, b) => b.transaction.date.localeCompare(a.transaction.date) || (b.transaction.dateCreation || "").localeCompare(a.transaction.dateCreation || ""));
+  const stats = computeStats(filteredAnalysis);
+  const balances = computeCreditorBalances(transactions);
+  const hasFilters = Object.values(filters).some(Boolean) || !!search.trim();
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+  const productions = unique([...config.productions, ...analysis.map(t => t.production)]);
+  const categories = unique([...config.categories, ...analysis.map(t => t.categorie)]);
+  const payers = unique([...config.payeurs, ...transactions.map(t => t.payeur)]);
+  const years = unique(transactions.map(t => t.date.slice(0, 4))).reverse();
+  const suppliers = unique(transactions.map(t => t.fournisseur || ""));
+  const totals = (dimension: "production" | "vehicleId") => {
+    const groups = new Map<string, { label: string; expense: number; revenue: number }>();
+    filteredAnalysis.filter(isOperatingTransaction).forEach(row => {
+      const key = dimension === "production" ? row.production : row.vehicleId;
+      if (!key) return;
+      const label = dimension === "production" ? key : vehicles.find(v => v.id === key) ? vehicleName(vehicles.find(v => v.id === key)!) : row.vehicleLabel || "Matériel associé";
+      const group = groups.get(key) || { label, expense: 0, revenue: 0 };
+      if (row.operation === "Dépenses") group.expense += row.montant; else group.revenue += row.montant;
+      groups.set(key, group);
+    });
+    return Array.from(groups, ([id, values]) => ({ id, ...values })).sort((a, b) => b.expense - a.expense);
+  };
+  const groups = totals(view === "materiel" ? "vehicleId" : "production");
+  const maximum = Math.max(1, ...groups.map(g => g.expense));
+  const unassigned = filteredAnalysis.filter(t => t.production === "À affecter" && t.operation === "Dépenses").reduce((sum, t) => sum + t.montant, 0);
+  const edit = (transaction: Transaction) => { setSelected(null); if (isPurchaseInvoice(transaction)) setInvoiceEditor(transaction); else setLegacyEditor(transaction); };
+  const saved = (warning?: string) => {
+    setInvoiceEditor(null); setLegacyEditor(null); setDebtEditor(null);
+    setMessage({ tone: warning ? "warning" : "success", text: warning || "Enregistrement confirmé." });
+  };
+  const remove = async () => {
+    if (!deleteTarget || deleting.current) return;
+    deleting.current = true; setDeleteBusy(true); setDeleteError("");
+    try {
+      const result = isPurchaseInvoice(deleteTarget)
+        ? await deletePurchaseInvoice(deleteTarget.id, deleteTarget.factureVersion)
+        : await deleteTransaction(deleteTarget.id, deleteTarget.pieceJointe?.storagePath);
+      if (result.success) { setDeleteTarget(null); setMessage({ tone: result.warning ? "warning" : "success", text: result.warning || "Écriture supprimée." }); }
+      else setDeleteError(result.error || "Suppression impossible. L’écriture est conservée.");
+    } catch { setDeleteError("Connexion interrompue. Vérifiez l’état de l’écriture avant de réessayer."); }
+    finally { deleting.current = false; setDeleteBusy(false); }
   };
 
-  const handleAddAvance = async (montant: string) => {
-    if (!avancePayeur) return;
-    const payeur = avancePayeur;
-    const data: TransactionFormData = {
-      ...EMPTY_TRANSACTION_FORM,
-      date: new Date().toISOString().split("T")[0],
-      nature: "avance",
-      operation: "Dépenses",
-      production: "Ferme",
-      categorie: "Avance",
-      sousCategorie: "Avance personnelle vers Revolut",
-      produit: `Avance ${creditorLabel(payeur)} vers Revolut`,
-      payeur,
-      montant,
-    };
-    const res = await createTransaction(data, undefined, transactions);
-    if (res.success) {
-      showToast({ type: "success", title: "Avance ajoutée" });
-      setAvancePayeur(null);
-    } else {
-      showToast({ type: "error", title: res.error || "Erreur" });
-    }
-  };
+  return <div className={`${farmStyles.theme} ${styles.page}`}>
+    <header className={styles.header}>
+      <div><p className={styles.eyebrow}>LA FERME TABOUCHE</p><h1>Coûts</h1><p className={styles.subtitle}>Achats, recettes et répartition</p></div>
+      <Button variant="ghost" aria-label="Autres actions" onClick={() => setPanel("more")}><MoreHorizontal aria-hidden="true" /></Button>
+    </header>
+    {message && <div className={styles.noticeRow}><Notice tone={message.tone}>{message.text}</Notice><Button variant="ghost" aria-label="Masquer le message" onClick={() => setMessage(null)}><X aria-hidden="true" /></Button></div>}
+    {loadError && <Notice tone="error">{loadError}</Notice>}
+    <Card className={styles.summary}>
+      <div className={styles.summaryHeading}><span>Dépenses</span><Button variant="ghost" onClick={() => setPanel("filters")}>{filters.annee || "Toutes les années"}<SlidersHorizontal aria-hidden="true" /></Button></div>
+      <p className={styles.bigAmount}>{loading ? "…" : money(stats.totalDepenses)}</p>
+      <p className={styles.secondary}>{hasFilters ? "Pour la sélection affichée" : "Hors avances et remboursements"}</p>
+      <div className={styles.summaryDetails}><div><span>Recettes</span><strong>{money(stats.totalRevenus)}</strong></div><div><span>Solde des opérations</span><strong>{money(stats.balance)}</strong></div></div>
+    </Card>
+    {unassigned > 0 && <Notice tone="warning">{money(unassigned)} restent à affecter à une production. Ces dépenses sont déjà comprises dans le total.</Notice>}
+    <div className={styles.toolbar}><div className={styles.search}><Search aria-hidden="true" /><input aria-label="Rechercher une écriture" placeholder="Fournisseur, achat, matériel…" value={search} onChange={e => setSearch(e.target.value)} /></div><Button aria-label={`Filtres${activeFilterCount ? ` : ${activeFilterCount} actifs` : ""}`} onClick={() => setPanel("filters")}><SlidersHorizontal aria-hidden="true" />{activeFilterCount || ""}</Button></div>
+    <div className={styles.tabs} aria-label="Vue des coûts">{([['ecritures','Écritures'],['productions','Productions'],['materiel','Matériel']] as const).map(([value,label]) => <button key={value} type="button" aria-pressed={view === value} onClick={() => setView(value)}>{label}</button>)}</div>
+    {hasFilters && <div className={styles.filterSummary}><span>{filtered.length} écriture{filtered.length !== 1 ? "s" : ""} retenue{filtered.length !== 1 ? "s" : ""}</span><Button variant="ghost" onClick={() => { setFilters(emptyFilters); setSearch(""); }}>Tout afficher</Button></div>}
+    {loading ? <Card><p role="status">Chargement des écritures…</p></Card> : view === "ecritures" ? <div className={styles.entries}>
+      {!filtered.length && <Card className={styles.empty}><Receipt aria-hidden="true" /><h2>{loadError ? "Données indisponibles" : "Aucune écriture"}</h2><p>{hasFilters ? "Essayez d’autres critères." : "Enregistrez votre premier achat pour commencer."}</p></Card>}
+      {filtered.map(({ transaction: t, lines }) => {
+        const invoice = isPurchaseInvoice(t);
+        const selectedAmount = lines.reduce((sum, row) => sum + row.montant, 0);
+        const partial = invoice && Math.round(selectedAmount * 100) !== Math.round(t.montant * 100);
+        const destinations = unique(lines.map(row => row.production));
+        return <button className={styles.entry} key={t.id} type="button" onClick={() => setSelected(t)}>
+          <span className={styles.entryTop}><span className={styles.entryTitle}>{invoice ? t.fournisseur || "Facture d’achat" : t.produit || "Écriture"}</span><strong className={styles.entryAmount}>{t.operation === "Revenus" ? "+" : "−"}{money(t.montant)}</strong></span>
+          <span className={styles.entryDescription}>{invoice ? `${t.allocations.length} affectation${t.allocations.length > 1 ? "s" : ""} · ${destinations.join(", ")}` : t.production + " · " + t.sousCategorie}</span>
+          {partial && <span className={styles.selectionAmount}>Dont {money(selectedAmount)} pour ces filtres</span>}
+          <span className={styles.entryBottom}><span>{formatDate(t.date)} · {payerName(t.payeur)}</span><span className={styles.entryIcons}>{t.pieceJointe && <Paperclip aria-label="Avec justificatif" />}<ChevronRight aria-hidden="true" /></span></span>
+        </button>;
+      })}
+    </div> : <div className={styles.entries}>
+      {view === "materiel" && <Notice>Cette vue utilise les liens explicites avec le matériel. Les anciennes écritures ne sont pas attribuées automatiquement.</Notice>}
+      {!groups.length && <Card className={styles.empty}><Tractor aria-hidden="true" /><h2>Aucune affectation {view === "materiel" ? "à un matériel" : "pour cette sélection"}</h2><p>Les nouvelles factures alimenteront cette analyse.</p></Card>}
+      {groups.map(group => <Card key={group.id}><div className={styles.groupTitle}><h2>{group.label}</h2><strong>{money(group.expense)}</strong></div><div className={styles.bar} aria-hidden="true"><span style={{ width: `${group.expense / maximum * 100}%` }} /></div><div className={styles.groupDetails}><span>Recettes {money(group.revenue)}</span><span>Solde {money(group.revenue - group.expense)}</span></div></Card>)}
+    </div>}
+    <div className={styles.purchaseAction}><Button variant="primary" fullWidth onClick={() => setInvoiceEditor("new")}><Plus aria-hidden="true" />Enregistrer un achat</Button></div>
 
-  const handleAddRemboursement = async (montant: string) => {
-    if (!remboursementPayeur) return;
-    const payeur = remboursementPayeur;
-    const data: TransactionFormData = {
-      ...EMPTY_TRANSACTION_FORM,
-      date: new Date().toISOString().split("T")[0],
-      nature: "remboursement",
-      operation: "Revenus",
-      production: "Ferme",
-      categorie: "Remboursement",
-      sousCategorie: "Remboursement personnel depuis Revolut",
-      produit: `Remboursement ${creditorLabel(payeur)} depuis Revolut`,
-      payeur,
-      montant,
-    };
-    const res = await createTransaction(data, undefined, transactions);
-    if (res.success) {
-      showToast({ type: "success", title: "Remboursement ajouté" });
-      setRemboursementPayeur(null);
-    } else {
-      showToast({ type: "error", title: res.error || "Erreur" });
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    const res = await deleteTransaction(deleteTarget.id, deleteTarget.storagePath);
-    if (res.success) showToast({ type: "success", title: "Transaction supprimée" });
-    else showToast({ type: "error", title: res.error || "Erreur" });
-    setDeleteTarget(null);
-  };
-
-  const hasFilters = search || filterOp || filterProd || filterCat || filterPayeur || filterAnnee;
-
-  if (configLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-5 fade-in">
-
-      {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-semibold text-stone-900 tracking-[-0.3px]">Comptabilité</h1>
-          <p className="text-[13px] text-stone-400 mt-0.5">Exploitation séparée des avances et remboursements personnels</p>
-        </div>
-        <button onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-stone-900 text-white text-[13px] font-medium rounded-lg hover:bg-stone-700 transition-colors cursor-pointer">
-          <Plus className="w-3.5 h-3.5" />
-          Ajouter une transaction
-        </button>
-      </div>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard label="Dépenses exploitation" value={`${fmt(stats.totalDepenses, 0)} €`} icon={<TrendingDown className="w-3.5 h-3.5 text-red-500" />} />
-        <KpiCard label="Recettes exploitation" value={`${fmt(stats.totalRevenus, 0)} €`} icon={<TrendingUp className="w-3.5 h-3.5 text-brand-500" />} />
-        <KpiCard
-          label="Résultat exploitation"
-          value={`${stats.balance >= 0 ? "+" : ""}${fmt(stats.balance, 0)} €`}
-          icon={<Scale className="w-3.5 h-3.5" />}
-        />
-        <KpiCard label="Transactions" value={stats.nbTransactions} icon={<Receipt className="w-3.5 h-3.5" />} />
-      </div>
-
-      {/* Dettes SY / BY */}
-      <div className="bg-white border border-stone-200 rounded-xl p-4">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <h2 className="text-[14px] font-semibold text-stone-800">Avances et remboursements</h2>
-            <p className="text-[12px] text-stone-400">Revolut est le compte de la ferme ; seules les dettes envers Sébastien et Benjamin sont suivies.</p>
-          </div>
-          <span className="text-[11px] text-stone-400">{financeTransactions.length} écriture{financeTransactions.length > 1 ? "s" : ""} hors exploitation</span>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-          {(["SY", "BY"] as const).map((payeur) => {
-            const dette = dettes[payeur];
-            return (
-            <div key={payeur} className="flex-1 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-[12px] font-semibold uppercase tracking-wide text-amber-700">
-                  Dette ferme → {creditorLabel(payeur)}
-                </p>
-                <p className="text-[22px] font-bold font-mono text-amber-900 mt-0.5">
-                  {fmt(dette)} €
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setAvancePayeur(payeur)}
-                  className="px-3 py-2 bg-white text-amber-800 border border-amber-200 text-[13px] font-medium rounded-lg hover:bg-amber-100 transition-colors cursor-pointer whitespace-nowrap"
-                >
-                  Avance
-                </button>
-                <button
-                  disabled={dette <= 0}
-                  onClick={() => setRemboursementPayeur(payeur)}
-                  className="flex items-center gap-2 px-3 py-2 bg-amber-600 text-white text-[13px] font-medium rounded-lg hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer whitespace-nowrap"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Rembourser
-              </button>
-              </div>
-            </div>
-          );})}
-        </div>
-      </div>
-
-      {/* Onglets */}
-      <div className="flex items-center gap-1 p-1 bg-stone-200/60 rounded-lg w-fit">
-        {(["liste", "par-production"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-3 py-1.5 rounded-md text-[13px] font-medium transition-all cursor-pointer ${tab === t ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-700"}`}>
-            {t === "liste" ? "Transactions" : "Par production"}
-          </button>
-        ))}
-      </div>
-
-      {tab === "liste" && (
-        <>
-          {/* Filtres */}
-          <div className="bg-white border border-stone-200 rounded-xl p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
-              <div className="relative col-span-2 md:col-span-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-stone-400" />
-                <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Rechercher..." className="w-full pl-9 pr-3 py-2 text-[13px] bg-stone-50 border border-stone-200 rounded-lg placeholder:text-stone-400 text-stone-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all" />
-              </div>
-              {[
-                { val: filterOp,    set: setFilterOp,    placeholder: "Opération",   opts: ["Dépenses", "Revenus"] },
-                { val: filterProd,  set: setFilterProd,  placeholder: "Production",  opts: config.productions },
-                { val: filterCat,   set: setFilterCat,   placeholder: "Catégorie",   opts: config.categories },
-                { val: filterPayeur, set: setFilterPayeur, placeholder: "Payeur",    opts: config.payeurs },
-                { val: filterAnnee,  set: setFilterAnnee,  placeholder: "Année",     opts: annees },
-              ].map(({ val, set, placeholder, opts }) => (
-                <select key={placeholder} value={val} onChange={(e) => set(e.target.value)}
-                  className="w-full px-3 py-2 text-[13px] bg-stone-50 border border-stone-200 rounded-lg text-stone-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all">
-                  <option value="">{placeholder}</option>
-                  {opts.map((o) => <option key={o} value={o}>{o}</option>)}
-                </select>
-              ))}
-            </div>
-            {hasFilters && (
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-stone-100">
-                <span className="text-[12px] text-stone-400">{filtered.length} résultat{filtered.length > 1 ? "s" : ""}</span>
-                <button onClick={() => { setSearch(""); setFilterOp(""); setFilterProd(""); setFilterCat(""); setFilterPayeur(""); setFilterAnnee(""); }}
-                  className="text-[12px] text-brand-600 hover:underline cursor-pointer">
-                  Réinitialiser
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Tableau */}
-          <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
-            {filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <Receipt className="w-10 h-10 text-stone-200 mb-3" />
-                <p className="text-[14px] font-medium text-stone-600">Aucune transaction</p>
-                <p className="text-[13px] text-stone-400 mt-1">
-                  {transactions.length === 0 ? "Commencez par ajouter une dépense ou un revenu." : "Aucun résultat pour ces filtres."}
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* Vue carte — mobile uniquement */}
-                <div className="md:hidden divide-y divide-stone-100">
-                  {filtered.map((t) => (
-                    <div key={t.id} onClick={() => openEdit(t)} className="px-4 py-3 hover:bg-stone-50 cursor-pointer">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-medium text-stone-800 truncate">{t.produit}</p>
-                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-50 text-brand-700">{t.production}</span>
-                            <span className="text-[11px] text-stone-400">{t.categorie} › {t.sousCategorie}</span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[11px] text-stone-400">{formatDate(t.date)}</span>
-                            <span className="text-[11px] font-mono bg-stone-100 text-stone-600 px-1 py-0.5 rounded">{t.payeur}</span>
-                            {t.fournisseur && <span className="text-[11px] text-stone-400 truncate">{t.fournisseur}</span>}
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <span className={`text-[15px] font-bold ${t.operation === "Revenus" ? "text-brand-600" : "text-stone-900"}`}>
-                            {t.operation === "Revenus" ? "+" : "−"}{fmt(t.montant)} €
-                          </span>
-                          {t.pieceJointe && (
-                            <a href={t.pieceJointe.url} target="_blank" rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="block ml-auto mt-0.5 text-stone-400 hover:text-brand-600"
-                              title={t.pieceJointe.nom}>
-                              <Paperclip className="w-3.5 h-3.5" />
-                            </a>
-                          )}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: t.id, label: t.produit, storagePath: t.pieceJointe?.storagePath }); }}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Vue tableau — desktop uniquement */}
-                <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full min-w-[500px]">
-                    <thead>
-                      <tr className="border-b border-stone-200">
-                        {["Date", "Production", "Catégorie", "Produit", "Fournisseur", "Qté", "Payeur", "Montant", ""].map((h) => (
-                          <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold text-stone-400 uppercase tracking-[0.06em] whitespace-nowrap">
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-100">
-                      {filtered.map((t) => (
-                        <tr key={t.id} onClick={() => openEdit(t)} className="hover:bg-stone-50/80 transition-colors group cursor-pointer">
-                          <td className="px-4 py-3 text-[12.5px] font-mono text-stone-500 whitespace-nowrap">{formatDate(t.date)}</td>
-                          <td className="px-4 py-3">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-brand-50 text-brand-700">
-                              {t.production}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-[12px] text-stone-500 whitespace-nowrap">
-                            {t.categorie} <span className="text-stone-300">›</span> {t.sousCategorie}
-                          </td>
-                          <td className="px-4 py-3 text-[13px] text-stone-800 max-w-[180px] truncate" title={t.produit}>{t.produit}</td>
-                          <td className="px-4 py-3 text-[12px] text-stone-400 whitespace-nowrap">{t.fournisseur || "—"}</td>
-                          <td className="px-4 py-3 text-[12px] text-stone-500 text-center">{t.quantite ?? "—"}</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="text-[11px] font-mono bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded">{t.payeur}</span>
-                          </td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap">
-                            <span className={`text-[13.5px] font-semibold ${t.operation === "Revenus" ? "text-brand-600" : "text-stone-900"}`}>
-                              {t.operation === "Revenus" ? "+" : "−"}{fmt(t.montant)} €
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={(e) => { e.stopPropagation(); openEdit(t); }}
-                                className="w-7 h-7 rounded-md hover:bg-stone-200 flex items-center justify-center cursor-pointer transition-colors">
-                                <Pencil className="w-3.5 h-3.5 text-stone-400" />
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); setDeleteTarget({ id: t.id, label: t.produit, storagePath: t.pieceJointe?.storagePath }); }}
-                                className="w-7 h-7 rounded-md hover:bg-red-50 flex items-center justify-center cursor-pointer transition-colors">
-                                <Trash2 className="w-3.5 h-3.5 text-stone-400 hover:text-red-500" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
-
-      {tab === "par-production" && (
-        <div className="bg-white border border-stone-200 rounded-xl overflow-hidden">
-          {parProduction.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <TrendingDown className="w-10 h-10 text-stone-200 mb-3" />
-              <p className="text-[14px] text-stone-400">Aucune donnée</p>
-            </div>
-          ) : (
-            <>
-              {/* Vue carte — mobile */}
-              <div className="md:hidden divide-y divide-stone-100">
-                {parProduction.map((row) => {
-                  const pct = row.depenses > 0 ? Math.min(100, (row.revenus / row.depenses) * 100) : 100;
-                  return (
-                    <div key={row.production} className="px-4 py-3">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[13px] font-semibold text-stone-800">{row.production}</span>
-                        <span className={`text-[14px] font-bold ${row.balance >= 0 ? "text-brand-600" : "text-stone-900"}`}>
-                          {row.balance >= 0 ? "+" : ""}{fmt(row.balance)} €
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-[11px] text-stone-500 mb-2">
-                        <span>−{fmt(row.depenses)} €</span>
-                        <span className="text-brand-600">+{fmt(row.revenus)} €</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-stone-100 rounded-full h-1.5">
-                          <div className="bg-brand-500 h-1.5 rounded-full" style={{ width: `${pct}%` }} />
-                        </div>
-                        <span className="text-[10px] text-stone-400">{Math.round(pct)}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-                <div className="px-4 py-3 bg-stone-50 border-t-2 border-stone-200 flex items-center justify-between">
-                  <span className="text-[12px] font-semibold text-stone-500 uppercase tracking-wide">Total</span>
-                  <span className={`text-[14px] font-bold ${stats.balance >= 0 ? "text-brand-700" : "text-stone-900"}`}>
-                    {stats.balance >= 0 ? "+" : ""}{fmt(stats.balance)} €
-                  </span>
-                </div>
-              </div>
-
-              {/* Vue tableau — desktop */}
-              <div className="hidden md:block">
-                <table className="w-full min-w-[500px]">
-                  <thead>
-                    <tr className="border-b border-stone-200">
-                      {["Production", "Dépenses", "Revenus", "Balance", "Couverture"].map((h) => (
-                        <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold text-stone-400 uppercase tracking-[0.06em]">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-100">
-                    {parProduction.map((row) => {
-                      const pct = row.depenses > 0 ? Math.min(100, (row.revenus / row.depenses) * 100) : 100;
-                      return (
-                        <tr key={row.production} className="hover:bg-stone-50">
-                          <td className="px-4 py-3 text-[13px] font-medium text-stone-800">{row.production}</td>
-                          <td className="px-4 py-3 text-[13px] text-stone-900">−{fmt(row.depenses)} €</td>
-                          <td className="px-4 py-3 text-[13px] text-brand-600">+{fmt(row.revenus)} €</td>
-                          <td className={`px-4 py-3 text-[13px] font-semibold ${row.balance >= 0 ? "text-brand-600" : "text-stone-900"}`}>
-                            {row.balance >= 0 ? "+" : ""}{fmt(row.balance)} €
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <div className="w-20 bg-stone-100 rounded-full h-1.5">
-                                <div className="bg-brand-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                              </div>
-                              <span className="text-[11px] text-stone-400">{Math.round(pct)}%</span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot className="border-t-2 border-stone-200 bg-stone-50">
-                    <tr>
-                      <td className="px-4 py-3 text-[12px] font-semibold uppercase tracking-wide text-stone-500">TOTAL</td>
-                      <td className="px-4 py-3 text-[13px] font-semibold text-stone-900">−{fmt(stats.totalDepenses)} €</td>
-                      <td className="px-4 py-3 text-[13px] font-semibold text-brand-600">+{fmt(stats.totalRevenus)} €</td>
-                      <td className={`px-4 py-3 text-[14px] font-bold ${stats.balance >= 0 ? "text-brand-700" : "text-stone-900"}`}>
-                        {stats.balance >= 0 ? "+" : ""}{fmt(stats.balance)} €
-                      </td>
-                      <td />
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Modal transaction */}
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)}
-        title={editTarget ? "Modifier la transaction" : "Nouvelle transaction"}
-        size="large"
-        buttons={[
-          { label: "Annuler", onClick: () => setShowModal(false), className: "px-4 py-2 text-[13px] bg-stone-100 text-stone-700 border border-stone-200 rounded-lg hover:bg-stone-200 cursor-pointer transition-colors" },
-          { label: formLoading ? "Enregistrement..." : (editTarget ? "Modifier" : "Ajouter"), onClick: handleSave, className: "px-4 py-2 text-[13px] font-medium text-white bg-stone-900 rounded-lg hover:bg-stone-700 cursor-pointer transition-colors" },
-        ]}>
-        <TransactionForm form={form} setForm={setForm} config={config}
-          onAddProduction={() => setAddModal("production")}
-          onAddCategorie={() => setAddModal("categorie")}
-          onAddSousCategorie={() => setAddModal("sousCategorie")}
-        />
-
-        {/* Pièce jointe */}
-        <div className="mt-4 pt-4 border-t border-stone-100">
-          <label className={`${labelClass}`}>Pièce jointe (photo, PDF, facture)</label>
-          {editTarget?.pieceJointe && !pieceJointeFile && (
-            <div className="flex items-center gap-2 mb-2 p-2 bg-stone-50 border border-stone-200 rounded-lg">
-              <Paperclip className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-              <a href={editTarget.pieceJointe.url} target="_blank" rel="noopener noreferrer"
-                className="text-[12px] text-brand-600 hover:underline truncate flex-1">
-                {editTarget.pieceJointe.nom}
-              </a>
-              <span className="text-[11px] text-stone-400">Remplacer ↓</span>
-            </div>
-          )}
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            onChange={(e) => setPieceJointeFile(e.target.files?.[0] ?? null)}
-            className="block w-full text-[13px] text-stone-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[12px] file:font-medium file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200 cursor-pointer"
-          />
-          {pieceJointeFile && (
-            <p className="text-[11px] text-brand-600 mt-1">✓ {pieceJointeFile.name}</p>
-          )}
-        </div>
-      </Modal>
-
-      {/* Modal avance — montant seul */}
-      <DebtEntryModal isOpen={!!avancePayeur} onClose={() => setAvancePayeur(null)} kind="avance" payeur={avancePayeur} onAdd={handleAddAvance} />
-
-      {/* Modal remboursement — montant seul, plafonné au solde par validateNoNegativeDebt */}
-      <DebtEntryModal isOpen={!!remboursementPayeur} onClose={() => setRemboursementPayeur(null)} kind="remboursement"
-        payeur={remboursementPayeur} dette={remboursementPayeur ? dettes[remboursementPayeur] : undefined} onAdd={handleAddRemboursement} />
-
-      {/* Modal suppression */}
-      <ConfirmModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={handleDelete}
-        title="Supprimer la transaction"
-        message={`Confirmer la suppression de <strong>${deleteTarget?.label}</strong> ?`}
-        confirmText="Supprimer" danger />
-
-      {/* Modals catégories */}
-      <AddValueModal isOpen={addModal === "production"} onClose={() => setAddModal(null)} label="Production"
-        onAdd={async (v) => {
-          const res = await addProduction(v, config);
-          if (res.success) { showToast({ type: "success", title: `"${v}" ajouté` }); await refreshConfig(); }
-          else showToast({ type: "error", title: res.error || "Erreur" });
-        }} />
-      <AddValueModal isOpen={addModal === "categorie"} onClose={() => setAddModal(null)} label="Catégorie"
-        onAdd={async (v) => {
-          const res = await addCategorie(v, config);
-          if (res.success) { showToast({ type: "success", title: `"${v}" ajouté` }); await refreshConfig(); }
-          else showToast({ type: "error", title: res.error || "Erreur" });
-        }} />
-      <AddValueModal isOpen={addModal === "sousCategorie"} onClose={() => setAddModal(null)} label="Sous-catégorie"
-        onAdd={async (v) => {
-          const res = await addSousCategorie(v, config);
-          if (res.success) { showToast({ type: "success", title: `"${v}" ajouté` }); await refreshConfig(); }
-          else showToast({ type: "error", title: res.error || "Erreur" });
-        }} />
-    </div>
-  );
+    {panel === "filters" && <Sheet title="Filtrer les écritures" onClose={() => setPanel(null)} footer={<Button variant="primary" fullWidth onClick={() => setPanel(null)}>Afficher les résultats</Button>}>
+      {([
+        ["annee", "Année", years], ["operation", "Opération", ["Dépenses", "Revenus"]], ["production", "Production", productions], ["categorie", "Catégorie", categories], ["payeur", "Payeur", payers],
+      ] as const).map(([key,label,options]) => <Field key={key} label={label} htmlFor={`cost-filter-${key}`}><select id={`cost-filter-${key}`} value={filters[key]} onChange={e => setFilters(prev => ({ ...prev, [key]: e.target.value }))}><option value="">Tout afficher</option>{options.map(value => <option key={value} value={value}>{key === "payeur" ? payerName(value) : value}</option>)}</select></Field>)}
+      <Field label="Matériel associé" htmlFor="cost-filter-vehicle"><select id="cost-filter-vehicle" value={filters.vehicleId} onChange={e => setFilters(prev => ({ ...prev, vehicleId: e.target.value }))}><option value="">Tous les matériels</option>{vehicles.map(vehicle => <option key={vehicle.id} value={vehicle.id}>{vehicleName(vehicle)}</option>)}</select></Field>
+    </Sheet>}
+    {panel === "more" && <Sheet title="Autres actions" onClose={() => setPanel(null)}><div className={styles.actions}>
+      <Button onClick={() => { setPanel(null); setLegacyEditor("revenue"); }}>Ajouter une recette</Button>
+      <Button onClick={() => setPanel("financing")}>Avances et remboursements</Button>
+      <Button onClick={() => { setPanel(null); setLegacyEditor("new"); }}>Saisie détaillée</Button>
+      <Link className={styles.actionLink} href="/rapports">Analyse financière<ArrowUpRight aria-hidden="true" /></Link>
+    </div></Sheet>}
+    {panel === "financing" && <Sheet title="Avances et remboursements" onClose={() => setPanel(null)} description="Le compte Revolut appartient à la ferme. Ces mouvements sont séparés des dépenses et recettes."><div className={styles.actions}>{(["SY","BY"] as const).map(payer => <Card key={payer}><p className={styles.secondary}>Dette envers {creditorLabel(payer)}</p><p className={styles.debtAmount}>{money(balances[payer])}</p><div className={styles.debtActions}><Button onClick={() => { setPanel(null); setDebtEditor({ kind: "avance", payeur: payer }); }}>Avance</Button><Button disabled={balances[payer] <= 0} onClick={() => { setPanel(null); setDebtEditor({ kind: "remboursement", payeur: payer }); }}>Rembourser</Button></div></Card>)}</div></Sheet>}
+    {selected && <Sheet title={isPurchaseInvoice(selected) ? "Facture d’achat" : "Détail de l’écriture"} onClose={() => setSelected(null)} footer={<Button variant="primary" fullWidth onClick={() => edit(selected)}>Modifier {isPurchaseInvoice(selected) ? "la facture" : "l’écriture"}</Button>}>
+      <p className={styles.detailAmount}>{money(selected.montant)}</p><p>{selected.fournisseur || selected.produit}</p><p className={styles.secondary}>{formatDate(selected.date)} · {payerName(selected.payeur)}</p>
+      {selected.reference && <p className={styles.secondary}>Référence : {selected.reference}</p>}
+      {isPurchaseInvoice(selected) ? <div className={styles.actions}>{expandPurchaseAllocations([selected]).map(line => <Card key={line.id}><strong>{line.production} · {money(line.montant)}</strong><p className={styles.secondary}>{line.produit}</p>{line.vehicleLabel && <p className={styles.secondary}>{line.vehicleLabel}</p>}</Card>)}</div> : <p className={styles.secondary}>{selected.production} · {selected.categorie} · {selected.sousCategorie}</p>}
+      {selected.remarque && <p className={styles.detailNote}>{selected.remarque}</p>}
+      {selected.pieceJointe && <a className={styles.actionLink} href={selected.pieceJointe.url} target="_blank" rel="noopener noreferrer"><Paperclip aria-hidden="true" />Ouvrir le justificatif</a>}
+      <Button variant="danger" fullWidth onClick={() => { setDeleteTarget(selected); setSelected(null); setDeleteError(""); }}><Trash2 aria-hidden="true" />Supprimer {isPurchaseInvoice(selected) ? "la facture" : "l’écriture"}</Button>
+    </Sheet>}
+    {deleteTarget && <Sheet title="Confirmer la suppression" onClose={() => setDeleteTarget(null)} busy={deleteBusy} footer={<Button variant="danger" fullWidth busy={deleteBusy} onClick={remove}>Supprimer définitivement</Button>}><p>{isPurchaseInvoice(deleteTarget) ? "La facture et toutes ses affectations seront supprimées." : "Cette écriture sera supprimée."}</p><p><strong>{deleteTarget.fournisseur || deleteTarget.produit} · {money(deleteTarget.montant)}</strong></p>{deleteError && <Notice tone="error">{deleteError}</Notice>}<Button fullWidth onClick={() => setDeleteTarget(null)} disabled={deleteBusy}>Conserver</Button></Sheet>}
+    {invoiceEditor && <PurchaseInvoiceEditor invoice={invoiceEditor === "new" ? undefined : invoiceEditor} productions={productions} suppliers={suppliers} vehicles={vehicles} userId={state.user?.uid || ""} onClose={() => setInvoiceEditor(null)} onSaved={saved} />}
+    {legacyEditor && <FinanceEntryEditor transaction={typeof legacyEditor === "string" ? undefined : legacyEditor} revenue={legacyEditor === "revenue"} config={config} transactions={transactions} onClose={() => setLegacyEditor(null)} onSaved={saved} onConfigChange={setConfig} />}
+    {debtEditor && <DebtEntryEditor {...debtEditor} balance={balances[debtEditor.payeur]} transactions={transactions} onClose={() => setDebtEditor(null)} onSaved={() => saved()} />}
+  </div>;
 }

@@ -6,6 +6,7 @@ import KpiCard from "@/components/KpiCard";
 import Modal, { ConfirmModal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import type { Ruche, RecolteMiel, VenteMiel } from "@/types/apiculture";
+import { expandPurchaseAllocations } from "@/types/purchase-invoice";
 import {
   createRuche, updateRuche, deleteRuche,
   createRecolte, updateRecolte, deleteRecolte,
@@ -405,7 +406,7 @@ export default function ApiculturePage() {
 
   // ——— Balance apiculture (transactions taguées "Apiculture") ———
   const coutsApiculture = useMemo(() =>
-    couts.filter((t) => t.production?.toLowerCase().includes("apicult") || t.production?.toLowerCase().includes("miel") || t.production?.toLowerCase().includes("abeill")),
+    expandPurchaseAllocations(couts).filter((t) => t.production?.toLowerCase().includes("apicult") || t.production?.toLowerCase().includes("miel") || t.production?.toLowerCase().includes("abeill")),
   [couts]);
 
   const depensesApiculture = useMemo(() =>

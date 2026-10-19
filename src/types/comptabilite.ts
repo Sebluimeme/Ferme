@@ -27,10 +27,15 @@ export interface Transaction {
   produit: string; // Description du produit/service
   remarque?: string;
   fournisseur?: string;
+  reference?: string; // Numéro de facture, conservé dans les vues analytiques
   quantite?: number;
   payeur: string; // Ex: "SY", "BY", "revolut"
   montant: number; // Toujours positif — operation détermine le sens
   nature?: TransactionNature; // Compatibilité : absent = exploitation, sauf remboursements historiques détectés
+  factureId?: string; // Présent sur les affectations virtuelles d'une facture d'achat
+  vehicleId?: string; // Axe matériel, indépendant de la production
+  vehicleLabel?: string;
+  typeAchat?: string;
   pieceJointe?: {
     url: string;
     storagePath: string;

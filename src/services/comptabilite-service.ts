@@ -1,5 +1,13 @@
 import firebaseService from "@/lib/firebase-service";
 import { validateNoNegativeDebt, type Transaction, type TransactionFormData } from "@/types/comptabilite";
+import {
+  clearedOptionalFields,
+  deleteTransactionWithAttachment,
+  parsePositiveDecimal,
+  requiresInvoiceService,
+  saveTransactionWithAttachment,
+  type TransactionMutationResult,
+} from "./comptabilite-write-safety";
 
 const PATH = "transactions";
 type TransactionPayload = Omit<Transaction, "id" | "dateCreation" | "derniereMAJ">;
@@ -68,7 +76,8 @@ const DEFAULT_CONFIG: CategoriesConfig = {
 };
 
 function mergeUnique(existing: string[] | undefined, defaults: string[]): string[] {
-  return Array.from(new Set([...(existing || []), ...defaults])).sort();
+  const values = Array.isArray(existing) ? existing.filter((value) => typeof value === "string") : [];
+  return Array.from(new Set([...values, ...defaults])).sort();
 }
 
 function normalizeConfig(config: CategoriesConfig): CategoriesConfig {
@@ -83,9 +92,9 @@ function normalizeConfig(config: CategoriesConfig): CategoriesConfig {
 export async function getCategoriesConfig(): Promise<CategoriesConfig> {
   const result = await firebaseService.getById<CategoriesConfig>(CONFIG_PATH, "categories");
   if (result.success && result.data) return normalizeConfig(result.data);
-  // Initialiser avec les valeurs par défaut
-  await firebaseService.create(CONFIG_PATH, { ...DEFAULT_CONFIG, id: "categories" } as unknown as Record<string, unknown>);
-  return DEFAULT_CONFIG;
+  // Consulter cette page ne doit jamais initialiser ou modifier la base.
+  // Les valeurs proposées restent locales tant que l'utilisateur ne les édite pas.
+  return normalizeConfig(DEFAULT_CONFIG);
 }
 
 export async function updateCategoriesConfig(config: CategoriesConfig) {
@@ -126,9 +135,9 @@ function parseFormData(data: TransactionFormData): TransactionPayload {
     produit: data.produit.trim(),
     ...(data.remarque.trim() ? { remarque: data.remarque.trim() } : {}),
     ...(data.fournisseur.trim() ? { fournisseur: data.fournisseur.trim() } : {}),
-    ...(data.quantite ? { quantite: parseFloat(data.quantite) } : {}),
+    ...(data.quantite.trim() ? { quantite: parsePositiveDecimal(data.quantite)! } : {}),
     payeur: data.payeur,
-    montant: Math.abs(parseFloat(data.montant)),
+    montant: parsePositiveDecimal(data.montant, 2)!,
     nature,
   };
 }
@@ -141,8 +150,10 @@ export function validateTransactionData(data: TransactionFormData): { valid: boo
   if (!data.categorie.trim()) errors.push("La catégorie est obligatoire");
   if (!data.sousCategorie.trim()) errors.push("La sous-catégorie est obligatoire");
   if (!data.produit.trim()) errors.push("Le produit/description est obligatoire");
-  if (!data.montant || isNaN(parseFloat(data.montant)) || parseFloat(data.montant) <= 0)
-    errors.push("Le montant doit être un nombre positif");
+  if (parsePositiveDecimal(data.montant, 2) === null)
+    errors.push("Le montant doit être positif, avec deux décimales maximum (ex. 12,50)");
+  if (data.quantite.trim() && parsePositiveDecimal(data.quantite) === null)
+    errors.push("La quantité doit être un nombre positif, ou rester vide");
   if ((data.nature === "avance" || data.nature === "remboursement") && !["SY", "BY"].includes(data.payeur)) {
     errors.push("Seuls Sébastien (SY) et Benjamin (BY) peuvent être avanceurs ou remboursés ; Revolut est le compte de la ferme.");
   }
@@ -155,48 +166,61 @@ async function getDebtReferenceTransactions(existingTransactions?: Transaction[]
   return result.success && result.data ? result.data : [];
 }
 
-export async function createTransaction(data: TransactionFormData, pieceJointe?: File, existingTransactions?: Transaction[]) {
+function attachmentStoragePath(file: File): string {
+  return `transactions/${crypto.randomUUID()}_${file.name}`;
+}
+
+export async function createTransaction(data: TransactionFormData, pieceJointe?: File, existingTransactions?: Transaction[]): Promise<TransactionMutationResult> {
   const validation = validateTransactionData(data);
   if (!validation.valid) return { success: false, error: validation.errors.join(", ") };
   const parsed = parseFormData(data);
   const debtValidation = validateNoNegativeDebt({ ...parsed, id: "" }, await getDebtReferenceTransactions(existingTransactions));
   if (!debtValidation.valid) return { success: false, error: debtValidation.error };
-  if (pieceJointe) {
-    const { uploadFile } = await import("@/lib/firebase-storage");
-    const path = `transactions/${Date.now()}_${pieceJointe.name}`;
-    const res = await uploadFile(path, pieceJointe);
-    if (res.success && res.url) {
-      parsed.pieceJointe = { url: res.url, storagePath: path, nom: pieceJointe.name };
-    }
-  }
-  return firebaseService.create(PATH, parsed as unknown as Record<string, unknown>);
+  return saveTransactionWithAttachment({
+    file: pieceJointe,
+    loadStorage: () => import("@/lib/firebase-storage"),
+    storagePath: attachmentStoragePath,
+    save: (attachment) => firebaseService.create(PATH, {
+      ...parsed,
+      ...(attachment ? { pieceJointe: attachment } : {}),
+    } as unknown as Record<string, unknown>),
+  });
 }
 
-export async function updateTransaction(id: string, data: TransactionFormData, pieceJointe?: File, ancienStoragePath?: string, existingTransactions?: Transaction[]) {
+export async function updateTransaction(id: string, data: TransactionFormData, pieceJointe?: File, _ancienStoragePath?: string, existingTransactions?: Transaction[]): Promise<TransactionMutationResult> {
   const validation = validateTransactionData(data);
   if (!validation.valid) return { success: false, error: validation.errors.join(", ") };
+  const current = await firebaseService.getById<Transaction>(PATH, id);
+  if (!current.success || !current.data) return { success: false, error: current.error || "Impossible de vérifier l'écriture avant modification" };
+  if (requiresInvoiceService(current.data)) return { success: false, error: "Cette facture d'achat doit être modifiée depuis son formulaire de facture pour préserver ses affectations." };
   const parsed = { ...parseFormData(data), id };
   const debtValidation = validateNoNegativeDebt(parsed as Transaction, await getDebtReferenceTransactions(existingTransactions));
   if (!debtValidation.valid) return { success: false, error: debtValidation.error };
-  if (pieceJointe) {
-    const { uploadFile, deleteFile } = await import("@/lib/firebase-storage");
-    // Supprimer l'ancienne pièce jointe si elle existe
-    if (ancienStoragePath) await deleteFile(ancienStoragePath);
-    const path = `transactions/${Date.now()}_${pieceJointe.name}`;
-    const res = await uploadFile(path, pieceJointe);
-    if (res.success && res.url) {
-      parsed.pieceJointe = { url: res.url, storagePath: path, nom: pieceJointe.name };
-    }
-  }
-  return firebaseService.update(PATH, id, parsed as unknown as Record<string, unknown>);
+  return saveTransactionWithAttachment({
+    file: pieceJointe,
+    // La valeur relue fait autorité : le formulaire peut dater d'avant une
+    // modification réalisée sur un autre téléphone.
+    previousStoragePath: current.data.pieceJointe?.storagePath,
+    loadStorage: () => import("@/lib/firebase-storage"),
+    storagePath: attachmentStoragePath,
+    save: (attachment) => firebaseService.update(PATH, id, {
+      ...parsed,
+      // Firebase ignore les clés absentes. null supprime réellement un champ vidé.
+      ...clearedOptionalFields(data),
+      ...(attachment ? { pieceJointe: attachment } : {}),
+    }),
+  });
 }
 
-export async function deleteTransaction(id: string, storagePath?: string) {
-  if (storagePath) {
-    const { deleteFile } = await import("@/lib/firebase-storage");
-    await deleteFile(storagePath);
-  }
-  return firebaseService.delete(PATH, id);
+export async function deleteTransaction(id: string, _storagePath?: string): Promise<TransactionMutationResult> {
+  const current = await firebaseService.getById<Transaction>(PATH, id);
+  if (!current.success || !current.data) return { success: false, error: current.error || "Impossible de vérifier l'écriture avant suppression" };
+  if (requiresInvoiceService(current.data)) return { success: false, error: "Cette facture d'achat doit être supprimée depuis son formulaire de facture pour préserver ses affectations." };
+  return deleteTransactionWithAttachment({
+    storagePath: current.data.pieceJointe?.storagePath,
+    remove: () => firebaseService.delete(PATH, id),
+    loadStorage: () => import("@/lib/firebase-storage"),
+  });
 }
 
 export function searchTransactions(transactions: Transaction[], query: string): Transaction[] {
