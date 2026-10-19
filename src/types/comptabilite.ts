@@ -86,6 +86,18 @@ export interface ComptabiliteStats {
 
 export type CreditorBalances = Record<FarmCreditor, number>;
 
+export interface CreditorStatement {
+  purchases: number;
+  advances: number;
+  receipts: number;
+  repayments: number;
+  contributed: number;
+  netBalance: number;
+  amountDue: number;
+}
+
+type FinancingTransaction = Pick<Transaction, "operation" | "payeur" | "montant" | "nature" | "categorie" | "sousCategorie" | "produit">;
+
 function normalize(value?: string): string {
   return (value || "")
     .toLowerCase()
@@ -129,16 +141,32 @@ export function getDebtImpact(transaction: Pick<Transaction, "operation" | "paye
   return 0;
 }
 
-export function computeCreditorBalances(transactions: Array<Pick<Transaction, "operation" | "payeur" | "montant" | "nature" | "categorie" | "sousCategorie" | "produit">>): CreditorBalances {
-  const balances: CreditorBalances = { SY: 0, BY: 0 };
+/** Use original transactions, never invoice headers plus their allocations. */
+export function computeCreditorStatements(transactions: FinancingTransaction[]): Record<FarmCreditor, CreditorStatement> {
+  const empty = () => ({ purchases: 0, advances: 0, receipts: 0, repayments: 0 });
+  const cents = { SY: empty(), BY: empty() };
   for (const transaction of transactions) {
     if (!isFarmCreditor(transaction.payeur)) continue;
-    balances[transaction.payeur] += getDebtImpact(transaction);
+    const account = cents[transaction.payeur];
+    const amount = Math.round(transaction.montant * 100);
+    const nature = getTransactionNature(transaction);
+    if (nature === "avance") account.advances += amount;
+    else if (nature === "remboursement") account.repayments += amount;
+    else if (transaction.operation === "Dépenses") account.purchases += amount;
+    else if (transaction.operation === "Revenus") account.receipts += amount;
   }
-  return {
-    SY: Math.max(0, roundCurrency(balances.SY)),
-    BY: Math.max(0, roundCurrency(balances.BY)),
+  const statement = (payeur: FarmCreditor): CreditorStatement => {
+    const account = cents[payeur];
+    const contributed = account.purchases + account.advances;
+    const net = contributed - account.receipts - account.repayments;
+    return { purchases: account.purchases / 100, advances: account.advances / 100, receipts: account.receipts / 100, repayments: account.repayments / 100, contributed: contributed / 100, netBalance: net / 100, amountDue: Math.max(0, net) / 100 };
   };
+  return { SY: statement("SY"), BY: statement("BY") };
+}
+
+export function computeCreditorBalances(transactions: FinancingTransaction[]): CreditorBalances {
+  const statements = computeCreditorStatements(transactions);
+  return { SY: statements.SY.amountDue, BY: statements.BY.amountDue };
 }
 
 function roundCurrency(value: number): number {

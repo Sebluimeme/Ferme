@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
+import { normalizePayer, payerLabel, uniquePayers } from "@/lib/comptabilite-payers";
 import { Button, Field, Notice, Sheet } from "@/components/ui/FarmUI";
 import { createTransaction, updateTransaction, addProduction, addCategorie, addSousCategorie, getCategoriesConfig, type CategoriesConfig } from "@/services/comptabilite-service";
 import { EMPTY_TRANSACTION_FORM, getTransactionNature, creditorLabel, type FarmCreditor, type Transaction, type TransactionFormData } from "@/types/comptabilite";
@@ -19,7 +20,7 @@ export function FinanceEntryEditor({ transaction, config, transactions, onClose,
     date: transaction.date, operation: transaction.operation, production: transaction.production,
     categorie: transaction.categorie, sousCategorie: transaction.sousCategorie, produit: transaction.produit,
     remarque: transaction.remarque || "", fournisseur: transaction.fournisseur || "", quantite: transaction.quantite == null ? "" : String(transaction.quantite),
-    payeur: transaction.payeur, montant: String(transaction.montant), nature: getTransactionNature(transaction),
+    payeur: normalizePayer(transaction.payeur), montant: String(transaction.montant), nature: getTransactionNature(transaction),
   } : { ...EMPTY_TRANSACTION_FORM, date: localDate(), operation: revenue ? "Revenus" : "Dépenses" });
   const [file, setFile] = useState<File>();
   const [busy, setBusy] = useState(false);
@@ -73,7 +74,7 @@ export function FinanceEntryEditor({ transaction, config, transactions, onClose,
         ] as const).map(([key, label, options]) => <Field key={key} label={label} htmlFor={`${id}-${key}`}><div style={{ display: "flex", gap: 8 }}><select id={`${id}-${key}`} value={form[key]} onChange={e => set(key, e.target.value)}><option value="">Choisir</option>{selectOptions(form[key], [...options]).map(value => <option key={value}>{value}</option>)}</select><Button aria-label={`Ajouter : ${label}`} onClick={() => { setAdding(key); setNewValue(""); setAddingError(""); }}>+</Button></div></Field>)}
         <Field label="Description" htmlFor={`${id}-description`}><input id={`${id}-description`} value={form.produit} onChange={e => set("produit", e.target.value)} /></Field>
         <Field label="Montant (€)" htmlFor={`${id}-amount`}><input id={`${id}-amount`} inputMode="decimal" value={form.montant} onChange={e => set("montant", e.target.value)} /></Field>
-        <Field label={form.operation === "Revenus" ? "Encaissé par" : "Payé par"} htmlFor={`${id}-payer`}><select id={`${id}-payer`} value={form.payeur} onChange={e => set("payeur", e.target.value)}>{selectOptions(form.payeur, config.payeurs).map(value => <option key={value} value={value}>{value === "SY" ? "Sébastien" : value === "BY" ? "Benjamin" : value.toLowerCase() === "revolut" ? "Ferme · Revolut" : value}</option>)}</select></Field>
+        <Field label={form.operation === "Revenus" ? "Encaissé par" : "Payé par"} htmlFor={`${id}-payer`}><select id={`${id}-payer`} value={form.payeur} onChange={e => set("payeur", e.target.value)}>{uniquePayers([form.payeur, ...config.payeurs]).map(value => <option key={value} value={value}>{payerLabel(value)}</option>)}</select></Field>
         <Field label="Fournisseur (facultatif)" htmlFor={`${id}-supplier`}><input id={`${id}-supplier`} value={form.fournisseur} onChange={e => set("fournisseur", e.target.value)} /></Field>
         <Field label="Référence ou remarque (facultatif)" htmlFor={`${id}-note`}><textarea id={`${id}-note`} value={form.remarque} onChange={e => set("remarque", e.target.value)} /></Field>
         <Field label="Quantité (facultatif)" htmlFor={`${id}-quantity`}><input id={`${id}-quantity`} inputMode="decimal" value={form.quantite} onChange={e => set("quantite", e.target.value)} /></Field>

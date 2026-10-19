@@ -8,18 +8,21 @@ import { database } from "@/lib/firebase";
 import { useAppStore } from "@/store/store";
 import { Button, Card, Field, Notice, Sheet, farmStyles } from "@/components/ui/FarmUI";
 import PurchaseInvoiceEditor from "@/components/purchases/PurchaseInvoiceEditor";
+import FinancingSummary from "@/components/FinancingSummary";
+import { payerLabel, uniquePayers } from "@/lib/comptabilite-payers";
+import { readTransactionRecords } from "@/lib/transaction-records";
 import { FinanceEntryEditor, DebtEntryEditor } from "@/components/purchases/FinanceEntryEditor";
 import { getCategoriesConfig, deleteTransaction, searchTransactions, filterTransactions, type CategoriesConfig } from "@/services/comptabilite-service";
 import { deletePurchaseInvoice } from "@/services/purchase-invoice-service";
 import { expandPurchaseAllocations, isPurchaseInvoice, type PurchaseInvoice } from "@/types/purchase-invoice";
-import { computeStats, computeCreditorBalances, creditorLabel, formatDate, isOperatingTransaction, type Transaction, type FarmCreditor } from "@/types/comptabilite";
+import { computeStats, computeCreditorBalances, formatDate, getTransactionNature, isOperatingTransaction, type Transaction, type FarmCreditor } from "@/types/comptabilite";
 import type { Vehicle } from "@/types/vehicle";
 import styles from "./CoutsPageContent.module.css";
 
 const money = (amount: number) => amount.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b, "fr"));
 const vehicleName = (v: Vehicle) => v.nom || [v.marque, v.modele].filter(Boolean).join(" ") || v.plaqueImmatriculation || "Matériel sans nom";
-const payerName = (payer: string) => payer === "SY" ? "Sébastien" : payer === "BY" ? "Benjamin" : payer.toLowerCase() === "revolut" ? "Ferme · Revolut" : payer;
+const payerName = payerLabel;
 const emptyFilters = { operation: "", production: "", categorie: "", payeur: "", annee: "", vehicleId: "" };
 
 export default function CoutsPageContent() {
@@ -48,8 +51,7 @@ export default function CoutsPageContent() {
     let active = true;
     getCategoriesConfig().then(value => { if (active) setConfig(value); }).catch(() => { if (active) setLoadError("Les choix de classement n’ont pas pu être chargés. Réessayez avec du réseau."); });
     const unsubTransactions = onValue(ref(database, "transactions"), snapshot => {
-      const entries = snapshot.val() || {};
-      setTransactions(Object.entries(entries).map(([key, value]) => ({ ...(value as Transaction), id: key })));
+      setTransactions(readTransactionRecords(snapshot.val()));
       setLoading(false); setLoadError("");
     }, () => { setLoading(false); setLoadError("Impossible de charger les écritures. Les dernières données affichées sont conservées."); });
     const unsubVehicles = onValue(ref(database, "vehicules"), snapshot => {
@@ -78,7 +80,7 @@ export default function CoutsPageContent() {
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
   const productions = unique([...config.productions, ...analysis.map(t => t.production)]);
   const categories = unique([...config.categories, ...analysis.map(t => t.categorie)]);
-  const payers = unique([...config.payeurs, ...transactions.map(t => t.payeur)]);
+  const payers = uniquePayers([...config.payeurs, ...transactions.map(t => t.payeur)]);
   const years = unique(transactions.map(t => t.date.slice(0, 4))).reverse();
   const suppliers = unique(transactions.map(t => t.fournisseur || ""));
   const totals = (dimension: "production" | "vehicleId") => {
@@ -117,15 +119,16 @@ export default function CoutsPageContent() {
   return <div className={`${farmStyles.theme} ${styles.page}`}>
     <header className={styles.header}>
       <div><h1>Coûts</h1><p className={styles.subtitle}>Achats et recettes</p></div>
-      <Button variant="ghost" aria-label="Autres actions" onClick={() => setPanel("more")}><MoreHorizontal aria-hidden="true" /></Button>
+      <div className={styles.headerActions}><Button variant="ghost" aria-label="Qui a financé la ferme ?" onClick={() => setPanel("financing")}>Financement</Button><Button variant="ghost" aria-label="Autres actions" onClick={() => setPanel("more")}><MoreHorizontal aria-hidden="true" /></Button></div>
     </header>
     {message && <div className={styles.noticeRow}><Notice tone={message.tone}>{message.text}</Notice><Button variant="ghost" aria-label="Masquer le message" onClick={() => setMessage(null)}><X aria-hidden="true" /></Button></div>}
     {loadError && <Notice tone="error">{loadError}</Notice>}
     <Card className={styles.summary}>
       <div className={styles.summaryHeading}><span>Dépenses</span><Button variant="ghost" onClick={() => setPanel("filters")}>{filters.annee || "Toutes les années"}<SlidersHorizontal aria-hidden="true" /></Button></div>
       <p className={styles.bigAmount}>{loading ? "…" : money(stats.totalDepenses)}</p>
-      <p className={styles.secondary}>{hasFilters ? "Pour la sélection affichée" : "Hors avances et remboursements"}</p>
-      <div className={styles.summaryDetails}><div><span>Recettes</span><strong>{money(stats.totalRevenus)}</strong></div><div><span>Solde</span><strong>{money(stats.balance)}</strong></div></div>
+      <p className={styles.secondary}>{hasFilters ? "Sélection affichée · hors avances et remboursements" : "Hors avances et remboursements"}</p>
+      <div className={styles.summaryDetails}><div><span>Recettes</span><strong>{money(stats.totalRevenus)}</strong></div><div><span>Recettes − achats</span><strong>{money(stats.balance)}</strong></div></div>
+      <p className={styles.summaryExplanation}>Cet écart n’est pas la somme à rembourser.</p>
     </Card>
     {unassigned > 0 && <Notice tone="warning">{money(unassigned)} restent à affecter à une production. Ces dépenses sont déjà comprises dans le total.</Notice>}
     <div className={styles.toolbar}><div className={styles.search}><Search aria-hidden="true" /><input aria-label="Rechercher une écriture" placeholder="Fournisseur, achat, matériel…" value={search} onChange={e => setSearch(e.target.value)} /></div><Button aria-label={`Filtres${activeFilterCount ? ` : ${activeFilterCount} actifs` : ""}`} onClick={() => setPanel("filters")}><SlidersHorizontal aria-hidden="true" />{activeFilterCount || ""}</Button></div>
@@ -135,12 +138,14 @@ export default function CoutsPageContent() {
       {!filtered.length && <Card className={styles.empty}><Receipt aria-hidden="true" /><h2>{loadError ? "Données indisponibles" : "Aucune écriture"}</h2><p>{hasFilters ? "Essayez d’autres critères." : "Enregistrez votre premier achat pour commencer."}</p></Card>}
       {filtered.map(({ transaction: t, lines }) => {
         const invoice = isPurchaseInvoice(t);
+        const nature = getTransactionNature(t);
         const selectedAmount = lines.reduce((sum, row) => sum + row.montant, 0);
         const partial = invoice && Math.round(selectedAmount * 100) !== Math.round(t.montant * 100);
         const destinations = unique(lines.map(row => row.production));
         return <button className={styles.entry} key={t.id} type="button" onClick={() => setSelected(t)}>
           <span className={styles.entryTop}><span className={styles.entryTitle}>{invoice ? t.fournisseur || "Facture d’achat" : t.produit || "Écriture"}</span><strong className={styles.entryAmount}>{t.operation === "Revenus" ? "+" : "−"}{money(t.montant)}</strong></span>
           <span className={styles.entryDescription}>{invoice ? `${t.allocations.length} affectation${t.allocations.length > 1 ? "s" : ""} · ${destinations.join(", ")}` : t.production + " · " + t.sousCategorie}</span>
+          {nature !== "exploitation" && <span className={styles.selectionAmount}>{nature === "avance" ? "Avance à la ferme" : "Remboursement personnel"} · hors total des achats</span>}
           {partial && <span className={styles.selectionAmount}>Dont {money(selectedAmount)} pour ces filtres</span>}
           <span className={styles.entryBottom}><span>{formatDate(t.date)} · {payerName(t.payeur)}</span><span className={styles.entryIcons}>{t.pieceJointe && <Paperclip aria-label="Avec justificatif" />}<ChevronRight aria-hidden="true" /></span></span>
         </button>;
@@ -160,11 +165,15 @@ export default function CoutsPageContent() {
     </Sheet>}
     {panel === "more" && <Sheet title="Autres actions" onClose={() => setPanel(null)}><div className={styles.actions}>
       <Button onClick={() => { setPanel(null); setLegacyEditor("revenue"); }}>Ajouter une recette</Button>
-      <Button onClick={() => setPanel("financing")}>Avances et remboursements</Button>
+      <Button onClick={() => setPanel("financing")}>Financement et remboursements</Button>
       <Button onClick={() => { setPanel(null); setLegacyEditor("new"); }}>Saisie détaillée</Button>
       <Link className={styles.actionLink} href="/rapports">Analyse financière<ArrowUpRight aria-hidden="true" /></Link>
     </div></Sheet>}
-    {panel === "financing" && <Sheet title="Avances et remboursements" onClose={() => setPanel(null)} description="Le compte Revolut appartient à la ferme. Ces mouvements sont séparés des dépenses et recettes."><div className={styles.actions}>{(["SY","BY"] as const).map(payer => <Card key={payer}><p className={styles.secondary}>Dette envers {creditorLabel(payer)}</p><p className={styles.debtAmount}>{money(balances[payer])}</p><div className={styles.debtActions}><Button onClick={() => { setPanel(null); setDebtEditor({ kind: "avance", payeur: payer }); }}>Avance</Button><Button disabled={balances[payer] <= 0} onClick={() => { setPanel(null); setDebtEditor({ kind: "remboursement", payeur: payer }); }}>Rembourser</Button></div></Card>)}</div></Sheet>}
+    {panel === "financing" && <Sheet title="Financement et remboursements" onClose={() => setPanel(null)}><FinancingSummary transactions={transactions}
+      onAdvance={payeur => { setPanel(null); setDebtEditor({ kind: "avance", payeur }); }}
+      onRepay={payeur => { setPanel(null); setDebtEditor({ kind: "remboursement", payeur }); }}
+      onShowEntries={payeur => { setPanel(null); setFilters({ ...emptyFilters, payeur }); setSearch(""); setView("ecritures"); }}
+    /></Sheet>}
     {selected && <Sheet title={isPurchaseInvoice(selected) ? "Facture d’achat" : "Détail de l’écriture"} onClose={() => setSelected(null)} footer={<Button variant="primary" fullWidth onClick={() => edit(selected)}>Modifier {isPurchaseInvoice(selected) ? "la facture" : "l’écriture"}</Button>}>
       <p className={styles.detailAmount}>{money(selected.montant)}</p><p>{selected.fournisseur || selected.produit}</p><p className={styles.secondary}>{formatDate(selected.date)} · {payerName(selected.payeur)}</p>
       {selected.reference && <p className={styles.secondary}>Référence : {selected.reference}</p>}

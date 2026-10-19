@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronRight, ExternalLink, Paperclip, Plus, Tractor, Trash2, X } from "lucide-react";
 import type { Vehicle } from "@/types/vehicle";
+import { KNOWN_PAYERS, normalizePayer, payerLabel, uniquePayers } from "@/lib/comptabilite-payers";
 import { invoiceToDraft, makeEmptyInvoiceDraft, parseMoneyCents, PURCHASE_TYPES, validatePurchaseInvoice, type PurchaseInvoice, type PurchaseInvoiceDraft } from "@/types/purchase-invoice";
 import { savePurchaseInvoice } from "@/services/purchase-invoice-service";
 import { Button, Card, Field, Notice, Sheet, farmStyles, useBodyScrollLock, useDialogFocus, useVisualViewport } from "@/components/ui/FarmUI";
@@ -158,7 +159,7 @@ export default function PurchaseInvoiceEditor({ invoice, productions, suppliers,
   }, [draftKey]);
 
   const markChanged = () => { editRevision.current += 1; dirtyRef.current = true; setDirty(true); setLocalStatus("saving"); };
-  const change = (next: PurchaseInvoiceDraft) => { current.current = { ...current.current, draft: next }; setDraft(next); markChanged(); };
+  const change = (next: PurchaseInvoiceDraft) => { const normalized = { ...next, payeur: normalizePayer(next.payeur) }; current.current = { ...current.current, draft: normalized }; setDraft(normalized); markChanged(); };
   const changeTotal = (value: string) => {
     const only = draft.allocations[0];
     const followsTotal = draft.allocations.length === 1 && (!only.montant || parseMoneyCents(only.montant) === parseMoneyCents(draft.montant));
@@ -231,7 +232,7 @@ export default function PurchaseInvoiceEditor({ invoice, productions, suppliers,
       <fieldset disabled={!ready || !!recovered || busy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         <Card>
           <label className={styles.heroLabel} htmlFor="purchase-total">Montant total de la facture</label><div className={styles.amount}><input id="purchase-total" type="text" inputMode="decimal" autoComplete="off" placeholder="0,00" value={draft.montant} onChange={event => changeTotal(event.target.value)} aria-label="Montant total de la facture en euros" /><span aria-hidden="true">€</span></div>
-          <div className={styles.formGrid}><Field label="Date" htmlFor="purchase-date"><input id="purchase-date" type="date" value={draft.date} onChange={event => change({ ...draft, date: event.target.value })} /></Field><Field label="Payé par" htmlFor="purchase-payer"><select id="purchase-payer" value={draft.payeur} onChange={event => change({ ...draft, payeur: event.target.value })}><option value="SY">Sébastien</option><option value="BY">Benjamin</option><option value="revolut">Ferme · Revolut</option>{!["SY", "BY", "revolut"].includes(draft.payeur) && <option value={draft.payeur}>{draft.payeur}</option>}</select></Field></div>
+          <div className={styles.formGrid}><Field label="Date" htmlFor="purchase-date"><input id="purchase-date" type="date" value={draft.date} onChange={event => change({ ...draft, date: event.target.value })} /></Field><Field label="Payé par" htmlFor="purchase-payer"><select id="purchase-payer" value={normalizePayer(draft.payeur)} onChange={event => change({ ...draft, payeur: event.target.value })}>{uniquePayers([...KNOWN_PAYERS, draft.payeur]).map(value => <option key={value} value={value}>{payerLabel(value)}</option>)}</select></Field></div>
           <div style={{ marginTop: 16 }}><Field label={<>Fournisseur <span className={styles.optional}>· facultatif</span></>} htmlFor="purchase-supplier"><input id="purchase-supplier" list="purchase-known-suppliers" maxLength={240} autoComplete="off" placeholder="Nom du fournisseur" value={draft.fournisseur} onChange={event => change({ ...draft, fournisseur: event.target.value })} /><datalist id="purchase-known-suppliers">{Array.from(new Set(suppliers)).filter(Boolean).map(supplier => <option key={supplier} value={supplier} />)}</datalist></Field></div>
           <div className={styles.attachment}><Button fullWidth onClick={() => fileRef.current?.click()}><Paperclip aria-hidden="true" />{invoice?.pieceJointe || file ? "Changer le justificatif" : "Joindre une photo ou un PDF"}</Button><input ref={fileRef} className={styles.fileInput} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,.heic,.heif" onChange={event => { chooseFile(event.target.files?.[0]); event.target.value = ""; }} aria-label="Choisir une photo ou un PDF" />
             {(file || invoice?.pieceJointe) && <div className={styles.fileRow}><span className={styles.fileName}>{file ? file.name : invoice?.pieceJointe && <a href={invoice.pieceJointe.url} target="_blank" rel="noopener noreferrer">{invoice.pieceJointe.nom}<ExternalLink aria-label="Nouvel onglet" /></a>}</span>{file && <Button className={styles.close} variant="ghost" aria-label="Retirer le justificatif choisi" onClick={() => { current.current = { ...current.current, file: null }; setFile(null); markChanged(); }}><X aria-hidden="true" /></Button>}</div>}

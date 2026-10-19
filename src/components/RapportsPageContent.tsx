@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useAppStore } from "@/store/store";
-import { computeCreditorBalances, computeStats, creditorLabel, isOperatingTransaction, type Transaction } from "@/types/comptabilite";
+import { computeStats, isOperatingTransaction, type Transaction } from "@/types/comptabilite";
+import FinancingSummary from "@/components/FinancingSummary";
 import { expandPurchaseAllocations } from "@/types/purchase-invoice";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -95,7 +96,6 @@ export default function RapportsPageContent() {
   // Les affectations servent aux analyses ; une facture reste une seule transaction.
   const transactionCount = useMemo(() => new Set(filtered.map((transaction) => transaction.factureId || transaction.id)).size, [filtered]);
   // Une dette ne se filtre pas par production : cela exclurait notamment ses remboursements.
-  const dettes = useMemo(() => computeCreditorBalances(canonicalTransactions), [canonicalTransactions]);
   const filteredOperating = useMemo(() => filtered.filter(isOperatingTransaction), [filtered]);
 
   // ── Dépenses par catégorie ────────────────────────────────────────────────
@@ -178,7 +178,7 @@ export default function RapportsPageContent() {
       {/* En-tête */}
       <div>
         <h1 className="text-[22px] font-semibold text-stone-900 tracking-[-0.3px]">Analyse financière</h1>
-        <p className="text-[13px] text-stone-400 mt-0.5">Résultat d'exploitation séparé des avances et remboursements</p>
+        <p className="text-[15px] text-stone-500 mt-1">Achats et recettes enregistrés, séparés du financement personnel</p>
       </div>
 
       {/* Filtres */}
@@ -217,31 +217,24 @@ export default function RapportsPageContent() {
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard label="Dépenses exploitation" value={`${fmt(stats.totalDepenses)} €`} icon={<TrendingDown className="w-3.5 h-3.5 text-red-500" />} />
-            <KpiCard label="Recettes exploitation" value={`${fmt(stats.totalRevenus)} €`} icon={<TrendingUp className="w-3.5 h-3.5 text-green-600" />} />
+            <KpiCard label="Achats enregistrés" value={`${fmt(stats.totalDepenses, 2)} €`} icon={<TrendingDown className="w-3.5 h-3.5 text-red-500" />} />
+            <KpiCard label="Recettes enregistrées" value={`${fmt(stats.totalRevenus, 2)} €`} icon={<TrendingUp className="w-3.5 h-3.5 text-green-600" />} />
             <KpiCard
-              label="Résultat exploitation"
-              value={`${stats.balance >= 0 ? "+" : ""}${fmt(stats.balance)} €`}
+              label="Recettes − achats"
+              value={`${stats.balance >= 0 ? "+" : ""}${fmt(stats.balance, 2)} €`}
               icon={<Scale className="w-3.5 h-3.5" />}
             />
             <KpiCard label="Transactions" value={transactionCount} icon={<Receipt className="w-3.5 h-3.5" />} />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {(["SY", "BY"] as const).map((payeur) => (
-              <div key={payeur} className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Dette globale ferme → {creditorLabel(payeur)}</p>
-                <p className="text-[22px] font-bold font-mono text-amber-900 mt-0.5">{fmt(dettes[payeur], 2)} €</p>
-                <p className="text-[11px] text-amber-800 mt-1">Toutes périodes et productions, après remboursements</p>
-              </div>
-            ))}
-          </div>
+          <p className="text-[15px] text-stone-500">L’écart recettes − achats exclut les avances et remboursements. Il inclut les achats de matériel et ne mesure pas, à lui seul, la rentabilité d’un élevage.</p>
+          <FinancingSummary transactions={canonicalTransactions} />
 
           {/* Coût par tête */}
           {coutParTete && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 mb-3">
-                Estimation coût / tête — {selectedProd} ({coutParTete.nbTetes} animaux actifs)
+                Achats rapportés à l’effectif actuel — {selectedProd} ({coutParTete.nbTetes} animaux actifs)
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div>
@@ -259,7 +252,7 @@ export default function RapportsPageContent() {
                   </div>
                 )}
               </div>
-              <p className="text-[10px] text-amber-500 mt-2">* Basé sur les animaux actifs dans le cheptel</p>
+              <p className="text-[14px] text-amber-700 mt-3">Simple division des achats sélectionnés par les animaux actifs aujourd’hui. Ce repère ne suit ni les animaux sortis ni les lots : ce n’est pas leur coût de revient réel.</p>
             </div>
           )}
 

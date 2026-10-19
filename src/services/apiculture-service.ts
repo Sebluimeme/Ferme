@@ -1,4 +1,5 @@
 import firebaseService from "@/lib/firebase-service";
+import { FARM_ACCOUNT_PAYER, normalizePayer } from "@/lib/comptabilite-payers";
 import type { Ruche, RecolteMiel, VenteMiel } from "@/types/apiculture";
 
 const PATH_RUCHES = "ruches";
@@ -62,7 +63,7 @@ function buildTransactionPayload(data: {
     remarque: data.notes ?? "",
     fournisseur: "",
     quantite: data.nbPots500g + data.nbPots1kg,
-    payeur: data.beneficiaire ?? "Revolut",
+    payeur: normalizePayer(data.beneficiaire ?? FARM_ACCOUNT_PAYER),
     montant: data.prixTotal,
   };
 }
@@ -78,6 +79,7 @@ export async function createVente(data: Omit<VenteMiel, "id" | "dateCreation" | 
   // 2. Créer la vente avec le lien
   return firebaseService.create<Record<string, unknown>>(PATH_VENTES, {
     ...data,
+    beneficiaire: normalizePayer(data.beneficiaire ?? FARM_ACCOUNT_PAYER),
     ...(transactionId ? { transactionId } : {}),
   });
 }
@@ -87,11 +89,12 @@ export async function updateVente(
   data: Partial<Omit<VenteMiel, "id" | "dateCreation" | "derniereMAJ">>,
   currentVente?: VenteMiel
 ) {
-  // Mettre à jour la transaction miroir si elle existe et qu'on a les données complètes
-  if (currentVente?.transactionId && (data.dateVente !== undefined || data.prixTotal !== undefined)) {
+  // Le bénéficiaire seul modifie aussi le payeur et donc la dette personnelle.
+  const mirroredFields = ["dateVente", "prixTotal", "beneficiaire", "nbPots500g", "nbPots1kg", "typeMiel", "notes"] as const;
+  if (currentVente?.transactionId && mirroredFields.some(field => data[field] !== undefined)) {
     const merged = { ...currentVente, ...data } as VenteMiel;
     if (merged.dateVente && merged.prixTotal != null) {
-      await firebaseService.update(PATH_TRANSACTIONS, currentVente.transactionId, buildTransactionPayload({
+      const mirrorResult = await firebaseService.update(PATH_TRANSACTIONS, currentVente.transactionId, buildTransactionPayload({
         dateVente: merged.dateVente,
         nbPots500g: merged.nbPots500g ?? 0,
         nbPots1kg: merged.nbPots1kg ?? 0,
@@ -100,9 +103,13 @@ export async function updateVente(
         notes: merged.notes,
         beneficiaire: merged.beneficiaire,
       }));
+      if (!mirrorResult.success) return { success: false, error: mirrorResult.error || "La mise à jour comptable a échoué. La vente n’a pas été modifiée." };
     }
   }
-  return firebaseService.update(PATH_VENTES, id, { ...data });
+  return firebaseService.update(PATH_VENTES, id, {
+    ...data,
+    ...(data.beneficiaire !== undefined ? { beneficiaire: normalizePayer(data.beneficiaire) } : {}),
+  });
 }
 
 export async function deleteVente(id: string, transactionId?: string) {

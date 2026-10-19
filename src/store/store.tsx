@@ -3,8 +3,10 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import firebaseService from "@/lib/firebase-service";
+import { database } from "@/lib/firebase";
+import { readTransactionRecords } from "@/lib/transaction-records";
 import { onAuthChange } from "@/lib/auth-service";
-import type { Unsubscribe } from "firebase/database";
+import { onValue, ref, type Unsubscribe } from "firebase/database";
 import type { User } from "firebase/auth";
 import type { Vehicle, MaintenanceAlert, MaintenanceEntry, MeterReading } from "@/types/vehicle";
 import type { Task } from "@/types/task";
@@ -318,7 +320,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: "SET_LOADING", payload: false });
       return { type: "SET_ANIMAUX", payload: animaux };
     });
-    const listenTransactions = () => listen<Transaction>("transactions", (data) => ({ type: "SET_COUTS", payload: data }));
+    const listenTransactions = () => {
+      listeners.push(onValue(ref(database, "transactions"), (snapshot) => {
+        dispatch({ type: "SET_LOADING", payload: false });
+        dispatch({ type: "SET_COUTS", payload: readTransactionRecords(snapshot.val()) });
+      }, () => {
+        dispatch({ type: "SET_LOADING", payload: false });
+        dispatch({ type: "SET_COUTS", payload: [] });
+      }));
+    };
     const listenAlertes = () => listen<Alerte>("alertes", (data) => ({ type: "SET_ALERTES", payload: data }));
     const listenVehicules = () => listen<Vehicle>("vehicules", (data) => ({ type: "SET_VEHICLES", payload: data }));
     const listenEntretiens = () => listen<MaintenanceEntry>("vehicules-maintenance", (data) => ({ type: "SET_MAINTENANCE_ENTRIES", payload: data }));

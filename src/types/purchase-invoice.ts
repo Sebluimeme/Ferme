@@ -1,4 +1,5 @@
 import type { Transaction } from "@/types/comptabilite";
+import { KNOWN_PAYERS, normalizePayer } from "@/lib/comptabilite-payers";
 
 export const PURCHASE_TYPES = [
   { value: "alimentation", label: "Alimentation", categorie: "Charges", sousCategorie: "Nourritures" },
@@ -116,7 +117,7 @@ export function validatePurchaseInvoice(draft: PurchaseInvoiceDraft): PurchaseIn
   }
   if (!SAFE_KEY.test(draft.id)) errors.push("L’identifiant de la facture est invalide.");
   if (!validDate(draft.date)) errors.push("Choisissez une date valide.");
-  if (!["SY", "BY", "revolut"].includes(draft.payeur)) errors.push("Choisissez qui a payé la facture.");
+  if (!(KNOWN_PAYERS as readonly string[]).includes(normalizePayer(draft.payeur))) errors.push("Choisissez qui a payé la facture.");
   const total = parseMoneyCents(draft.montant);
   if (total === null || total <= 0) errors.push("Le total doit être positif, avec deux décimales maximum.");
   if (draft.fournisseur.length > 240 || draft.reference.length > 240 || draft.remarque.length > 4000) {
@@ -157,7 +158,7 @@ export function validatePurchaseInvoice(draft: PurchaseInvoiceDraft): PurchaseIn
 export function invoiceToDraft(invoice: PurchaseInvoice): PurchaseInvoiceDraft {
   return {
     id: invoice.id, date: invoice.date, fournisseur: invoice.fournisseur || "", reference: invoice.reference || "",
-    payeur: invoice.payeur, montant: (invoice.totalCentimes / 100).toFixed(2), remarque: invoice.remarque || "", version: invoice.factureVersion,
+    payeur: normalizePayer(invoice.payeur), montant: (invoice.totalCentimes / 100).toFixed(2), remarque: invoice.remarque || "", version: invoice.factureVersion,
     allocations: invoice.allocations.map((allocation) => ({
       id: allocation.id, production: allocation.production, vehicleId: allocation.vehicleId, vehicleLabel: allocation.vehicleLabel,
       typeAchat: allocation.typeAchat, description: allocation.description, quantite: allocation.quantite?.toString() || "",
@@ -191,7 +192,7 @@ export function buildPurchaseInvoice(
   const pieceJointe = options.pieceJointe || options.previous?.pieceJointe;
   return {
     id: draft.id, typeFacture: "achat", factureVersion: (options.previous?.factureVersion || 0) + 1,
-    date: draft.date, operation: "Dépenses", nature: "exploitation", payeur: draft.payeur,
+    date: draft.date, operation: "Dépenses", nature: "exploitation", payeur: normalizePayer(draft.payeur),
     production: sameProduction ? first.production : "Plusieurs productions",
     categorie: sameType ? mappedType.categorie : "Charges", sousCategorie: sameType ? mappedType.sousCategorie : "Achats répartis",
     produit: allocations.length === 1 ? first.description : `Facture d’achat · ${allocations.length} affectations`,

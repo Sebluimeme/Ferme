@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { FARM_ACCOUNT_PAYER, KNOWN_PAYERS, normalizePayer, payerLabel, uniquePayers } from "@/lib/comptabilite-payers";
 import { useAppStore } from "@/store/store";
 import KpiCard from "@/components/KpiCard";
 import Modal, { ConfirmModal } from "@/components/Modal";
@@ -247,7 +248,7 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
     dateVente: initial?.dateVente ?? today,
     ...poidsKgToVenteForm(initialPoids || 0.5),
     typeMiel: initial?.typeMiel ?? "Toutes fleurs",
-    beneficiaire: initial?.beneficiaire ?? "Revolut",
+    beneficiaire: normalizePayer(initial?.beneficiaire ?? FARM_ACCOUNT_PAYER),
     prixTotal: initial?.prixTotal ?? "",
     notes: initial?.notes ?? "",
   });
@@ -314,6 +315,7 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
           value={form.typeMiel}
           onChange={(e) => setForm((p) => ({ ...p, typeMiel: e.target.value }))}
         >
+          {!TYPES_MIEL.includes(form.typeMiel) && <option value={form.typeMiel}>{form.typeMiel || "Non renseigné"}</option>}
           {TYPES_MIEL.map((t) => (
             <option key={t} value={t}>{t}</option>
           ))}
@@ -327,9 +329,7 @@ function VenteForm({ initial, onSubmit, onCancel, loading }: {
           value={form.beneficiaire}
           onChange={(e) => setForm((p) => ({ ...p, beneficiaire: e.target.value }))}
         >
-          <option value="Revolut">Revolut (ferme)</option>
-          <option value="SY">Sébastien (SY)</option>
-          <option value="BY">Benjamin (BY)</option>
+          {uniquePayers([FARM_ACCOUNT_PAYER, ...KNOWN_PAYERS, form.beneficiaire]).map(value => <option key={value} value={value}>{payerLabel(value)}</option>)}
         </select>
       </div>
 
@@ -1072,7 +1072,7 @@ export default function ApiculturePage() {
         <VenteForm onSubmit={handleCreateVente} onCancel={() => setModalVente(false)} loading={saving} />
       </Modal>
       <Modal isOpen={!!editVente} onClose={() => setEditVente(null)} title="Modifier la vente">
-        {editVente && <VenteForm initial={{ dateVente: editVente.dateVente, nbPots500g: String(editVente.nbPots500g), nbPots1kg: String(editVente.nbPots1kg), prixTotal: String(editVente.prixTotal), notes: editVente.notes ?? "" }} onSubmit={handleUpdateVente} onCancel={() => setEditVente(null)} loading={saving} />}
+        {editVente && <VenteForm initial={{ dateVente: editVente.dateVente, nbPots500g: String(editVente.nbPots500g), nbPots1kg: String(editVente.nbPots1kg), beneficiaire: editVente.beneficiaire ?? FARM_ACCOUNT_PAYER, typeMiel: editVente.typeMiel ?? "", prixTotal: String(editVente.prixTotal), notes: editVente.notes ?? "" }} onSubmit={handleUpdateVente} onCancel={() => setEditVente(null)} loading={saving} />}
       </Modal>
       <ConfirmModal isOpen={!!deleteVenteTarget} onClose={() => setDeleteVenteTarget(null)} onConfirm={handleDeleteVente}
         title="Supprimer la vente" message={`Supprimer la vente du <strong>${deleteVenteTarget ? formatDate(deleteVenteTarget.dateVente) : ""}</strong> (${deleteVenteTarget ? formatEur(deleteVenteTarget.prixTotal) : ""}) ?`} confirmText="Supprimer" danger />

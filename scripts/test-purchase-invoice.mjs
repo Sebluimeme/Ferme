@@ -13,6 +13,7 @@ let passed = 0;
 try {
   // Compiler les vrais fichiers en modules isolés permet d'injecter le transport sans initialiser Firebase.
   const modules = [
+    ["../src/lib/comptabilite-payers.ts", "comptabilite-payers.mjs"],
     ["../src/types/comptabilite.ts", "comptabilite.mjs"],
     ["../src/types/purchase-invoice.ts", "purchase-invoice.mjs"],
     ["../src/services/purchase-invoice-service.ts", "service.mjs"],
@@ -22,6 +23,7 @@ try {
       compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
     }).outputText;
     compiled = compiled.replaceAll('"@/types/comptabilite"', '"./comptabilite.mjs"')
+      .replaceAll('"@/lib/comptabilite-payers"', '"./comptabilite-payers.mjs"')
       .replaceAll('"@/types/purchase-invoice"', '"./purchase-invoice.mjs"');
     await writeFile(join(temporaryDirectory, destination), compiled);
   }
@@ -106,6 +108,19 @@ try {
     const invoice = model.buildPurchaseInvoice(input);
     assert.equal(invoice.produit, "Alimentation · Frais communs");
     assert.equal(invoice.fournisseur, undefined);
+  });
+
+  await test("ancienne graphie Revolut acceptée en brouillon et enregistrée sous une seule identité", () => {
+    for (const payeur of ["Revolut", "revolut", " REVOLUT "]) {
+      const input = draft({ payeur });
+      assert.equal(model.validatePurchaseInvoice(input).valid, true);
+      const invoice = model.buildPurchaseInvoice(input);
+      assert.equal(invoice.payeur, "revolut");
+      const historical = { ...invoice, payeur };
+      assert.equal(model.invoiceToDraft(historical).payeur, "revolut");
+      assert.equal(historical.payeur, payeur);
+      assert.deepEqual(finance.computeCreditorBalances([invoice]), { SY: 0, BY: 0 });
+    }
   });
 
   await test("une écriture canonique : 350 € de dépenses et dette, pas 700 €", async () => {

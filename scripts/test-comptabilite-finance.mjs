@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import {
   computeCreditorBalances,
+  computeCreditorStatements,
   computeStats,
   getDebtImpact,
   isOperatingTransaction,
@@ -99,6 +100,42 @@ test("autorise un remboursement égal à la dette sans toucher l'autre personne"
   ];
   assert.equal(validateNoNegativeDebt(transactions[2], transactions.slice(0, 2)).valid, true);
   assert.deepEqual(computeCreditorBalances(transactions), { SY: 0, BY: 80 });
+});
+
+test("le détail distingue achats, avances, recettes et remboursements en centimes", () => {
+  const rows = [
+    tx({ payeur: "BY", montant: 1200.10 }),
+    tx({ payeur: "BY", montant: 200.20, nature: "avance" }),
+    tx({ payeur: "BY", montant: 300.30, operation: "Revenus" }),
+    tx({ payeur: "BY", montant: 100, operation: "Revenus", nature: "remboursement" }),
+    tx({ payeur: "revolut", montant: 200.20 }),
+  ];
+  assert.deepEqual(computeCreditorStatements(rows).BY, {
+    purchases: 1200.10, advances: 200.20, receipts: 300.30, repayments: 100,
+    contributed: 1400.30, netBalance: 1000, amountDue: 1000,
+  });
+  assert.equal(computeCreditorBalances(rows).BY, 1000);
+  assert.equal(computeStats(rows.filter(t => t.payeur === "BY")).balance.toFixed(2), "-899.80");
+});
+
+test("une recette dépassant les apports conserve un solde signé visible", () => {
+  const account = computeCreditorStatements([
+    tx({ montant: 100 }), tx({ montant: 125, operation: "Revenus" }),
+  ]).SY;
+  assert.equal(account.netBalance, -25);
+  assert.equal(account.amountDue, 0);
+});
+
+test("les mouvements historiques explicites restent dans le financement", () => {
+  const account = computeCreditorStatements([
+    tx({ montant: 300, nature: undefined, categorie: "Avance", produit: "Virement vers le compte ferme" }),
+    tx({ montant: 50, nature: undefined, categorie: "Remboursement", operation: "Revenus" }),
+  ]).SY;
+  assert.equal(account.advances, 300);
+  assert.equal(account.repayments, 50);
+  assert.equal(account.purchases, 0);
+  assert.equal(account.receipts, 0);
+  assert.equal(account.netBalance, 250);
 });
 
 console.log(`✅ ${passed} tests comptabilité finances OK`);

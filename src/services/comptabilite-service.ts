@@ -1,4 +1,5 @@
 import firebaseService from "@/lib/firebase-service";
+import { KNOWN_PAYERS, normalizePayer, samePayer, uniquePayers } from "@/lib/comptabilite-payers";
 import { validateNoNegativeDebt, type Transaction, type TransactionFormData } from "@/types/comptabilite";
 import {
   clearedOptionalFields,
@@ -72,7 +73,7 @@ const DEFAULT_CONFIG: CategoriesConfig = {
     "Avance personnelle vers Revolut",
     "Remboursement personnel depuis Revolut",
   ],
-  payeurs: ["SY", "BY", "revolut"],
+  payeurs: [...KNOWN_PAYERS],
 };
 
 function mergeUnique(existing: string[] | undefined, defaults: string[]): string[] {
@@ -85,7 +86,7 @@ function normalizeConfig(config: CategoriesConfig): CategoriesConfig {
     productions: mergeUnique(config.productions, DEFAULT_CONFIG.productions),
     categories: mergeUnique(config.categories, DEFAULT_CONFIG.categories),
     sousCategories: mergeUnique(config.sousCategories, DEFAULT_CONFIG.sousCategories),
-    payeurs: mergeUnique(config.payeurs, DEFAULT_CONFIG.payeurs),
+    payeurs: uniquePayers(mergeUnique(config.payeurs, DEFAULT_CONFIG.payeurs)).sort(),
   };
 }
 
@@ -98,7 +99,8 @@ export async function getCategoriesConfig(): Promise<CategoriesConfig> {
 }
 
 export async function updateCategoriesConfig(config: CategoriesConfig) {
-  return firebaseService.update(CONFIG_PATH, "categories", config as unknown as Record<string, unknown>);
+  const normalized = { ...config, payeurs: uniquePayers(config.payeurs) };
+  return firebaseService.update(CONFIG_PATH, "categories", normalized as unknown as Record<string, unknown>);
 }
 
 export async function addProduction(production: string, currentConfig: CategoriesConfig) {
@@ -136,7 +138,7 @@ function parseFormData(data: TransactionFormData): TransactionPayload {
     ...(data.remarque.trim() ? { remarque: data.remarque.trim() } : {}),
     ...(data.fournisseur.trim() ? { fournisseur: data.fournisseur.trim() } : {}),
     ...(data.quantite.trim() ? { quantite: parsePositiveDecimal(data.quantite)! } : {}),
-    payeur: data.payeur,
+    payeur: normalizePayer(data.payeur),
     montant: parsePositiveDecimal(data.montant, 2)!,
     nature,
   };
@@ -250,7 +252,7 @@ export function filterTransactions(
     if (operation && t.operation !== operation) return false;
     if (production && t.production !== production) return false;
     if (categorie && t.categorie !== categorie) return false;
-    if (payeur && t.payeur !== payeur) return false;
+    if (payeur && !samePayer(t.payeur, payeur)) return false;
     if (annee && !t.date.startsWith(annee)) return false;
     return true;
   });
