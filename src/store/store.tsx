@@ -6,7 +6,7 @@ import firebaseService from "@/lib/firebase-service";
 import { database } from "@/lib/firebase";
 import { readTransactionRecords } from "@/lib/transaction-records";
 import { onAuthChange } from "@/lib/auth-service";
-import { onValue, ref, type Unsubscribe } from "firebase/database";
+import { limitToLast, onValue, orderByKey, query, ref, type Unsubscribe } from "firebase/database";
 import type { User } from "firebase/auth";
 import type { Vehicle, MaintenanceAlert, MaintenanceEntry, MeterReading } from "@/types/vehicle";
 import type { Task } from "@/types/task";
@@ -274,6 +274,8 @@ const AppContext = createContext<{
   closeSidebar: () => void;
 } | null>(null);
 
+const WEATHER_HOME_READINGS = 3000;
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const listenersRef = useRef<Unsubscribe[]>([]);
@@ -337,7 +339,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const listenPartiels = () => listen<Partiel>("partiels", (data) => ({ type: "SET_PARTIELS", payload: data }));
     const listenActivitesFourrage = () => listen<ActiviteFourrage>("activites-fourrage", (data) => ({ type: "SET_ACTIVITES_FOURRAGE", payload: data }));
     const listenDistributionsFourrage = () => listen<DistributionFourrage>("distributions-fourrage", (data) => ({ type: "SET_DISTRIBUTIONS_FOURRAGE", payload: data }));
-    const listenMeteo = () => listen<WeatherReading>("weather-readings", (data) => ({ type: "SET_WEATHER_READINGS", payload: data }));
+    const listenMeteo = () => {
+      // L'accueil peut avoir laissé une fenêtre courte : ne jamais afficher un
+      // cumul annuel partiel le temps que l'historique complet arrive.
+      dispatch({ type: "SET_WEATHER_READINGS", payload: [] });
+      listen<WeatherReading>("weather-readings", (data) => ({ type: "SET_WEATHER_READINGS", payload: data }));
+    };
+    // L'accueil n'affiche que le dernier relevé, la pluie du jour et le cumul 7 j :
+    // inutile de télécharger tout l'historique (~8,5 Mo et croissant) à chaque
+    // ouverture. Clés `${stationId}_AAAAMMJJHHmm` chronologiques, donc pas d'index
+    // requis ; 3000 relevés ≈ 10 jours au rythme d'un relevé toutes les 5 min.
+    const listenMeteoRecent = () => {
+      const recent = query(ref(database, "weather-readings"), orderByKey(), limitToLast(WEATHER_HOME_READINGS));
+      listeners.push(onValue(recent, (snapshot) => {
+        dispatch({ type: "SET_WEATHER_READINGS", payload: Object.values(snapshot.val() ?? {}) as WeatherReading[] });
+      }, () => {
+        dispatch({ type: "SET_WEATHER_READINGS", payload: [] });
+      }));
+    };
     // animaux-chaleurs/{animalId}/{chaleurId} : structure imbriquée par animal, à aplatir en liste unique.
     const listenChaleursGlobal = () => {
       listeners.push(firebaseService.listen<Record<string, ChaleurEntry>>("animaux-chaleurs", (data) => {
@@ -362,7 +381,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       defer(listenEntretiens);
       defer(listenRelevesVehicule);
       defer(listenActivitesFourrage);
-      defer(listenMeteo);
+      defer(listenMeteoRecent);
     } else if (pathname === "/animaux" || pathname.startsWith("/animaux/")) {
       listenAnimaux();
       if (pathname === "/animaux") listenChaleursGlobal();
