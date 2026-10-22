@@ -1,6 +1,6 @@
 "use client";
 
-import { ChartNoAxesCombined, CircleAlert, Clock3, Droplet, Gauge, Logs, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { ChartNoAxesCombined, CircleAlert, Clock3, Droplet, Logs, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button, Card, Notice, farmStyles } from "@/components/ui/FarmUI";
 import type { ChauffageStatus, HeatingMetric } from "@/lib/chauffage";
@@ -112,7 +112,7 @@ function Equipment({ metricKey, title, subtitle, metric, kind = "tank", sourceIn
       <span className={`${styles.visualReading} ${kind === "tank" ? styles.tankValue : styles.boilerValue}`}><Reading metric={metric} /></span>
     </span>
     <span className={styles.equipmentTitle}>{title}</span>
-    <span className={styles.equipmentSubtitle}>{subtitle}</span>
+    {subtitle && <span className={styles.equipmentSubtitle}>{subtitle}</span>}
     <ReadingDate metric={metric} setpoint={kind === "fuel"} sourceInterrupted={sourceInterrupted} />
     <span className={styles.chartLink}><ChartNoAxesCombined aria-hidden="true" />Historique</span>
   </button>;
@@ -122,15 +122,7 @@ function LocalPipes() {
   return <svg className={styles.localPipes} viewBox="0 0 100 180" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M28 48H72M28 137H72" /></svg>;
 }
 
-function ServoReading() {
-  return <div className={`${styles.servo} ${styles.warning}`}>
-    <span className={styles.servoHeader}><Gauge aria-hidden="true" /><span>Servomoteur fioul</span></span>
-    <span className={styles.readingMeta}>Position non mesurée. L’ancien pourcentage ne constitue pas un retour de position.</span>
-  </div>;
-}
-
-function Installation({ status, topology, sourceInterrupted, onSelectMetric }: { status: ChauffageStatus; topology: HeatingTopology; sourceInterrupted: boolean; onSelectMetric?: (key: HeatingHistoryKey) => void }) {
-  const noBReturn = status.measurements.tankB.availability !== "available" || status.diagnostics.servo.availability !== "available";
+function Installation({ status, topology, sourceInterrupted, onSelectMetric, controlPanel }: { status: ChauffageStatus; topology: HeatingTopology; sourceInterrupted: boolean; onSelectMetric?: (key: HeatingHistoryKey) => void; controlPanel?: ReactNode }) {
   return <Card className={styles.installation} role="region" aria-label="Vue de l’installation de chauffage">
     <p className={styles.diagramHint}><ChartNoAxesCombined aria-hidden="true" />Touche un ballon ou une chaudière pour ouvrir son graphique.</p>
     <div className={`${styles.buildings} ${topology.confirmed ? styles.confirmedNetwork : ""}`}>
@@ -139,10 +131,10 @@ function Installation({ status, topology, sourceInterrupted, onSelectMetric }: {
         <div className={`${styles.equipmentPair} ${id === "A" ? styles.singleEquipment : ""}`}>
           {id !== "A" && <LocalPipes />}
           <Equipment metricKey={`tank${id}`} title={id === "D" ? "Haut du ballon" : "Ballon d’eau chaude"} subtitle={id === "A" ? "Température du ballon" : "2 000 litres"} metric={status.measurements[`tank${id}`]} sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} />
-          {id === "B" && <Equipment metricKey="fuelSetpoint" title="Chaudière fioul" subtitle={status.fuel.source === "transmitted" ? "Dernière consigne transmise" : "Ancien réglage mémorisé"} metric={status.fuel.setpoint} kind="fuel" sourceInterrupted={sourceInterrupted || noBReturn} onSelectMetric={onSelectMetric} />}
+          {id === "B" && <Equipment metricKey="fuelSetpoint" title="Chaudière fioul" subtitle="" metric={status.fuel.setpoint} kind="fuel" sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} />}
           {id === "D" && <Equipment metricKey="woodBoiler" title="Chaudière bois" subtitle="Température mesurée" metric={status.measurements.woodBoiler} kind="wood" sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} />}
         </div>
-        {id === "B" && <><ServoReading /><p className={styles.settingNote}>L’envoi par l’API ne mesure ni la position du servomoteur, ni la température réelle de la chaudière.</p></>}
+        {id === "B" && <div className={styles.fuelControl}>{controlPanel}</div>}
       </section>)}
     </div>
     <p className={styles.diagramNote}>{topology.description || (topology.confirmed ? "Les ballons partagent le réseau de chauffage." : "Réseau partagé représenté en pointillés. Le tracé entre les bâtiments reste à confirmer.")}</p>
@@ -162,12 +154,9 @@ export default function HeatingDashboard({ status, loading, error, refreshing, o
       <span className={`${styles.connectionStatus} ${connected ? styles.connected : styles.warning}`}><ConnectionIcon aria-hidden="true" />{loading && !status.hasData ? "Chargement des relevés…" : connectionLabel}</span>
       {checked && <span className={styles.checked}>Vérifié le <time dateTime={checked.iso} title={checked.full}>{checked.short}</time></span>}
     </div>
-    {offline && <Notice tone="warning" className={styles.notice}>Le suivi en direct est interrompu. Les derniers relevés conservés restent visibles avec leur date.</Notice>}
     {error && !offline && <Notice tone="error" className={styles.notice}>L’actualisation a échoué. Les dernières valeurs connues restent affichées.</Notice>}
     {!loading && !status.hasData && !error && !offline && <Notice className={styles.notice}>Les températures apparaîtront dès les premiers relevés disponibles.</Notice>}
-    {status.hasData && !status.connected && !offline && !error && <Notice tone="warning" className={styles.notice}>Home Assistant ne répond pas. Les valeurs affichées correspondent à leur dernière date de relevé.</Notice>}
-    {controlPanel}
-    <Installation status={status} topology={topology} sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} />
+    <Installation status={status} topology={topology} sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} controlPanel={controlPanel} />
     <p className={styles.help}><CircleAlert aria-hidden="true" /><span>En orange : une valeur ancienne ou une liaison interrompue. La date indique quand la valeur a été relevée.</span></p>
     <footer className={styles.actions}><Button variant="primary" fullWidth busy={refreshing} disabled={loading} onClick={() => { void onRefresh(); }}>{!refreshing && <RefreshCw aria-hidden="true" />}{refreshing ? "Actualisation…" : "Actualiser"}</Button></footer>
   </div>;

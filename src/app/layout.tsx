@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr">
       <body className="font-sans antialiased">
-        <RegisterSW />
+        <RegisterSW loadedVersion={process.env.VERCEL_GIT_COMMIT_SHA || process.env.NEXT_PUBLIC_APP_VERSION || null} />
         <AppProvider>
           <ToastProvider>
             <AuthGate>

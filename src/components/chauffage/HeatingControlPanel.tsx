@@ -1,8 +1,8 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Clock3, Minus, Plus, SlidersHorizontal, Thermometer, Wifi, WifiOff } from "lucide-react";
-import { Button, Card, Field, Notice, Sheet, farmStyles } from "@/components/ui/FarmUI";
+import { ChevronDown, CircleAlert, Clock3, Minus, Plus, Send, SlidersHorizontal, Thermometer, Wifi, WifiOff } from "lucide-react";
+import { Button, Field, Notice, Sheet, farmStyles } from "@/components/ui/FarmUI";
 import { HEATING_DEFAULT_MINIMUM_D, HEATING_FUEL_MINIMUM, HEATING_FUEL_MAXIMUM, HEATING_RELEASE_D, heatingControlReason, heatingSettingsFromDraft, type HeatingControlSettings, type HeatingControlStatus } from "@/lib/heating-control";
 import styles from "./HeatingControlPanel.module.css";
 
@@ -29,10 +29,10 @@ function displayDate(value: string | null) {
 }
 
 function Availability({ status, loading, offline }: Pick<HeatingControlPanelProps, "status" | "loading" | "offline">) {
-  if (offline) return <Notice tone="warning">Hors connexion. Rétablis la connexion pour enregistrer de nouveaux réglages.</Notice>;
-  if (loading && !status) return <p className={styles.muted} role="status">Chargement des réglages…</p>;
-  if (!status?.available) return <Notice tone="warning">Les réglages du chauffage ne sont pas encore disponibles. L’enregistrement est momentanément indisponible.</Notice>;
-  if (!status.fresh) return <Notice tone="warning">La synchronisation des réglages est en retard. Leur enregistrement reprendra après un relevé récent.</Notice>;
+  if (offline) return <p className={styles.connection} role="status"><WifiOff aria-hidden="true" /><span>Hors connexion · derniers états connus</span></p>;
+  if (loading && !status) return <p className={styles.muted} role="status">Chargement du pilotage…</p>;
+  if (!status?.available) return <p className={styles.connection} role="status"><Clock3 aria-hidden="true" /><span>Pilotage momentanément indisponible</span></p>;
+  if (!status.fresh) return <p className={styles.connection} role="status"><Clock3 aria-hidden="true" /><span>Synchronisation en retard · nouveaux réglages indisponibles</span></p>;
   return null;
 }
 
@@ -40,28 +40,28 @@ function Delivery({ status, offline, detailed = false }: { status: HeatingContro
   const stale = offline || !status.fresh;
   const transmitted = displayDate(status.lastTransmittedAt);
   const lastSeen = displayDate(status.moduleLastSeenAt);
+  const target = status.mode === "manual" ? status.manualTemperature : status.desiredTemperature ?? status.recommendedTemperature;
   const labels = {
     disabled: "Pilotage désactivé",
     waiting_module: "En attente du module B",
     waiting_sensor: "En attente de mesures récentes",
     pending: "Transmission en attente",
-    transmitted: "Dernier envoi via API enregistré",
+    transmitted: "Dernier envoi enregistré",
     uncertain: "Transmission non confirmée",
     blocked: "Transmission suspendue",
   };
-  const label = stale ? "État de transmission ancien" : !status.calibrationValid ? "Calibration incomplète — pilotage bloqué" : !status.actuationEnabled ? labels.disabled : labels[status.deliveryState];
-  const attention = stale || !status.actuationEnabled || !status.moduleOnline || status.deliveryState !== "transmitted";
+  const label = !status.calibrationValid ? "Calibration incomplète · pilotage bloqué" : !status.actuationEnabled ? labels.disabled : labels[status.deliveryState];
+  const showDeliveryState = !stale && (!status.calibrationValid || !status.actuationEnabled || status.deliveryState !== "transmitted");
   return <div className={styles.delivery}>
-    <div className={styles.deliveryTarget}><span>Consigne fioul demandée</span><strong>{temperature(status.desiredTemperature)}</strong></div>
-    <p className={`${styles.deliveryState} ${attention ? styles.deliveryWarning : ""}`}><Clock3 aria-hidden="true" /><span>{label}</span></p>
-    {!stale && !status.calibrationValid && <p className={styles.muted}>{heatingControlReason("calibration_required")}</p>}
-    {!stale && status.actuationEnabled && !status.moduleOnline && <p className={styles.muted}>Module B hors ligne. La dernière demande est conservée dans Home Assistant.</p>}
-    {stale && <p className={styles.muted}>La transmission actuelle ne peut pas être vérifiée. Les derniers états connus restent affichés.</p>}
-    <div className={styles.lastTransmission}><span>Consigne transmise via API</span><strong>{transmitted ? temperature(status.lastTransmittedTemperature) : "—"}</strong>{transmitted ? <time dateTime={transmitted.iso}>{transmitted.text}</time> : <span className={styles.noTransmission}>Aucun envoi enregistré</span>}</div>
-    <p className={styles.feedback}>Position mécanique non mesurée. Un envoi via API ne confirme pas le mouvement du servomoteur.</p>
+    <div className={styles.targets}>
+      <div className={styles.deliveryTarget}><span>{status.mode === "manual" ? "Consigne souhaitée" : "Consigne théorique"}</span><strong>{temperature(target)}</strong><span>{status.mode === "manual" ? "Mode manuel" : "Calcul automatique"}</span></div>
+      <div className={styles.lastTransmission}><span>Dernier envoi via API</span><strong>{transmitted ? temperature(status.lastTransmittedTemperature) : "—"}</strong>{transmitted ? <time dateTime={transmitted.iso}>{transmitted.text}</time> : <span>Aucun envoi enregistré</span>}</div>
+    </div>
+    {!stale && <p className={styles.connection}>{status.moduleOnline ? <Wifi aria-hidden="true" /> : <WifiOff aria-hidden="true" />}<span>{status.moduleOnline ? "Module en ligne" : "Module hors ligne"}{!status.moduleOnline && status.actuationEnabled ? " · demande conservée" : ""}</span></p>}
+    {showDeliveryState && <p className={styles.deliveryState}>{!status.calibrationValid || !status.actuationEnabled ? <CircleAlert aria-hidden="true" /> : <Clock3 aria-hidden="true" />}<span>{label}</span></p>}
     {detailed && <>
-      <p className={`${styles.moduleState} ${stale || !status.moduleOnline ? styles.deliveryWarning : ""}`}>{status.moduleOnline && !stale ? <Wifi aria-hidden="true" /> : <WifiOff aria-hidden="true" />}<span>{stale ? "Liaison du module à vérifier" : status.moduleOnline ? "Module B connecté" : "Module B hors ligne"}{lastSeen && <> · dernier contact le <time dateTime={lastSeen.iso}>{lastSeen.text}</time></>}</span></p>
-      <p className={styles.muted}>Lors d’une coupure, seule la dernière demande est conservée. En automatique, elle est recalculée avec des mesures récentes avant transmission.</p>
+      {lastSeen && <p className={styles.muted}>Dernier contact du module : <time dateTime={lastSeen.iso}>{lastSeen.text}</time>.</p>}
+      {stale && <p className={styles.muted}>La transmission actuelle ne peut pas être vérifiée. Les valeurs affichées correspondent aux derniers états connus.</p>}
     </>}
   </div>;
 }
@@ -107,7 +107,7 @@ function TemperatureInput({ id, value, onChange, min, max, disabled, label, hint
   </Field>;
 }
 
-function ControlSheet({ status, loading, offline, busy, error, result, onSave, onClose }: HeatingControlPanelProps & { onClose: () => void }) {
+function ControlSheet({ status, loading, offline, busy, error, onSave, onClose }: HeatingControlPanelProps & { onClose: () => void }) {
   const id = useId();
   // A draft belongs to the status seen on opening. Live updates must not replace it.
   const [revision] = useState(status?.available ? status.revision : null);
@@ -125,6 +125,8 @@ function ControlSheet({ status, loading, offline, busy, error, result, onSave, o
   const validMinimum = Number.isInteger(minimumValue) && minimumValue >= 55 && minimumValue <= 59;
   const settingsToSave = heatingSettingsFromDraft(mode, manualValue, minimumValue, confirmedSettings);
   const canSave = !!status?.available && status.fresh && !offline && !loading && !waiting && !saved && !changedElsewhere && revision !== null && settingsToSave !== null;
+  const transmissionAllowed = status?.actuationEnabled && status.calibrationValid;
+  const actionLabel = mode === "manual" ? transmissionAllowed ? "Envoyer la consigne" : "Mémoriser la consigne" : "Enregistrer le mode automatique";
 
   async function save() {
     if (!canSave || revision === null || settingsToSave === null) return;
@@ -140,13 +142,12 @@ function ControlSheet({ status, loading, offline, busy, error, result, onSave, o
     }
   }
 
-  return <Sheet title="Réglage du chauffage" description="Chaudière fioul · bâtiment B" onClose={onClose} busy={waiting} footer={<div className={styles.footer}>
-    <Button variant="primary" fullWidth disabled={!canSave} busy={waiting} onClick={() => { void save(); }}>{waiting ? "Enregistrement…" : saved ? "Réglages enregistrés" : "Enregistrer les réglages"}</Button>
-    <p>{saved ? "Le mode est enregistré. La transmission de la consigne est suivie séparément ci-dessus." : "Home Assistant mémorise le mode et gère ensuite la transmission de la consigne."}</p>
+  return <Sheet title="Pilotage fioul" description="Chaudière du bâtiment B" onClose={onClose} busy={waiting} footer={<div className={styles.footer}>
+    <Button variant="primary" fullWidth disabled={!canSave} busy={waiting} onClick={() => { void save(); }}>{!waiting && !saved && mode === "manual" && transmissionAllowed && <Send aria-hidden="true" />}{waiting ? "Envoi de la demande…" : saved ? "Demande enregistrée" : actionLabel}</Button>
+    <p>{saved ? "Demande enregistrée dans Home Assistant. Le dernier envoi est indiqué séparément ci-dessus." : !status?.available || !status.fresh || offline ? "Une connexion et un état récent sont nécessaires pour envoyer une demande." : transmissionAllowed ? "Home Assistant enregistre la demande, puis gère son envoi au module." : "Le pilotage est bloqué : seuls les réglages seront mémorisés."}</p>
   </div>}>
     <div className={styles.sheetContent}>
       <Availability status={status} loading={loading} offline={offline} />
-      {status?.available && !status.actuationEnabled && <Notice tone="warning">{status.calibrationValid ? "Le pilotage est désactivé dans Home Assistant. Les réglages peuvent être mémorisés, mais aucune nouvelle consigne n’est transmise tant qu’il reste désactivé." : heatingControlReason("calibration_required")}</Notice>}
       {revision === null && <p className={styles.muted}>Valeurs proposées par défaut : fioul 60 °C et limite du ballon D 57 °C. Elles ne sont pas enregistrées. Rouvre ce panneau lorsque les réglages seront disponibles.</p>}
       {changedElsewhere && <Notice tone="warning">Les réglages ont changé depuis l’ouverture du panneau. Ta saisie est conservée ici. Ferme puis rouvre le panneau pour repartir des derniers réglages.</Notice>}
       <div><p id={`${id}-mode`} className={styles.fieldLabel}>Mode de régulation</p><div role="group" aria-labelledby={`${id}-mode`} className={styles.modeChoice}>
@@ -155,7 +156,7 @@ function ControlSheet({ status, loading, offline, busy, error, result, onSave, o
       </div></div>
       {mode === "manual" ? <TemperatureInput id={`${id}-manual`} value={manual} onChange={setManual} min={HEATING_FUEL_MINIMUM} max={HEATING_FUEL_MAXIMUM} disabled={waiting || saved} label="Consigne de la chaudière fioul" hint="De 50 à 70 °C. Home Assistant conserve cette consigne si le module B est temporairement hors ligne." /> : <>
         <TemperatureInput id={`${id}-minimum`} value={minimumD} onChange={setMinimumD} min={55} max={59} disabled={waiting || saved} label="Limite basse de la sonde du ballon D" hint="De 55 à 59 °C, sur la sonde affichée dans Ferme. À adapter à la différence avec la sonde de la chaudière." />
-        <div className={styles.automaticExplanation}><Thermometer aria-hidden="true" /><div>
+        <details className={styles.details}><summary>Fonctionnement automatique<ChevronDown aria-hidden="true" /></summary><div className={styles.automaticExplanation}><Thermometer aria-hidden="true" /><div>
           <strong>Deux repères pour le ballon D</strong>
           <dl className={styles.thresholds}>
             <div><dt>Limite basse</dt><dd>{validMinimum ? temperature(minimumValue) : "—"}</dd></div>
@@ -165,11 +166,18 @@ function ControlSheet({ status, loading, offline, busy, error, result, onSave, o
           <p>Quand D remonte vers 60 °C, la consigne fioul baisse par étapes. Dès que D atteint <b>60 °C</b>, elle revient à <b>50 °C</b>.</p>
           <p>Le délai entre les corrections évite les mouvements répétés à chaque variation de température.</p>
           <p>Le seuil physique de 55 °C de la chaudière reste inchangé. Il est mesuré par une autre sonde.</p>
-        </div></div>
+        </div></div></details>
       </>}
-      {status?.available && <section aria-label="État actuel du pilotage"><h3 className={styles.sectionTitle}>État actuel du pilotage</h3><Delivery status={status} offline={offline} detailed /><Calculation status={status} offline={offline} /></section>}
+      {status?.available && <section aria-label="État actuel du pilotage"><h3 className={styles.sectionTitle}>Suivi de la consigne</h3><Delivery status={status} offline={offline} detailed />
+        <details className={styles.details}><summary>Détails du pilotage<ChevronDown aria-hidden="true" /></summary><div className={styles.detailsBody}>
+          <p className={styles.muted}>Position mécanique non mesurée. Un envoi via API ne confirme pas le mouvement du servomoteur, ni la température réelle de la chaudière.</p>
+          {!status.calibrationValid && <p className={styles.muted}>{heatingControlReason("calibration_required")}</p>}
+          <p className={styles.muted}>Si le module est hors ligne, Home Assistant conserve seulement la dernière demande. En automatique, elle est recalculée avec des mesures récentes avant transmission.</p>
+          <Calculation status={status} offline={offline} />
+        </div></details>
+      </section>}
       {(saveError || error) && <Notice tone="error">{saveError || error}</Notice>}
-      {saved && <Notice tone="success">{result || "Mode et réglages enregistrés. L’état de transmission de la consigne apparaît séparément."}</Notice>}
+      {saved && <p className={styles.result} role="status">Demande enregistrée dans Home Assistant.</p>}
     </div>
   </Sheet>;
 }
@@ -179,15 +187,16 @@ export default function HeatingControlPanel(props: HeatingControlPanelProps) {
   const [open, setOpen] = useState(false);
   const known = status?.available;
   return <>
-    <Card className={`${farmStyles.theme} ${styles.card}`} role="region" aria-label="Réglage de la chaudière fioul">
-      <header className={styles.header}><div><p className={styles.eyebrow}>Chaudière fioul</p><h2>Réglage du chauffage</h2></div><SlidersHorizontal aria-hidden="true" /></header>
-      {known && <div className={styles.summary}><p className={styles.registeredMode}>Mode {status.mode === "manual" ? "Manuel" : "Automatique"} enregistré</p><div><span>{status.mode === "manual" ? "Consigne manuelle" : "Limite basse du ballon D"}</span><strong>{temperature(status.mode === "manual" ? status.manualTemperature : status.minimumD)}</strong></div>{status.mode === "automatic" && <p>Fioul de 50 à 70 °C. Réduction progressive à l’approche de 60 °C dans D, puis retour à 50 °C.</p>}</div>}
+    <section className={`${farmStyles.theme} ${styles.card}`} aria-label="Pilotage de la chaudière fioul">
+      <header className={styles.header}><h3>Pilotage fioul</h3>{known && <span className={styles.modeBadge}>{status.mode === "manual" ? "Manuel" : "Automatique"}</span>}</header>
       <Availability status={status} loading={loading} offline={offline} />
       {known && <Delivery status={status} offline={offline} />}
+      {known && status.mode === "automatic" && <p className={styles.muted}>Minimum D : {temperature(status.minimumD)}. Fioul à 50 °C dès que D atteint 60 °C.</p>}
+      <p className={styles.feedback}>Position mécanique non mesurée.</p>
       {error && <Notice tone="error">{error}</Notice>}
-      {result && <Notice tone="success">{result}</Notice>}
-      <Button fullWidth disabled={busy} onClick={() => setOpen(true)}><SlidersHorizontal aria-hidden="true" />Régler le chauffage</Button>
-    </Card>
+      {result && <p className={styles.result} role="status">Demande enregistrée dans Home Assistant.</p>}
+      <Button variant="primary" fullWidth disabled={busy} onClick={() => setOpen(true)}><SlidersHorizontal aria-hidden="true" />{known && status.mode === "manual" ? "Choisir une consigne" : "Régler le fioul"}</Button>
+    </section>
     {open && <ControlSheet {...props} onClose={() => setOpen(false)} />}
   </>;
 }
