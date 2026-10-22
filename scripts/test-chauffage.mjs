@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   HEATING_ENTITY_IDS, HEATING_STATUS_PATH, buildHeatingSnapshot, heatingFailureSnapshot,
   normalizeHeatingSnapshot, classifyHeatingFreshness, selectHeatingEntities, formatHeatingValue,
-  mergeHeatingLastValid,
+  mergeHeatingLastValid, HEATING_TRANSMITTED_ENTITY_ID,
 } from "../src/lib/chauffage.ts";
 import {
   createHeatingHaReader, createHeatingFirebaseClient, collectHeatingSnapshot,
@@ -118,6 +118,29 @@ await test("Consigne à 60 °C avec climate off : réglage visible sans prétend
   assert.equal(status.fuel.mode, "off");
   assert.equal("currentTemperature" in status.fuel, false);
   assert.equal(status.measurements.woodBoiler.value, null);
+});
+
+await test("La consigne réellement transmise remplace le thermostat logiciel avec sa date d’envoi", () => {
+  const transmitted = { ...sensor("fuelSetpoint", "50", 0), entity_id: HEATING_TRANSMITTED_ENTITY_ID, attributes: { unit_of_measurement: "°C", transmitted_at: iso(3600000) } };
+  const status = normalizeHeatingSnapshot(snapshot([sensor("fuelSetpoint", "off", 0, { temperature: 60 }), transmitted]), now);
+  assert.equal(status.fuel.setpoint.value, 50);
+  assert.equal(status.fuel.setpoint.reportedAt, iso(3600000));
+  assert.equal(status.fuel.source, "transmitted");
+  assert.equal(status.fuel.mode, null);
+  const history = heatingHistoryUpdates(snapshot([transmitted]));
+  assert.ok(Object.values(history).some(p => p.at === now - 3600000 && p.value === 50));
+});
+
+await test("Aucune transmission ne reprend implicitement l’ancien réglage logiciel", () => {
+  const old = snapshot([sensor("fuelSetpoint", "off", 0, { temperature: 60 })]);
+  const current = buildHeatingSnapshot([{ ...sensor("fuelSetpoint", "unavailable"), entity_id: HEATING_TRANSMITTED_ENTITY_ID }], iso(), old);
+  assert.equal(normalizeHeatingSnapshot(current, now).fuel.setpoint.value, null);
+  assert.equal(normalizeHeatingSnapshot(current, now).fuel.source, "transmitted");
+});
+
+await test("Une transmission sans date source n’invente pas une heure de mouvement", () => {
+  const status = normalizeHeatingSnapshot(snapshot([{ ...sensor("fuelSetpoint", "50"), entity_id: HEATING_TRANSMITTED_ENTITY_ID }]), now);
+  assert.equal(status.fuel.setpoint.value, null);
 });
 
 await test("Une consigne indisponible reste absente même si un attribut ancien subsiste", () => {
@@ -377,7 +400,7 @@ await test("Historique Home Assistant : GET seulement, six entités ciblées et 
   await read(now-86_400_000,now);
   assert.equal(calls[0].init.method,"GET");
   assert.equal(calls[0].init.body,undefined);
-  assert.equal(calls[0].url.searchParams.get("filter_entity_id").split(",").length,6);
+  assert.equal(calls[0].url.searchParams.get("filter_entity_id").split(",").length,7);
   assert.equal(calls[0].url.searchParams.has("minimal_response"),false);
   await assert.rejects(read(now-8*86_400_000,now),/invalid-history-range/);
   assert.deepEqual(parseHeatingRelayArgs(["--once","--backfill-days","7"]),{once:true,backfillDays:7});

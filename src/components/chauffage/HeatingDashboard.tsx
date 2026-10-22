@@ -67,7 +67,7 @@ function ReadingDate({ metric, setpoint = false, sourceInterrupted = false }: { 
   return <span className={`${styles.readingMeta} ${warning ? styles.warning : ""}`}>
     <span className={styles.readingState}>
       {warning ? <CircleAlert aria-hidden="true" /> : <Clock3 aria-hidden="true" />}
-      {!hasValue ? "Aucun relevé conservé" : setpoint ? "Réglage mémorisé" : warning ? "Dernier relevé" : "Relevé récent"}
+      {!hasValue ? "Aucun relevé conservé" : setpoint ? metric.label : warning ? "Dernier relevé" : "Relevé récent"}
     </span>
     {hasValue && !setpoint && <span>{readingAge(metric)}</span>}
     {date ? <time dateTime={date.iso} title={date.full}>{date.short}</time> : hasValue ? <span>Date inconnue</span> : <span>En attente du capteur</span>}
@@ -139,10 +139,10 @@ function Installation({ status, topology, sourceInterrupted, onSelectMetric }: {
         <div className={`${styles.equipmentPair} ${id === "A" ? styles.singleEquipment : ""}`}>
           {id !== "A" && <LocalPipes />}
           <Equipment metricKey={`tank${id}`} title={id === "D" ? "Haut du ballon" : "Ballon d’eau chaude"} subtitle={id === "A" ? "Température du ballon" : "2 000 litres"} metric={status.measurements[`tank${id}`]} sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} />
-          {id === "B" && <Equipment metricKey="fuelSetpoint" title="Chaudière fioul" subtitle="Consigne mémorisée" metric={status.fuel.setpoint} kind="fuel" sourceInterrupted={sourceInterrupted || noBReturn} onSelectMetric={onSelectMetric} />}
+          {id === "B" && <Equipment metricKey="fuelSetpoint" title="Chaudière fioul" subtitle={status.fuel.source === "transmitted" ? "Dernière consigne transmise" : "Ancien réglage mémorisé"} metric={status.fuel.setpoint} kind="fuel" sourceInterrupted={sourceInterrupted || noBReturn} onSelectMetric={onSelectMetric} />}
           {id === "D" && <Equipment metricKey="woodBoiler" title="Chaudière bois" subtitle="Température mesurée" metric={status.measurements.woodBoiler} kind="wood" sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} />}
         </div>
-        {id === "B" && <><ServoReading /><p className={styles.settingNote}>La consigne mémorisée ne confirme pas que le servomoteur l’a appliquée.</p></>}
+        {id === "B" && <><ServoReading /><p className={styles.settingNote}>L’envoi par l’API ne mesure ni la position du servomoteur, ni la température réelle de la chaudière.</p></>}
       </section>)}
     </div>
     <p className={styles.diagramNote}>{topology.description || (topology.confirmed ? "Les ballons partagent le réseau de chauffage." : "Réseau partagé représenté en pointillés. Le tracé entre les bâtiments reste à confirmer.")}</p>

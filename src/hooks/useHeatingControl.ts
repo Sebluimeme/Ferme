@@ -4,11 +4,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { onValue, ref } from "firebase/database";
 import { auth, database } from "@/lib/firebase";
 import { useAppStore } from "@/store/store";
-import { HEATING_CONTROL_PATH, normalizeHeatingControl, validHeatingSettings, type HeatingControlRequest, type HeatingControlSettings } from "@/lib/heating-control";
+import { HEATING_CONTROL_PATH, HEATING_CONTROL_VERSION, heatingConfigurationReceiptState, normalizeHeatingControl, validHeatingSettings, type HeatingControlRequest, type HeatingControlSettings } from "@/lib/heating-control";
 
-const pendingKey = (uid: string) => `ferme:heating-control:receipt:${uid}`;
+const pendingKey = (uid: string) => `ferme:heating-control:v2:receipt:${uid}`;
 const unconfirmed = "La confirmation n’a pas été reçue. Le réglage peut avoir été mémorisé : vérifie l’état actuel avant de réessayer.";
-const accepted = "Réglages mémorisés dans Home Assistant. Observation uniquement : aucun mouvement du servomoteur.";
+const accepted = "Mode et réglages enregistrés dans Home Assistant. La transmission de la consigne est suivie séparément.";
 
 export function useHeatingControl() {
   const uid = useAppStore().state.user?.uid;
@@ -24,6 +24,7 @@ export function useHeatingControl() {
   const operation = useRef<AbortController | null>(null);
   const rawRef = useRef(raw); rawRef.current = raw;
   const receiptStop = useRef<(() => void) | null>(null);
+  const previousReceiptStop = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -49,18 +50,20 @@ export function useHeatingControl() {
       if (id && /^\d{13}-[a-f0-9]{32}$/.test(id)) {
         previousStop = onValue(ref(database, `${HEATING_CONTROL_PATH}/requests/${id}`), snapshot => {
           if (!active) return;
-          const receipt = snapshot.val();
-          if (receipt?.status === "accepted") {
+          const receipt = heatingConfigurationReceiptState(snapshot.val(), id, uid);
+          if (receipt === "accepted") {
             setError(null); setResult(accepted); localStorage.removeItem(pendingKey(uid));
-          } else if (["rejected", "uncertain"].includes(receipt?.status)) {
-            setResult(null); setError(receipt.status === "rejected" ? "La précédente demande a été refusée ou a expiré." : unconfirmed);
+          } else if (receipt === "rejected" || receipt === "uncertain") {
+            setResult(null); setError(receipt === "rejected" ? "La précédente demande a été refusée ou a expiré." : unconfirmed);
             localStorage.removeItem(pendingKey(uid));
           } else setError("Une précédente demande n’a pas encore été confirmée. Consulte les réglages actuels avant de réessayer.");
         });
+        previousReceiptStop.current = previousStop;
       }
     } catch { /* A receipt cache is optional and never a command queue. */ }
     return () => {
       active = false; clearTimeout(timer); statusStop(); connectionStop(); previousStop?.();
+      if (previousReceiptStop.current === previousStop) previousReceiptStop.current = null;
       operation.current?.abort(); operation.current = null; receiptStop.current?.(); receiptStop.current = null;
     };
   }, [uid]);
@@ -73,6 +76,7 @@ export function useHeatingControl() {
     const current = rawRef.current && rawRef.current.uid === uid ? normalizeHeatingControl(rawRef.current.value) : null;
     if (!uid || offline || !navigator.onLine || !current?.available || !current.fresh) throw new Error("Attends le retour de la connexion et des réglages récents.");
     if (!validHeatingSettings(settings) || current.revision !== expectedRevision) throw new Error("Les réglages ont changé. Ferme puis rouvre le panneau.");
+    previousReceiptStop.current?.(); previousReceiptStop.current = null;
     const controller = new AbortController(); operation.current = controller;
     setBusy(true); setError(null); setResult(null);
     const timeout = window.setTimeout(() => controller.abort(), 45_000);
@@ -89,7 +93,7 @@ export function useHeatingControl() {
       if (activeUid.current !== uid || controller.signal.aborted) throw new Error(unconfirmed);
       const createdAt = Date.now();
       const id = `${createdAt}-${crypto.randomUUID().replaceAll("-", "")}`;
-      const request: HeatingControlRequest = { version: 1, id, requestedBy: uid, createdAt, expiresAt: createdAt + 90_000, expectedRevision, status: "pending", ...settings };
+      const request: HeatingControlRequest = { version: HEATING_CONTROL_VERSION, id, requestedBy: uid, createdAt, expiresAt: createdAt + 90_000, expectedRevision, status: "pending", ...settings };
       const project = database.app.options.projectId ?? "";
       const emulator = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true" && project.startsWith("demo-") && ["localhost", "127.0.0.1", "[::1]", "::1"].includes(location.hostname);
       const base = emulator ? "http://127.0.0.1:9000" : database.app.options.databaseURL;
@@ -109,11 +113,11 @@ export function useHeatingControl() {
       }
       const receipt = new Promise<void>((resolve, reject) => {
         localReceiptStop = onValue(ref(database, `${HEATING_CONTROL_PATH}/requests/${id}`), snapshot => {
-          const value = snapshot.val();
+          const value = heatingConfigurationReceiptState(snapshot.val(), id, uid);
           if (activeUid.current !== uid) { reject(new Error(unconfirmed)); return; }
-          if (value?.status === "accepted") resolve();
-          else if (value?.status === "rejected") reject(new Error("La demande a été refusée ou a expiré. Ferme puis rouvre les réglages."));
-          else if (value?.status === "uncertain") reject(new Error(unconfirmed));
+          if (value === "accepted") resolve();
+          else if (value === "rejected") reject(new Error("La demande a été refusée ou a expiré. Ferme puis rouvre les réglages."));
+          else if (value === "uncertain") reject(new Error(unconfirmed));
         }, () => reject(new Error(unconfirmed)));
         receiptStop.current = localReceiptStop;
       });

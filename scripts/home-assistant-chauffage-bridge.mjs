@@ -15,6 +15,7 @@ import {
   selectHeatingEntities,
   mergeHeatingLastValid,
   HEATING_ENTITY_IDS,
+  HEATING_TRANSMITTED_ENTITY_ID,
 } from "../src/lib/chauffage.ts";
 import {
   HEATING_HISTORY_PATH, HEATING_HISTORY_KEYS, heatingHistoryUpdates,
@@ -76,7 +77,7 @@ export function createHeatingHaHistoryReader({ baseUrl, token, fetchImpl = fetch
     }
     const url = new URL(`${base}/api/history/period/${new Date(fromMs).toISOString()}`);
     url.searchParams.set("end_time", new Date(toMs).toISOString());
-    url.searchParams.set("filter_entity_id", HEATING_HISTORY_KEYS.map((key) => HEATING_ENTITY_IDS[key]).join(","));
+    url.searchParams.set("filter_entity_id", [...HEATING_HISTORY_KEYS.map((key) => HEATING_ENTITY_IDS[key]), HEATING_TRANSMITTED_ENTITY_ID].join(","));
     const history = await jsonRequest(url, {
       method: "GET", headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, cache: "no-store",
     }, { fetchImpl, timeoutMs, errorPrefix: "ha-history" });

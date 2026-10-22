@@ -1,17 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeHeatingControl, controlStatusFromHa, validateHeatingControlRequest, parseHaHeatingConfiguration } from "../src/lib/heating-control.ts";
+import { normalizeHeatingControl, controlStatusFromHa, validateHeatingControlRequest, parseHaHeatingConfiguration, validHeatingSettings, heatingConfigurationReceiptState, heatingSettingsFromDraft } from "../src/lib/heating-control.ts";
 import { createHeatingConfigurationHaClient, createHeatingControlFirebase, processHeatingControlRequests } from "./home-assistant-heating-control-bridge.mjs";
 
 const now = Date.now();
 const id = `${now}-0123456789abcdef0123456789abcdef`;
-const request = () => ({ version: 1, id, mode: "automatic", manualTemperature: 60, minimumD: 58, requestedBy: "user_test", createdAt: now, expiresAt: now + 90_000, expectedRevision: 0, status: "pending" });
+const request = () => ({ version: 2, id, mode: "automatic", manualTemperature: 60, minimumD: 57, requestedBy: "user_test", createdAt: now, expiresAt: now + 90_000, expectedRevision: 0, status: "pending" });
 function states(revision = 0, requestId = "") {
-  return [{ entity_id: "sensor.ferme_chauffage_controle", state: "observation", attributes: {
-    schema_version: 1, revision, request_id: requestId, mode: "automatic", manual_temperature: 60, minimum_d: 58,
-    phase: "observation", reason: "warming_up", recommended_temperature: 60, updated_at: new Date(now).toISOString(),
-    calibration_valid: false, actuation_enabled: false, observed_temperature_d: 57, observed_temperature_b: 60,
-  } }, { entity_id: "input_text.ferme_chauffage_configuration", state: JSON.stringify({ v: 1, r: revision, id: requestId, m: "automatic", t: 60, d: 58 }) }];
+  return [{ entity_id: "sensor.ferme_chauffage_controle", state: "active", attributes: {
+    schema_version: 2, revision, request_id: requestId, mode: "automatic", manual_temperature: 60, minimum_d: 57,
+    phase: "active", reason: "warming_up", recommended_temperature: 60, updated_at: new Date(now).toISOString(),
+    calibration_valid: true, actuation_enabled: true, observed_temperature_d: 57, observed_temperature_b: 60,
+    fuel_minimum: 50, fuel_maximum: 70, release_temperature_d: 60,
+    module_online: true, module_last_seen_at: new Date(now).toISOString(),
+    delivery_state: "pending", desired_temperature: 60, last_transmitted_temperature: null,
+    last_transmitted_at: null, position_feedback: "unmeasured",
+  } }, { entity_id: "input_text.ferme_chauffage_configuration", state: JSON.stringify({ v: 1, r: revision, id: requestId, m: "automatic", t: 60, d: 57 }) }];
 }
 function fixture(value = request(), options = {}) {
   const calls = []; let current = states();
@@ -29,13 +33,62 @@ function fixture(value = request(), options = {}) {
   return { calls, firebase, ha, states: states(), now: () => now };
 }
 
-test("only a recent, observation-only HA status authorizes saving settings", () => {
+test("only a valid recent v2 status authorizes saving configuration; v1 never enables the actuator", () => {
   const good = controlStatusFromHa(states(), now);
   assert.equal(good.available, true); assert.equal(good.fresh, true);
+  assert.equal(good.version, 2); assert.equal(good.actuationEnabled, true);
   assert.equal(normalizeHeatingControl(good, now + 91_000).fresh, false);
-  assert.equal(normalizeHeatingControl({ ...good, actuationEnabled: true }, now).available, false);
-  assert.equal(normalizeHeatingControl({ ...good, calibrationValid: true }, now).available, false);
-  assert.equal(normalizeHeatingControl({ ...good, version: 2 }, now).available, false);
+  const disabled = normalizeHeatingControl({ ...good, actuationEnabled: false, calibrationValid: false, deliveryState: "disabled" }, now);
+  assert.equal(disabled.available, true); assert.equal(disabled.actuationEnabled, false);
+  for (const version of [1, "2", true, 3]) {
+    const old = normalizeHeatingControl({ ...good, version }, now);
+    assert.equal(old.available, false); assert.equal(old.actuationEnabled, false);
+    assert.equal(old.desiredTemperature, null);
+  }
+});
+test("strict v2 status rejects fake booleans, numeric strings, invalid limits and feedback claims", () => {
+  const good = controlStatusFromHa(states(), now);
+  for (const change of [
+    { actuationEnabled: "true" }, { calibrationValid: "true" }, { moduleOnline: 1 }, { moduleOnline: "false" },
+    { calibrationValid: false }, { available: "true" }, { revision: true }, { phase: "observation" },
+    { fuelMinimum: "50" }, { fuelMaximum: 90 }, { releaseTemperatureD: 59 }, { positionFeedback: "measured" },
+    { desiredTemperature: "60" }, { desiredTemperature: true }, { desiredTemperature: Number.NaN }, { desiredTemperature: 71 },
+    { lastTransmittedTemperature: Infinity }, { deliveryState: ["pending"] }, { moduleLastSeenAt: "bad-date" },
+    { lastTransmittedAt: new Date(now + 31_000).toISOString() }, { deliveryState: "transmitted" },
+  ]) {
+    const value = normalizeHeatingControl({ ...good, ...change }, now);
+    assert.equal(value.available, false, JSON.stringify(change));
+    assert.equal(value.actuationEnabled, false);
+  }
+  const badMeasurements = normalizeHeatingControl({ ...good, temperatureD: true, temperatureB: "60", recommendedTemperature: 85, nextAdjustmentAt: "wrong" }, now);
+  assert.equal(badMeasurements.temperatureD, null); assert.equal(badMeasurements.temperatureB, null);
+  assert.equal(badMeasurements.recommendedTemperature, null); assert.equal(badMeasurements.nextAdjustmentAt, null);
+});
+test("waiting desired temperature stays separate from the previous API transmission", () => {
+  const raw = states();
+  const sentAt = new Date(now - 3_600_000).toISOString();
+  Object.assign(raw[0].attributes, {
+    module_online: false, phase: "suspended", reason: "sensor_b_unavailable", delivery_state: "waiting_module",
+    desired_temperature: 62, last_transmitted_temperature: 55, last_transmitted_at: sentAt,
+  });
+  const status = controlStatusFromHa(raw, now);
+  assert.equal(status.available, true); assert.equal(status.fresh, true);
+  assert.equal(status.desiredTemperature, 62); assert.equal(status.deliveryState, "waiting_module");
+  assert.equal(status.lastTransmittedTemperature, 55); assert.equal(status.lastTransmittedAt, sentAt);
+  assert.equal(status.moduleOnline, false); assert.equal(status.positionFeedback, "unmeasured");
+  assert.equal("appliedTemperature" in status, false); assert.equal("servoPosition" in status, false);
+});
+test("nullable Firebase fields are optional but a transmitted state requires a dated API record", () => {
+  const raw = states();
+  delete raw[0].attributes.last_transmitted_at; delete raw[0].attributes.last_transmitted_temperature;
+  delete raw[0].attributes.module_last_seen_at; delete raw[0].attributes.desired_temperature;
+  assert.equal(controlStatusFromHa(raw, now).available, true);
+  raw[0].attributes.delivery_state = "transmitted";
+  assert.equal(controlStatusFromHa(raw, now).available, false);
+  Object.assign(raw[0].attributes, { last_transmitted_temperature: 60, last_transmitted_at: new Date(now).toISOString() });
+  assert.equal(controlStatusFromHa(raw, now).available, true);
+  raw[0].attributes.next_adjustment_at = Number.MAX_VALUE;
+  assert.equal(controlStatusFromHa(raw, now).nextAdjustmentAt, null);
 });
 test("an absent controller cannot be mistaken for an available manual mode", () => {
   assert.equal(controlStatusFromHa([], now).available, false);
@@ -44,10 +97,42 @@ test("an absent controller cannot be mistaken for an available manual mode", () 
 });
 test("request validation rejects expiry, replay keys, out-of-range and hidden payloads", () => {
   assert.deepEqual(validateHeatingControlRequest(request(), id, now), request());
-  for (const change of [{ expiresAt: now }, { createdAt: now + 31_000 }, { expiresAt: now + 91_000 }, { manualTemperature: 91 }, { manualTemperature: "60" }, { minimumD: 39 }, { expectedRevision: -1 }, { expectedRevision: 0.5 }, { expectedRevision: 999999999 }, { status: "accepted" }, { actuator: true }, { entity_id: "switch.any" }, { mode: "off" }, { mode: ["manual"] }]) {
+  for (const change of [{ version: 1 }, { version: "2" }, { expiresAt: now }, { createdAt: now + 31_000 }, { expiresAt: now + 91_000 }, { manualTemperature: 71 }, { manualTemperature: 49 }, { manualTemperature: "60" }, { manualTemperature: true }, { manualTemperature: Number.NaN }, { minimumD: 54 }, { minimumD: 60 }, { minimumD: "57" }, { minimumD: true }, { minimumD: Number.NaN }, { expectedRevision: -1 }, { expectedRevision: 0.5 }, { expectedRevision: 999999999 }, { status: "accepted" }, { actuator: true }, { entity_id: "switch.any" }, { mode: "off" }, { mode: ["manual"] }]) {
     assert.throws(() => validateHeatingControlRequest({ ...request(), ...change }, id, now));
   }
   assert.throws(() => validateHeatingControlRequest(request(), "different-key", now));
+  const oldKey = `${now - 60_000}-0123456789abcdef0123456789abcdef`;
+  assert.throws(() => validateHeatingControlRequest({ ...request(), id: oldKey }, oldKey, now));
+  assert.throws(() => validateHeatingControlRequest({ ...request(), createdAt: now - 1000, expiresAt: now + 1000 }, id, now));
+});
+test("manual and automatic settings enforce commissioned bounds and preserve internal helper v1", () => {
+  for (const manualTemperature of [50, 70]) for (const minimumD of [55, 59]) {
+    assert.equal(validHeatingSettings({ mode: "manual", manualTemperature, minimumD }), true);
+  }
+  assert.deepEqual(parseHaHeatingConfiguration(states(5, id)), { revision: 5, requestId: id });
+  const malformed = states();
+  for (const change of [{ v: 2 }, { t: 90 }, { d: 60 }, { r: true }, { d: "57" }]) {
+    malformed[1].state = JSON.stringify({ v: 1, r: 5, id, m: "automatic", t: 60, d: 57, ...change });
+    assert.equal(parseHaHeatingConfiguration(malformed), null);
+  }
+});
+test("configuration receipts validate identity and v2 without claiming physical transmission", () => {
+  const receipt = { ...request(), status: "accepted", processedAt: now + 1000 };
+  assert.equal(heatingConfigurationReceiptState(receipt, id, "user_test"), "accepted");
+  for (const change of [{ version: 1 }, { requestedBy: "other-user" }, { id: "wrong" }, { status: "transmitted" }, { status: ["accepted"] }, { manualTemperature: 90 }, { expectedRevision: true }]) {
+    assert.equal(heatingConfigurationReceiptState({ ...receipt, ...change }, id, "user_test"), null);
+  }
+});
+test("switching mode can save its valid field without silently submitting an invalid hidden draft", () => {
+  const confirmed = { mode: "manual", manualTemperature: 60, minimumD: 57 };
+  assert.equal(heatingSettingsFromDraft("manual", 71, 57, confirmed), null);
+  assert.deepEqual(heatingSettingsFromDraft("automatic", 71, 57, confirmed), { mode: "automatic", manualTemperature: 60, minimumD: 57 });
+  assert.equal(heatingSettingsFromDraft("automatic", 60, 60, confirmed), null);
+  assert.deepEqual(heatingSettingsFromDraft("manual", 62, 60, confirmed), { mode: "manual", manualTemperature: 62, minimumD: 57 });
+  assert.deepEqual(heatingSettingsFromDraft("automatic", Number.NaN, 56, confirmed), { mode: "automatic", manualTemperature: 60, minimumD: 56 });
+  assert.deepEqual(heatingSettingsFromDraft("manual", 61, Number.NaN, confirmed), { mode: "manual", manualTemperature: 61, minimumD: 57 });
+  assert.deepEqual(heatingSettingsFromDraft("automatic", 62, 58, confirmed), { mode: "automatic", manualTemperature: 62, minimumD: 58 });
+  assert.deepEqual(confirmed, { mode: "manual", manualTemperature: 60, minimumD: 57 });
 });
 
 test("Firebase queries omit ETag while single-request reads obtain it for CAS", async () => {

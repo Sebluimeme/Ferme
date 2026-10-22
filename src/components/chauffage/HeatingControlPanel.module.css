@@ -3,14 +3,25 @@
 .header h2 { margin: 3px 0 0; font-size: 23px; line-height: 1.25; font-weight: 700; letter-spacing: -.45px; }
 .header > svg { width: 24px; height: 24px; flex: none; color: var(--farm-accent); }
 .eyebrow { margin: 0; color: var(--farm-muted); font-size: 14px; }
-.observation { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 12px; border-radius: 12px; background: var(--farm-warning-bg); color: var(--farm-warning); font-size: 14px; font-weight: 600; line-height: 1.45; }
-.observation svg { width: 19px; height: 19px; flex: none; margin-top: 1px; }
 .summary { padding: 0 2px; }
 .summary > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .summary span { color: var(--farm-muted); font-size: 15px; }
 .summary strong { flex: none; font-size: 32px; line-height: 1.15; font-weight: 750; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
 .summary p { margin: 7px 0 0; color: var(--farm-muted); font-size: 14px; }
-.calculation { display: flex; flex-direction: column; gap: 12px; }
+.summary .registeredMode { margin: 0 0 10px; color: var(--farm-text); font-size: 15px; font-weight: 600; }
+.delivery { display: flex; flex-direction: column; gap: 9px; padding-top: 14px; border-top: 1px solid var(--farm-divider); }
+.deliveryTarget { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.deliveryTarget > span { font-size: 15px; }
+.deliveryTarget > strong { flex: none; font-size: 28px; line-height: 1.15; font-weight: 700; font-variant-numeric: tabular-nums; }
+.deliveryState, .moduleState { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 14px; line-height: 1.45; color: var(--farm-muted); }
+.deliveryState svg, .moduleState svg { flex: none; width: 17px; height: 17px; margin-top: 1px; }
+.deliveryWarning { color: var(--farm-warning); }
+.lastTransmission { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 3px 10px; padding-top: 8px; color: var(--farm-muted); }
+.lastTransmission > span { font-size: 14px; }
+.lastTransmission > strong { font-size: 19px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.lastTransmission > time, .lastTransmission > .noTransmission { grid-column: 1 / -1; font-size: 13px; }
+.feedback { margin: 0; font-size: 13px; line-height: 1.45; color: var(--farm-muted); }
+.calculation { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
 .proposal { padding: 14px; border: 1px solid var(--farm-divider); border-radius: 14px; }
 .proposal > span { display: block; font-size: 15px; font-weight: 600; }
 .proposal strong { display: block; margin-top: 5px; font-size: 29px; line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums; }

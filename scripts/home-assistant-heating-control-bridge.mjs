@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Configuration-only bridge. The only HA service is the observation package's configurer script. */
+/** Configuration-only bridge. Regulation and physical dispatch run locally in HA. */
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -8,7 +8,7 @@ import { HEATING_CONTROL_PATH, controlStatusFromHa, parseHaHeatingConfiguration,
 const SERVICE_PATH = "/api/services/script/ferme_chauffage_configurer";
 const REQUEST_KEY = /^\d{13}-[a-f0-9]{32}$/;
 const message = {
-  accepted: "Réglages mémorisés dans Home Assistant. Observation uniquement : aucun mouvement du servomoteur.",
+  accepted: "Réglages enregistrés dans Home Assistant. Le suivi de transmission indique séparément si la consigne attend le module.",
   rejected: "Demande refusée ou expirée. Rouvre les réglages pour lire la configuration actuelle.",
   uncertain: "La confirmation n’a pas pu être obtenue. Vérifie les réglages actuels avant toute nouvelle demande.",
 };
@@ -135,7 +135,7 @@ export async function main(args = process.argv.slice(2), env = process.env) {
         const states = await ha.readStates();
         await firebase.writeStatus(controlStatusFromHa(states));
         await processHeatingControlRequests({ firebase, ha, states });
-        console.log("[heating-control] observation configuration synchronized");
+        console.log("[heating-control] configuration and delivery status synchronized");
       } catch {
         console.error("[heating-control] synchronization unconfirmed");
         if (args.includes("--once")) process.exitCode = 1;

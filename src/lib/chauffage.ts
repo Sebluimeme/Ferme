@@ -1,5 +1,6 @@
 /** Shared, read-only heating telemetry contract. No network calls or device commands. */
 export const HEATING_STATUS_PATH = "chauffage-ha/status/current";
+export const HEATING_TRANSMITTED_ENTITY_ID = "sensor.ferme_chauffage_consigne_envoyee";
 export const HEATING_ENTITY_IDS = {
   tankA: "sensor.sous_station_bat_a_temperature_cuve",
   tankB: "sensor.batiment_b_ballon_b",
@@ -22,6 +23,7 @@ export interface HeatingEntity {
     unit_of_measurement?: string;
     temperature_unit?: string;
     temperature?: number | string;
+    transmitted_at?: string;
   };
   last_reported?: string;
   last_updated?: string;
@@ -62,7 +64,7 @@ export interface ChauffageStatus {
   relayFreshness: HeatingFreshness;
   errorCode?: HeatingSourceError;
   measurements: Record<"tankA" | "tankB" | "tankD" | "woodBoiler", HeatingMetric>;
-  fuel: { setpoint: HeatingMetric; mode: string | null };
+  fuel: { setpoint: HeatingMetric; mode: string | null; source: "transmitted" | "legacy" | "unknown" };
   diagnostics: { servo: HeatingMetric; woodFault: boolean | null };
   hasData: boolean;
 }
@@ -78,7 +80,7 @@ function record(value: unknown): value is Record<string, unknown> {
 }
 
 export function getHeatingEntityIds(): string[] {
-  return Object.values(HEATING_ENTITY_IDS);
+  return [...Object.values(HEATING_ENTITY_IDS), HEATING_TRANSMITTED_ENTITY_ID];
 }
 
 /** Keep only known entity IDs and the small set of attributes needed by the page. */
@@ -86,18 +88,19 @@ export function selectHeatingEntities(states: unknown): HeatingSnapshot["entitie
   const output: HeatingSnapshot["entities"] = {};
   const candidates = Array.isArray(states) ? states : record(states) ? Object.values(states) : [];
   for (const [key, id] of Object.entries(HEATING_ENTITY_IDS)) {
-    const raw = candidates.find((item: unknown) => record(item) && item.entity_id === id);
+    const raw = (key === "fuelSetpoint" ? candidates.find((item: unknown) => record(item) && item.entity_id === HEATING_TRANSMITTED_ENTITY_ID) : undefined)
+      ?? candidates.find((item: unknown) => record(item) && item.entity_id === id);
     if (!record(raw) || typeof raw.state !== "string") continue;
     const attributes: HeatingEntity["attributes"] = {};
     if (record(raw.attributes)) {
-      for (const field of ["unit_of_measurement", "temperature_unit"] as const) {
+      for (const field of ["unit_of_measurement", "temperature_unit", "transmitted_at"] as const) {
         if (typeof raw.attributes[field] === "string") attributes[field] = raw.attributes[field];
       }
       if (typeof raw.attributes.temperature === "string" || typeof raw.attributes.temperature === "number") {
         attributes.temperature = raw.attributes.temperature;
       }
     }
-    const entity: HeatingEntity = { entity_id: id, state: raw.state, attributes };
+    const entity: HeatingEntity = { entity_id: String(raw.entity_id), state: raw.state, attributes };
     for (const field of ["last_reported", "last_updated", "last_changed"] as const) {
       if (typeof raw[field] === "string") entity[field] = raw[field];
     }
@@ -157,7 +160,8 @@ function metric(
   options: { setpoint?: boolean; percentage?: boolean } = {},
 ): HeatingMetric {
   const unit = options.percentage ? "%" : "°C";
-  const reportedAt = validTimestamp(entity?.last_reported ?? entity?.last_updated ?? entity?.last_changed, nowMs);
+  const transmitted = options.setpoint && entity?.entity_id === HEATING_TRANSMITTED_ENTITY_ID;
+  const reportedAt = validTimestamp(transmitted ? entity?.attributes.transmitted_at : entity?.last_reported ?? entity?.last_updated ?? entity?.last_changed, nowMs);
   const sourceStateAt = validTimestamp(entity?.last_updated ?? entity?.last_changed ?? entity?.last_reported, nowMs);
   const base: HeatingMetric = {
     value: null, unit, reportedAt: null, isFallback: false, sourceStateAt,
@@ -165,14 +169,14 @@ function metric(
     availability: entity ? "unavailable" : "missing", label,
   };
   if (!entity || UNAVAILABLE.has(entity.state.trim().toLowerCase())) return base;
-  const rawValue = options.setpoint ? entity.attributes.temperature : entity.state;
+  const rawValue = options.setpoint && !transmitted ? entity.attributes.temperature : entity.state;
   const value = numberValue(rawValue);
   // HA climate entities do not usually carry a unit. This installation uses °C;
   // an explicit different unit is rejected rather than silently relabelled.
   const sourceUnit = entity.attributes.temperature_unit ?? entity.attributes.unit_of_measurement;
   const supportedUnit = options.percentage
     ? sourceUnit === "%"
-    : sourceUnit === "°C" || sourceUnit === "C" || (options.setpoint && sourceUnit === undefined);
+    : sourceUnit === "°C" || sourceUnit === "C" || (options.setpoint && !transmitted && sourceUnit === undefined);
   if (value === null || !reportedAt || !supportedUnit || (options.percentage && (value < 0 || value > 100))) {
     return { ...base, availability: "invalid" };
   }
@@ -215,7 +219,8 @@ function retainedMetric(
   nowMs: number, options: { setpoint?: boolean; percentage?: boolean } = {},
 ): HeatingMetric {
   const current = metric(entity, label, nowMs, options);
-  const previous = metric(retained, label, nowMs, options);
+  // A new controller with no transmission yet must not inherit the old thermostat's setpoint.
+  const previous = metric(entity?.entity_id === HEATING_TRANSMITTED_ENTITY_ID && retained?.entity_id !== HEATING_TRANSMITTED_ENTITY_ID ? undefined : retained, label, nowMs, options);
   if (current.value !== null && (!previous.reportedAt || !current.reportedAt
     || Date.parse(current.reportedAt) >= Date.parse(previous.reportedAt))) return current;
   if (previous.value === null) return current;
@@ -248,8 +253,9 @@ export function normalizeHeatingSnapshot(raw: unknown, nowMs = Date.now()): Chau
       woodBoiler: retainedMetric(entities.woodBoiler, lastValid.woodBoiler, "Chaudière à bois", nowMs),
     },
     fuel: {
-      setpoint: retainedMetric(fuelEntity, lastValid.fuelSetpoint, "Consigne chaudière fioul", nowMs, { setpoint: true }),
-      mode: fuelEntity && !UNAVAILABLE.has(fuelEntity.state.trim().toLowerCase()) ? fuelEntity.state : null,
+      setpoint: retainedMetric(fuelEntity, lastValid.fuelSetpoint, fuelEntity?.entity_id === HEATING_TRANSMITTED_ENTITY_ID ? "Dernière consigne transmise via API" : "Ancien réglage mémorisé", nowMs, { setpoint: true }),
+      mode: fuelEntity?.entity_id === HEATING_ENTITY_IDS.fuelSetpoint && !UNAVAILABLE.has(fuelEntity.state.trim().toLowerCase()) ? fuelEntity.state : null,
+      source: fuelEntity?.entity_id === HEATING_TRANSMITTED_ENTITY_ID ? "transmitted" : fuelEntity?.entity_id === HEATING_ENTITY_IDS.fuelSetpoint ? "legacy" : "unknown",
     },
     diagnostics: {
       servo: retainedMetric(entities.servo, lastValid.servo, "Position du servomoteur", nowMs, { percentage: true }),

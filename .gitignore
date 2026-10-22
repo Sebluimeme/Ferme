@@ -22,6 +22,7 @@ npm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+__pycache__/
 
 # pwa
 **/public/sw.js

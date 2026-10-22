@@ -1,6 +1,6 @@
 import {
   HEATING_ENTITY_IDS, HEATING_METRIC_KEYS, normalizeHeatingSnapshot, selectHeatingEntities,
-  mergeHeatingLastValid,
+  mergeHeatingLastValid, HEATING_TRANSMITTED_ENTITY_ID,
 } from "./chauffage.ts";
 import type { HeatingMetric, HeatingMetricKey, HeatingSnapshot } from "./chauffage.ts";
 
@@ -127,11 +127,12 @@ export function importHeatingRecorderHistory(raw: unknown, fromMs: number, toMs:
   let lastValid: NonNullable<HeatingSnapshot["lastValid"]> = {};
   if (!Array.isArray(raw)) return { updates, lastValid };
   const allowed = new Set<string>(HEATING_HISTORY_KEYS.map((key) => HEATING_ENTITY_IDS[key]));
+  allowed.add(HEATING_TRANSMITTED_ENTITY_ID);
   const observations = raw.flat().filter((item) => object(item) && allowed.has(String(item.entity_id))) as Record<string, unknown>[];
   for (const rawEntity of observations) {
     const entity = Object.values(selectHeatingEntities([rawEntity]))[0];
     if (!entity) continue;
-    let timestamp = entity.last_updated ?? entity.last_changed;
+    let timestamp = entity.entity_id === HEATING_TRANSMITTED_ENTITY_ID ? entity.attributes.transmitted_at : entity.last_updated ?? entity.last_changed;
     let at = Date.parse(timestamp ?? "");
     const changed = Date.parse(entity.last_changed ?? "");
     if (at === fromMs) {
@@ -144,7 +145,7 @@ export function importHeatingRecorderHistory(raw: unknown, fromMs: number, toMs:
     const entities = selectHeatingEntities([original]);
     lastValid = mergeHeatingLastValid(lastValid, {}, entities, toMs);
     const snapshot: HeatingSnapshot = { version: 1, connected: true, checkedAt: new Date(toMs).toISOString(), lastSuccessfulAt: null, entities };
-    const key = HEATING_HISTORY_KEYS.find((candidate) => HEATING_ENTITY_IDS[candidate] === original.entity_id)!;
+    const key = original.entity_id === HEATING_TRANSMITTED_ENTITY_ID ? "fuelSetpoint" : HEATING_HISTORY_KEYS.find((candidate) => HEATING_ENTITY_IDS[candidate] === original.entity_id)!;
     const value = metrics(snapshot)[key];
     const point: HeatingHistoryPoint = genuine(value)
       ? { at, value: value.value, kind: "measurement" } : { at, value: null, kind: "gap" };
