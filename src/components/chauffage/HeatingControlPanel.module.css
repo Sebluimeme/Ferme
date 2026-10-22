@@ -42,5 +42,9 @@
 .automaticExplanation > svg { width: 21px; height: 21px; flex: none; color: var(--farm-accent); margin-top: 1px; }
 .automaticExplanation strong { font-size: 15px; line-height: 1.4; }
 .automaticExplanation p { margin: 7px 0 0; color: var(--farm-muted); font-size: 14px; line-height: 1.5; }
+.thresholds { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.thresholds > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.thresholds dt { font-size: 14px; line-height: 1.4; }
+.thresholds dd { flex: none; margin: 0; font-size: 18px; font-weight: 700; line-height: 1.25; font-variant-numeric: tabular-nums; }
 .footer p { margin: 8px 0 0; color: var(--farm-muted); font-size: 13px; line-height: 1.4; text-align: center; }
 @media (max-width: 360px) { .header h2 { font-size: 21px; } .stepper { grid-template-columns: 48px minmax(0, 1fr) 48px; gap: 8px; } .stepper > button { width: 48px; } }

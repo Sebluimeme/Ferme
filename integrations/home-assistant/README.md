@@ -35,9 +35,21 @@ Lire ce helper après l'appel pour confirmer `id` et `r`. Ne pas confondre cet a
 
 Les capteurs sont `sensor.esphome_web_61063e_tampon_haut` et `sensor.batiment_b_ballon_b`. Les deux doivent fournir un nombre valide en °C et un `last_reported` datant de moins de cinq minutes. Valeur indisponible, historique restauré, date future et unités incorrectes suspendent le calcul. Une ancienne température reste exploitable pour l'affichage de Ferme, mais pas pour la régulation.
 
-Le calcul utilise une cible `minimum_d + 2 °C`, une tendance sur 10 à 15 minutes et une projection à 10 minutes. Il attend trois confirmations sur des relevés distincts avant de proposer une variation. Les corrections simulées sont de 1 °C, ou de 2 °C en cas de baisse plus marquée, espacées d'au moins 10 minutes. La plage automatique **provisoire** est 50–85 °C ; elle ne valide pas les limites physiques de la chaudière. Les champs `commissioned_minimum` et `commissioned_maximum` restent nuls.
+Le calcul utilise un seuil bas `minimum_d`, un seuil haut `minimum_d + 2 °C`, une tendance sur 10 à 15 minutes et une projection à 10 minutes. Avec le réglage 58 °C, la plage souhaitée du ballon D est donc 58–60 °C.
 
-Une remontée suffisamment rapide évite de proposer une hausse ; une température au-dessus de la cible permet une diminution progressive. Après une coupure ou une reprise du moteur d'observation, l'historique est reconstruit avant toute nouvelle proposition. Si D ne montre pas de hausse d'au moins 0,3 °C dans les 30 minutes suivant le début des propositions montantes, les nouvelles hausses sont suspendues. **Puisque ces propositions ne sont pas appliquées, ce constat ne démontre pas une panne du chauffage.**
+Le repos correspond à une **consigne fioul de 50 °C**. Dès que D atteint le seuil haut, la proposition revient directement à 50 °C, sans attendre la temporisation ou les trois confirmations exigées pour une hausse. Cette priorité de retour au repos s'applique aussi après une précédente alerte d'absence de remontée. Elle ne commande pas l'arrêt du brûleur.
+
+Au repos, la proposition reste à 50 °C tant que la projection à 10 minutes ne prévoit pas de passage sous le seuil bas. Les hausses simulées de 1 °C, ou de 2 °C en cas de baisse plus marquée, restent espacées d'au moins 10 minutes et nécessitent trois confirmations sur des relevés distincts. La demande d'appoint devient persistante à la première hausse confirmée ; une prédiction transitoire pendant l'attente ne suffit pas à la mémoriser. La demande persiste ensuite entre les deux seuils jusqu'au seuil haut. Elle se désengage aussi si D est déjà au-dessus du seuil bas et remonte assez vite pour atteindre le seuil haut dans la projection à 10 minutes.
+
+Le dernier segment récent, couvrant au moins deux minutes, doit confirmer une remontée avant un désengagement anticipé. Une tendance ancienne positive ne doit pas masquer un refroidissement récent, et une ancienne baisse ne doit pas provoquer une hausse alors que le ballon remonte nettement.
+
+Exemples avec seuil bas 58 °C : D à 60 °C stable → retour immédiat à 50 °C ; D à 59 °C stable après désengagement → maintien à 50 °C ; D à 59 °C descendant de 0,2 °C/min → demande d'appoint progressive ; D à 59 °C montant de 0,1 °C/min → retour à 50 °C. La plage automatique **provisoire** est 50–85 °C ; elle ne valide pas les limites physiques de la chaudière. Les champs `commissioned_minimum` et `commissioned_maximum` restent nuls.
+
+Après une coupure ou une reprise du moteur d'observation, la demande et la dernière proposition sont conservées pour la même révision de réglages. L'historique est reconstruit avant toute nouvelle hausse. Une tendance manquante ne signifie pas que l'appoint est devenu inutile. Le retour au repos reste conditionné à deux mesures fraîches et valides ; dès que D atteint le seuil haut, cette décision reste prioritaire.
+
+Le délai d'observation d'une remontée ne démarre que lorsque la proposition atteint au moins `max(température D, température B) + 2 °C`. Une proposition encore trop basse pour apporter de la chaleur ne déclenche pas une fausse absence de réponse. Si D ne montre ensuite pas de hausse d'au moins 0,3 °C pendant 30 minutes, les nouvelles hausses sont suspendues. La limite de 85 °C n'est jamais dépassée, même si ce niveau théoriquement utile serait supérieur. **Puisque ces propositions ne sont pas appliquées, ce constat ne démontre pas une panne du chauffage.**
+
+Depuis le repos à 50 °C, la montée de 1–2 °C par dix minutes peut être trop lente pour empêcher D de franchir 55 °C. Cette cadence d'observation n'est donc pas validée pour le pilotage physique. Elle devra être ajustée à partir de mesures B fiables et du délai réel de transfert entre bâtiments avant activation, sans déduire un saut initial arbitraire.
 
 ## État exposé
 
@@ -52,12 +64,15 @@ Les constantes numériques et booléennes sont exprimées comme templates (`{{ 1
 - `last_proposal_at`, `next_adjustment_at` : secondes Unix, la seconde date est la prochaine possibilité théorique de correction ;
 - `updated_at` : date ISO ;
 - les indicateurs constants de verrouillage et les bornes provisoires.
+- `heat_demand` : demande d'appoint mémorisée dans le calcul ; `resting_temperature` : 50 °C.
 
 | Code | Sens |
 |---|---|
 | `manual_observation` | Réglage manuel mémorisé, aucun mouvement |
 | `warming_up` | Construction d'un historique récent suffisant |
 | `automatic_observation` | Calcul automatique en observation |
+| `resting_observation` | Proposition maintenue au repos à 50 °C |
+| `releasing_observation` | Retour proposé directement à 50 °C |
 | `stabilizing` | Attente de confirmations sur de nouveaux relevés |
 | `cooldown` | Attente entre deux propositions de variation |
 | `sensor_d_unavailable`, `sensor_b_unavailable` | Mesure invalide ou indisponible |

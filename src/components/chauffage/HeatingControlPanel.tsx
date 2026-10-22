@@ -93,7 +93,8 @@ function ControlSheet({ status, loading, offline, busy, error, result, onSave, o
   const changedElsewhere = revision !== null && status !== null && status.revision !== revision && !saved && !waiting;
   const manualValue = manual.trim() === "" ? Number.NaN : Number(manual);
   const minimumValue = minimumD.trim() === "" ? Number.NaN : Number(minimumD);
-  const valid = Number.isInteger(manualValue) && manualValue >= 50 && manualValue <= 90 && Number.isInteger(minimumValue) && minimumValue >= 40 && minimumValue <= 75;
+  const validMinimum = Number.isInteger(minimumValue) && minimumValue >= 40 && minimumValue <= 75;
+  const valid = Number.isInteger(manualValue) && manualValue >= 50 && manualValue <= 90 && validMinimum;
   const canSave = !!status?.available && status.fresh && !offline && !loading && !waiting && !saved && !changedElsewhere && revision !== null && valid;
 
   async function save() {
@@ -125,7 +126,17 @@ function ControlSheet({ status, loading, offline, busy, error, result, onSave, o
       </div></div>
       {mode === "manual" ? <TemperatureInput id={`${id}-manual`} value={manual} onChange={setManual} min={50} max={90} disabled={waiting || saved} label="Température souhaitée de la chaudière fioul" hint="Consigne théorique du potentiomètre, de 50 à 90 °C. Le réglage est mémorisé pour observation." /> : <>
         <TemperatureInput id={`${id}-minimum`} value={minimumD} onChange={setMinimumD} min={40} max={75} disabled={waiting || saved} label="Limite basse de la sonde du ballon D" hint="De 40 à 75 °C, sur la sonde affichée dans Ferme. À adapter à la différence avec la sonde de la chaudière." />
-        <div className={styles.automaticExplanation}><Thermometer aria-hidden="true" /><div><strong>Marge d’anticipation : 2 °C</strong><p>Le calcul vise {Number.isFinite(minimumValue) && minimumValue >= 40 && minimumValue <= 75 ? temperature(minimumValue + 2) : "2 °C au-dessus de ta limite"}, puis propose des corrections progressives pour limiter le fioul. La consigne fioul simulée reste entre 50 et 85 °C.</p><p>Le seuil physique de 55 °C de la chaudière reste inchangé. Il est mesuré par une autre sonde.</p></div></div>
+        <div className={styles.automaticExplanation}><Thermometer aria-hidden="true" /><div>
+          <strong>Deux repères pour le ballon D</strong>
+          <dl className={styles.thresholds}>
+            <div><dt>Limite basse</dt><dd>{validMinimum ? temperature(minimumValue) : "—"}</dd></div>
+            <div><dt>Retour au minimum fioul</dt><dd>{validMinimum ? temperature(minimumValue + 2) : "—"}</dd></div>
+          </dl>
+          <p>Dès que D atteint {validMinimum ? temperature(minimumValue + 2) : "la limite basse + 2 °C"}, ou qu’une remontée nette annonce ce seuil, la proposition fioul revient directement à <b>50 °C</b>.</p>
+          <p>Elle reste à 50 °C tant que la tendance ne prévoit pas un passage sous {validMinimum ? temperature(minimumValue) : "ta limite basse"} dans les 10 prochaines minutes. Si nécessaire, le calcul propose une hausse progressive, jusqu’à 85 °C maximum.</p>
+          <p>Entre les deux repères, le besoin d’appoint reste mémorisé jusqu’au retour au seuil haut pour éviter les allers-retours.</p>
+          <p>Le seuil physique de 55 °C de la chaudière reste inchangé. Il est mesuré par une autre sonde.</p>
+        </div></div>
       </>}
       {status?.available && <section aria-label="État actuel de l’observation"><h3 className={styles.sectionTitle}>État actuel de l’observation</h3><Calculation status={status} offline={offline} /></section>}
       {(saveError || error) && <Notice tone="error">{saveError || error}</Notice>}
@@ -142,7 +153,7 @@ export default function HeatingControlPanel(props: HeatingControlPanelProps) {
     <Card className={`${farmStyles.theme} ${styles.card}`} role="region" aria-label="Réglage de la chaudière fioul">
       <header className={styles.header}><div><p className={styles.eyebrow}>Chaudière fioul</p><h2>Réglage du chauffage</h2></div><SlidersHorizontal aria-hidden="true" /></header>
       <p className={styles.observation}><Eye aria-hidden="true" /><span>{observationLabel}</span></p>
-      {known && <div className={styles.summary}><div><span>{status.mode === "manual" ? "Manuel · consigne mémorisée" : "Automatique · limite du ballon D"}</span><strong>{temperature(status.mode === "manual" ? status.manualTemperature : status.minimumD)}</strong></div>{status.mode === "automatic" && <p>Sur la sonde Ferme, avec une marge de 2 °C.</p>}</div>}
+      {known && <div className={styles.summary}><div><span>{status.mode === "manual" ? "Manuel · consigne mémorisée" : "Automatique · limite du ballon D"}</span><strong>{temperature(status.mode === "manual" ? status.manualTemperature : status.minimumD)}</strong></div>{status.mode === "automatic" && <p>Minimum fioul : 50 °C. Retour direct à ce minimum dès que la sonde D atteint {temperature(status.minimumD + 2)}.</p>}</div>}
       <Availability status={status} loading={loading} offline={offline} />
       {status?.available && status.mode === "automatic" && <p className={styles.muted}>{offline || !status.fresh || status.phase === "suspended" ? <>Calcul suspendu. {status.fresh && !offline ? heatingControlReason(status.reason).replace(/^Calcul suspendu : /, "") : "En attente de relevés récents."}</> : <>{status.recommendedTemperature !== null && <strong>Proposition fioul : {temperature(status.recommendedTemperature)}. </strong>}{heatingControlReason(status.reason)}</>}</p>}
       {error && <Notice tone="error">{error}</Notice>}

@@ -176,11 +176,10 @@ automation:
                or (trigger is defined and trigger.platform == 'homeassistant') }}
       - variables:
           healthy: "{{ config_valid and d_valid and b_valid and 0 <= current_time - d_at <= 300 and 0 <= current_time - b_at <= 300 }}"
+          same_configuration: "{{ config_valid and previous.get('r',-1) == config.r }}"
           old_history: "{{ [] if reset else previous.get('h',[]) }}"
           q: >-
-            {% set initial = state_attr('climate.chaudiere_fioul','temperature') %}
-            {% set value = initial if initial is number and 50 <= initial <= 90 else 60 %}
-            {{ [[value if reset else previous.get('q',value), 50] | max,85] | min }}
+            {{ [[previous.get('q',50) if same_configuration else 50, 50] | max,85] | min }}
           last: "{{ current_time if reset else previous.get('at',current_time) }}"
           warming_since: "{{ current_time if reset or not healthy else previous.get('w',current_time) }}"
       - variables:
@@ -205,17 +204,43 @@ automation:
             {% if history | length >= 2 and history[-1][0] - history[0][0] >= 600 %}
               {{ [[(history[-1][1] - history[0][1]) / ((history[-1][0] - history[0][0]) / 60), -0.5] | max, 0.5] | min | round(3) }}
             {% else %}{{ none }}{% endif %}
+          recent_slope: >-
+            {% set ns = namespace(point=none) %}
+            {% if history | length >= 2 %}
+              {% for p in history[:-1] %}
+                {% if 120 <= history[-1][0] - p[0] <= 600 %}{% set ns.point = p %}{% endif %}
+              {% endfor %}
+            {% endif %}
+            {{ [[(history[-1][1] - ns.point[1]) / ((history[-1][0] - ns.point[0]) / 60),-0.5] | max,0.5] | min | round(3) if ns.point is not none else none }}
           target: "{{ config.d + 2 if config_valid else 60 }}"
+      - variables:
+          projected_d: >-
+            {{ d_state | float + ([slope,recent_slope] | min if recent_slope is number else slope) * 10
+               if healthy and slope is number else none }}
+          recent_recovery: >-
+            {{ healthy and recent_slope is number and recent_slope > 0.02
+               and d_state | float + recent_slope * 10 >= target }}
+          release_support: >-
+            {{ healthy and config.get('m') == 'automatic'
+               and (d_state | float >= target or
+                    (d_state | float >= config.d and slope is number and slope > 0.02
+                     and recent_recovery and projected_d is number and projected_d >= target)) }}
+      - variables:
+          heat_demand: >-
+            {{ config_valid and config.get('m') == 'automatic' and not release_support
+               and ((same_configuration and previous.get('a',0) == 1)
+                    or (healthy and projected_d is number and projected_d < config.d and not recent_recovery)) }}
           no_response: >-
-            {{ healthy and not reset and previous.get('bt',0) > 0
+            {{ healthy and not reset and not release_support and previous.get('bt',0) > 0
+               and q >= ([d_state | float,b_state | float] | max) + 2
                and current_time - previous.bt >= 1800
                and d_state | float < previous.get('b',0) + 0.3 }}
       - variables:
+          rest_ready: >-
+            {{ healthy and config.get('m') == 'automatic'
+               and (release_support or (not heat_demand and slope is number)) }}
           direction: >-
-            {% if not healthy or config.get('m') != 'automatic' %}0
-            {% elif d_state | float >= target + 1 or (d_state | float >= target and slope is number and slope > 0.02) %}-1
-            {% elif not no_response and slope is number
-                 and d_state | float + slope * 10 < target - 1 %}1
+            {% if heat_demand and not no_response and projected_d is number and projected_d < target and not recent_recovery %}1
             {% else %}0{% endif %}
           elapsed: "{{ current_time - last }}"
       - variables:
@@ -235,6 +260,8 @@ automation:
             {% elif not 0 <= current_time - d_at <= 300 %}7
             {% elif not 0 <= current_time - b_at <= 300 %}8
             {% elif config.m == 'manual' %}0
+            {% elif rest_ready and q > 50 %}12
+            {% elif rest_ready %}11
             {% elif no_response %}9
             {% elif current_time - warming_since < 600 or slope is not number %}1
             {% elif direction != 0 and confirmations < 3 %}3
@@ -244,22 +271,25 @@ automation:
           proposed: >-
             {% set step = 2 if healthy and d_state | float < config.get('d',58) - 2 and direction == 1 else 1 %}
             {{ config.get('t',60) if config_valid and config.m == 'manual' else
-               ([[q + direction * step,50] | max,85] | min if can_adjust else q) }}
+               (50 if rest_ready else [[q + direction * step,50] | max,85] | min if can_adjust else q) }}
       - variables:
-          changed: "{{ can_adjust and proposed != q }}"
+          changed: "{{ healthy and config.get('m') == 'automatic' and proposed != q }}"
+          response_eligible: >-
+            {{ healthy and heat_demand and proposed >= ([d_state | float,b_state | float] | max) + 2 }}
           response_pending: >-
-            {{ not reset and healthy and direction >= 0 and previous.get('bt',0) > 0
+            {{ not reset and response_eligible and previous.get('bt',0) > 0
                and previous.get('b') is number and d_state | float < previous.b + 0.3 }}
       - variables:
           response_base: >-
-            {{ previous.b if response_pending else d_state | float if changed and direction == 1 else none }}
+            {{ previous.b if response_pending else d_state | float if changed and direction == 1 and response_eligible else none }}
           response_at: >-
-            {{ previous.bt if response_pending else current_time if changed and direction == 1 else 0 }}
+            {{ previous.bt if response_pending else current_time if changed and direction == 1 and response_eligible else 0 }}
       - variables:
           next_observation: >-
             {{ {'r':config.get('r',0),'q':proposed,'at':current_time if changed else last,
                 'h':history,'n':0 if changed else confirmations,'dir':direction,
                 'w':warming_since,'b':response_base,'bt':response_at,'s':reason_code,
+                'a':1 if heat_demand and ((same_configuration and previous.get('a',0) == 1) or (changed and direction == 1)) else 0,
                 'tick':current_time} | to_json }}
       - condition: template
         value_template: "{{ next_observation | string | length <= 255 }}"
@@ -306,6 +336,10 @@ template:
           commissioned_maximum: "{{ none }}"
           simulation_minimum: "{{ 50 }}"
           simulation_maximum: "{{ 85 }}"
+          resting_temperature: "{{ 50 }}"
+          heat_demand: >-
+            {% set p = states('input_text.ferme_chauffage_observation') | from_json({}) %}
+            {{ p is mapping and p.get('a',0) == 1 and 0 <= as_timestamp(now()) - p.get('tick',0) <= 180 }}
           phase: >-
             {% set p = states('input_text.ferme_chauffage_observation') | from_json({}) %}
             {% set o = p if p is mapping else {} %}
@@ -313,7 +347,7 @@ template:
           reason: >-
             {% set p = states('input_text.ferme_chauffage_observation') | from_json({}) %}
             {% set o = p if p is mapping else {} %}
-            {% set reasons = ['manual_observation','warming_up','automatic_observation','stabilizing','cooldown','sensor_d_unavailable','sensor_b_unavailable','sensor_d_stale','sensor_b_stale','no_heat_response','configuration_invalid'] %}
+            {% set reasons = ['manual_observation','warming_up','automatic_observation','stabilizing','cooldown','sensor_d_unavailable','sensor_b_unavailable','sensor_d_stale','sensor_b_stale','no_heat_response','configuration_invalid','resting_observation','releasing_observation'] %}
             {{ 'observer_stale' if not 0 <= as_timestamp(now()) - o.get('tick',0) <= 180 else reasons[o.get('s',10) | int] if 0 <= o.get('s',10) | int < reasons | length else 'configuration_invalid' }}
           recommended_temperature: >-
             {% set p = states('input_text.ferme_chauffage_observation') | from_json({}) %}

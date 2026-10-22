@@ -47,6 +47,8 @@ export function heatingControlReason(reason: string): string {
     manual_observation: "Réglage manuel mémorisé, sans mouvement du servomoteur.",
     warming_up: "Observation des premières mesures avant de calculer une tendance.",
     automatic_observation: "Proposition calculée pour préserver la limite du ballon D.",
+    resting_observation: "Fioul proposé au minimum de 50 °C : aucun appoint supplémentaire demandé.",
+    releasing_observation: "Retour proposé directement à 50 °C : le ballon D est suffisamment chaud ou remonte vers ce niveau.",
     stabilizing: "La température se stabilise : aucun changement proposé.",
     cooldown: "Le délai entre deux ajustements est respecté.",
     sensor_d_unavailable: "Calcul suspendu : la sonde du ballon D ne répond pas.",

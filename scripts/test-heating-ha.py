@@ -163,6 +163,18 @@ class HeatingPackageTests(unittest.TestCase):
     def setUp(self):
         self.h = Harness()
 
+    def mature_observation(self, d=59, slope=0, q=70, demand=1, last_age=1200, no_response=False):
+        self.h.configure()
+        self.h.set(D, d)
+        self.h.set(B, 65)
+        self.h.set(OBS, json.dumps({
+            'r': 1, 'q': q, 'at': self.h.time-last_age,
+            'h': [[self.h.time-900, d-slope*15], [self.h.time-600, d-slope*10], [self.h.time-300, d-slope*5]],
+            'n': 2 if demand else 0, 'dir': 1 if demand else 0, 'w': self.h.time-3600,
+            'b': d if no_response else None, 'bt': self.h.time-2400 if no_response else 0,
+            's': 2, 'a': demand, 'tick': self.h.time-60,
+        }))
+
     def test_all_actions_are_only_internal_input_text_writes(self):
         def walk(item):
             if isinstance(item, dict):
@@ -314,20 +326,20 @@ class HeatingPackageTests(unittest.TestCase):
     def test_absence_of_heat_response_suspends_instead_of_escalating(self):
         self.h.configure()
         self.h.observe()
-        for _ in range(43):
+        for _ in range(100):
             self.h.tick(d=51)
         self.assertEqual(self.h.status()["reason"], "no_heat_response")
         previous = json.loads(self.h.entities[OBS].state)["q"]
         for _ in range(20):
             self.assertEqual(self.h.tick(d=51)["q"], previous)
 
-    def test_warming_wood_prevents_escalation_then_reduces_gradually(self):
+    def test_warming_wood_keeps_resting_setpoint(self):
         self.h.configure()
         initial = self.h.observe()["q"]
         for minute in range(1, 21):
             self.h.tick(d=56+minute*0.3)
             self.assertLessEqual(json.loads(self.h.entities[OBS].state)["q"], initial)
-        self.assertLess(json.loads(self.h.entities[OBS].state)["q"], initial)
+        self.assertEqual(json.loads(self.h.entities[OBS].state)["q"], 50)
 
     def test_short_variations_do_not_reverse_the_setpoint(self):
         self.h.configure()
@@ -352,16 +364,184 @@ class HeatingPackageTests(unittest.TestCase):
         self.h.observe()
         self.assertEqual(self.h.status()["reason"], "warming_up")
 
-    def test_automatic_simulation_clamps_initial_value_and_limits(self):
-        for initial, expect in [(90,85),(50,50),("unknown",60)]:
+    def test_automatic_simulation_starts_at_rest_and_remains_bounded(self):
+        for initial in [90,50,"unknown"]:
             self.h = Harness()
             self.h.set("climate.chaudiere_fioul", "off", attributes={"temperature": initial})
             self.h.configure()
-            self.assertEqual(self.h.observe()["q"], expect)
+            self.assertEqual(self.h.observe()["q"], 50)
             for _ in range(30):
-                q = self.h.tick(d=70 if expect == 50 else 51)["q"]
+                q = self.h.tick(d=51)["q"]
                 self.assertGreaterEqual(q, 50)
                 self.assertLessEqual(q, 85)
+
+    def test_60_stable_immediately_returns_70_to_50_despite_cooldown_and_no_response(self):
+        self.mature_observation(d=60, slope=0, q=70, last_age=60, no_response=True)
+        o = self.h.observe()
+        self.assertEqual(o['q'], 50)
+        self.assertEqual(o['at'], self.h.time)
+        self.assertEqual(o['a'], 0)
+        self.assertEqual(o['bt'], 0)
+        self.assertEqual(self.h.status()['reason'], 'releasing_observation')
+        self.assertFalse(self.h.status()['heat_demand'])
+        self.assertEqual(self.h.status()['resting_temperature'], 50)
+
+    def test_hot_tank_returns_to_rest_without_waiting_for_trend(self):
+        self.h.configure()
+        self.h.set(D, 60)
+        o = self.h.observe()
+        self.assertEqual(o['q'], 50)
+        self.assertEqual(self.h.status()['reason'], 'resting_observation')
+
+    def test_59_stable_stays_at_50_after_disengagement(self):
+        self.mature_observation(d=60, q=70)
+        self.h.observe()
+        for _ in range(25):
+            o = self.h.tick(d=59)
+            self.assertEqual(o['q'], 50)
+            self.assertEqual(o['a'], 0)
+        self.assertEqual(self.h.status()['reason'], 'resting_observation')
+
+    def test_59_rising_fast_enough_releases_support_before_60(self):
+        self.mature_observation(d=59, slope=0.1, q=70, last_age=60)
+        o = self.h.observe()
+        self.assertEqual(o['q'], 50)
+        self.assertEqual(o['a'], 0)
+        self.assertEqual(self.h.status()['reason'], 'releasing_observation')
+
+    def test_59_falling_restarts_gradually_after_confirmations(self):
+        self.mature_observation(d=59, slope=-0.2, q=50, demand=0)
+        o = self.h.observe()
+        self.assertEqual(o['a'], 0)
+        self.assertEqual(self.h.status()['reason'], 'stabilizing')
+        self.assertEqual(o['q'], 50)
+        self.assertEqual(self.h.tick(d=58.8)['q'], 50)
+        o = self.h.tick(d=58.6)
+        self.assertEqual(o['q'], 51)
+        self.assertEqual(o['a'], 1)
+        for _ in range(9):
+            self.assertEqual(self.h.tick(d=58.6)['q'], 51)
+
+    def test_heat_demand_latches_until_upper_limit_and_then_clears(self):
+        self.mature_observation(d=59, slope=0, q=61, demand=1)
+        self.assertEqual(self.h.observe()['q'], 62)
+        for _ in range(10):
+            o = self.h.tick(d=59)
+            self.assertEqual(o['a'], 1)
+        self.assertEqual(o['q'], 63)
+        o = self.h.tick(d=60)
+        self.assertEqual(o['q'], 50)
+        self.assertEqual(o['a'], 0)
+
+    def test_resting_decision_requires_both_fresh_sensors(self):
+        self.mature_observation(d=60, q=70)
+        self.h.set(B, 'unavailable')
+        o = self.h.observe()
+        self.assertEqual(o['q'], 70)
+        self.assertEqual(self.h.status()['reason'], 'sensor_b_unavailable')
+        self.assertIsNone(self.h.status()['recommended_temperature'])
+
+    def test_outage_preserves_heat_demand_and_setpoint_until_history_recovers(self):
+        self.mature_observation(d=59, q=70, demand=1)
+        self.h.set(B, 'unavailable')
+        o = self.h.observe()
+        self.assertEqual(o['a'], 1)
+        self.assertEqual(o['q'], 70)
+        self.assertEqual(o['h'], [])
+        for _ in range(9):
+            o = self.h.tick(d=59)
+            self.assertEqual(o['a'], 1)
+            self.assertEqual(o['q'], 70)
+            self.assertIsNone(self.h.status()['trend_c_per_minute'])
+        o = self.h.tick(d=60)
+        self.assertEqual(o['a'], 0)
+        self.assertEqual(o['q'], 50)
+
+    def test_long_observer_gap_preserves_demand_instead_of_assuming_rest(self):
+        self.mature_observation(d=59, q=70, demand=1)
+        self.h.time += 3600
+        self.h.set(D, 59)
+        self.h.set(B, 65)
+        o = self.h.observe()
+        self.assertEqual(o['a'], 1)
+        self.assertEqual(o['q'], 70)
+        self.assertIsNone(self.h.status()['trend_c_per_minute'])
+
+    def test_unknown_trend_does_not_mean_no_heat_demand(self):
+        self.mature_observation(d=59, q=70, demand=0)
+        self.h.set(B, 'unavailable')
+        self.h.observe()
+        o = self.h.tick(d=59)
+        self.assertEqual(o['q'], 70)
+        self.assertEqual(self.h.status()['reason'], 'warming_up')
+        for _ in range(10):
+            o = self.h.tick(d=59)
+        self.assertEqual(o['q'], 50)
+
+    def test_early_release_does_not_ignore_a_recent_cooling_reversal(self):
+        self.mature_observation(d=59.5, q=70, demand=1)
+        p = json.loads(self.h.entities[OBS].state)
+        p['h'] = [[self.h.time-900,55],[self.h.time-600,58],[self.h.time-300,60]]
+        self.h.set(OBS,json.dumps(p))
+        o = self.h.observe()
+        self.assertGreater(self.h.status()['trend_c_per_minute'], 0)
+        self.assertGreaterEqual(o['q'],70)
+        self.assertEqual(o['a'],1)
+        self.assertNotEqual(self.h.status()['reason'],'releasing_observation')
+
+    def test_new_support_detects_fast_recent_cooling_despite_earlier_rise(self):
+        self.mature_observation(d=59.5, q=50, demand=0)
+        p = json.loads(self.h.entities[OBS].state)
+        p['h'] = [[self.h.time-900,55],[self.h.time-600,58],[self.h.time-300,60.5]]
+        self.h.set(OBS,json.dumps(p))
+        o = self.h.observe()
+        self.assertEqual(o['a'],0)
+        self.assertEqual(o['q'],50)
+        self.assertEqual(self.h.status()['reason'],'stabilizing')
+
+    def test_recent_strong_warming_prevents_raise_based_on_old_cooling(self):
+        self.mature_observation(d=59, q=70, demand=1)
+        p = json.loads(self.h.entities[OBS].state)
+        p['h'] = [[self.h.time-900,62],[self.h.time-600,60],[self.h.time-300,58]]
+        self.h.set(OBS,json.dumps(p))
+        o = self.h.observe()
+        self.assertLess(self.h.status()['trend_c_per_minute'], 0)
+        self.assertEqual(o['q'],70)
+        self.assertEqual(o['dir'],0)
+
+    def test_new_heat_demand_attribute_is_boolean(self):
+        self.h.configure()
+        self.h.observe()
+        self.assertIs(self.h.status()['heat_demand'], False)
+        self.mature_observation(d=59, slope=-0.2, q=50, demand=0)
+        self.h.observe()
+        self.h.tick(d=58.8)
+        self.h.tick(d=58.6)
+        self.assertIs(self.h.status()['heat_demand'], True)
+
+    def test_no_response_does_not_block_ramp_below_useful_setpoint(self):
+        self.h.configure()
+        self.h.observe()
+        for _ in range(100):
+            o = self.h.tick(d=57,b=60)
+            self.assertNotEqual(self.h.status()['reason'],'no_heat_response')
+            self.assertEqual(o['bt'],0)
+        self.assertGreater(o['q'],53)
+        self.assertLess(o['q'],62)
+        for _ in range(55):
+            o = self.h.tick(d=57,b=60)
+        self.assertGreaterEqual(o['q'],62)
+        self.assertEqual(self.h.status()['reason'],'no_heat_response')
+
+    def test_useful_setpoint_beyond_cap_never_raises_above_85(self):
+        self.mature_observation(d=57,q=84,demand=1)
+        self.h.set(B,90)
+        self.h.observe()
+        for _ in range(35):
+            o = self.h.tick(d=57,b=90)
+            self.assertLessEqual(o['q'],85)
+            self.assertEqual(o['bt'],0)
+        self.assertEqual(o['q'],85)
 
     def test_lost_observer_is_visible_and_recommendation_expires(self):
         self.h.observe()
