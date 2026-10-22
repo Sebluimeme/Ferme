@@ -23,6 +23,7 @@ CFG = "input_text.ferme_chauffage_configuration"
 OBS = "input_text.ferme_chauffage_observation"
 TX = "input_text.ferme_chauffage_transmission"
 HIST = "input_text.ferme_chauffage_historique_d"
+STABILITY = "input_text.ferme_chauffage_stabilisation"
 ACTIVE = "input_boolean.ferme_chauffage_commande_active"
 LEGACY = "automation.nouvelle_automatisation_2"
 D = "sensor.esphome_web_61063e_tampon_haut"
@@ -155,7 +156,7 @@ class Harness:
                     continue
                 assert service == "input_text.set_value", service
                 entity = action["target"]["entity_id"]
-                assert entity in [CFG, OBS, TX, HIST], entity
+                assert entity in [CFG, OBS, TX, HIST, STABILITY], entity
                 value = str(self.render(action["data"]["value"], context))
                 assert len(value) <= 255, (len(value), value)
                 self.calls.append((service, entity, value))
@@ -280,7 +281,7 @@ class HeatingPackageTests(unittest.TestCase):
         self.assertEqual(h.configure(mode='manual',manual_temperature=80),'invalid_request')
         h.set(ACTIVE,'on');h.observe()
         self.assertEqual(h.servo_calls,[])
-        h.configure();h.set(D,0);h.set(B,100);h.observe()
+        h.configure();h.set(D,0);h.set(B,100);h.transmitted(70,online=0);h.observe()
         self.assertEqual(h.read(OBS)['q'],70)
         self.assertEqual(h.servo_calls,[24])
 
@@ -372,23 +373,25 @@ class HeatingPackageTests(unittest.TestCase):
         self.active_auto(d=56,b=60)
         self.h.set(D,56,age=7200);self.h.set(B,60,age=7200)
         source_d=self.h.entities[D].last_reported;source_b=self.h.entities[B].last_reported
-        self.assertEqual(self.h.observe()['q'],62)
-        self.assertEqual(self.h.servo_calls,[-2])
+        self.h.observe()
+        for _ in range(10): self.h.time+=60;self.h.observe()
+        self.assertEqual(self.h.read(OBS)['q'],54)
+        self.assertEqual(self.h.servo_calls,[-50,-34])
         self.assertEqual(self.h.entities[D].last_reported,source_d)
         self.assertEqual(self.h.entities[B].last_reported,source_b)
         self.assertEqual(self.h.read(HIST)['at'],self.h.time)
         self.assertEqual(self.h.read(TX)['seen'],self.h.time)
 
-    def test_constant_connected_d_creates_plateau_history_and_releases_70_to_66(self):
+    def test_constant_connected_d_creates_plateau_history_and_releases_70_to_68(self):
         self.active_auto(d=59);self.h.transmitted(70)
         self.h.set(D,59,age=7200);self.h.set(B,60,age=7200)
         original_d_date=self.h.entities[D].last_reported
-        for minute in range(11):
+        for minute in range(13):
             if minute:self.h.time+=60
             result=self.h.observe()
-        self.assertEqual(result['q'],66)
+        self.assertEqual(result['q'],68)
         self.assertEqual(result['s'],'release_support')
-        self.assertEqual(self.h.servo_calls,[14])
+        self.assertEqual(self.h.servo_calls,[22])
         self.assertEqual(self.h.entities[D].last_reported,original_d_date)
         self.assertEqual(self.h.read(HIST)['at'],self.h.time)
 
@@ -429,23 +432,24 @@ class HeatingPackageTests(unittest.TestCase):
         self.assertIsNone(self.h.status()['observed_temperature_d'])
         self.assertEqual(self.h.servo_calls,[])
 
-    def test_useful_initial_support_62_not_slow_51(self):
-        self.active_auto(d=56,b=60); result=self.h.observe()
-        self.assertEqual(result['q'],62)
-        self.assertEqual(result['s'],'support_start')
-        self.assertEqual(self.h.servo_calls,[-2])
+    def test_initial_support_no_longer_jumps_to_b_plus_two(self):
+        self.active_auto(d=56,b=64)
+        self.assertEqual(self.h.observe()['q'],50)
+        for _ in range(9): self.assertEqual(self.h.tick(d=56,b=64)['q'],50)
+        self.assertEqual(self.h.tick(d=56,b=64)['q'],54)
+        self.assertEqual(self.h.servo_calls,[-50,-34])
 
     def test_offline_b_calculates_from_d_without_sending_or_stair_stepping(self):
         self.active_auto(d=56)
         self.h.set(B,'unavailable')
-        for _ in range(20):
+        for minute in range(20):
             self.h.time+=60;self.h.set(D,56);self.h.observe()
-            self.assertEqual(self.h.status()['desired_temperature'],61)
+            self.assertEqual(self.h.status()['desired_temperature'],50 if minute<2 else 54)
             self.assertEqual(self.h.status()['phase'],'active')
             self.assertEqual(self.h.status()['delivery_state'],'waiting_module')
             self.assertIsNone(self.h.status()['last_transmitted_temperature'])
         self.assertEqual(self.h.servo_calls,[])
-        self.h.set(D,61);self.h.observe()
+        self.h.set(D,62);self.h.observe()
         self.assertEqual(self.h.status()['desired_temperature'],50)
         self.h.set(B,60);self.h.observe()
         self.assertEqual(self.h.servo_calls,[-50])
@@ -458,7 +462,7 @@ class HeatingPackageTests(unittest.TestCase):
         self.assertEqual(self.h.servo_calls,[])
 
     def test_hot_d_priority_50_even_offline(self):
-        self.active_auto(d=61); self.h.set(B,'unavailable'); self.h.transmitted(70,age=10)
+        self.active_auto(d=62); self.h.set(B,'unavailable'); self.h.transmitted(70,age=10)
         self.h.observe()
         self.assertEqual(self.h.status()['desired_temperature'],50)
         self.assertEqual(self.h.status()['delivery_state'],'waiting_module')
@@ -467,18 +471,18 @@ class HeatingPackageTests(unittest.TestCase):
     def test_reconnect_recomputes_hot_over_old_pending_support(self):
         self.active_auto(d=56); self.h.fail_servo=True; self.h.observe()
         self.h.set(B,'unavailable');self.h.observe()
-        self.h.time+=180;self.h.set(D,61);self.h.set(B,60);self.h.fail_servo=False;self.h.observe()
-        self.assertEqual(self.h.servo_calls,[-2,-50])
+        self.h.time+=180;self.h.set(D,62);self.h.set(B,60);self.h.fail_servo=False;self.h.observe()
+        self.assertEqual(self.h.servo_calls,[-50,-50])
         self.assertEqual(self.h.read(TX)['t'],50)
 
     def test_same_absolute_target_resent_after_reconnect(self):
-        self.active_auto(d=61);self.h.observe();self.h.observe()
+        self.active_auto(d=62);self.h.observe();self.h.observe()
         self.assertEqual(self.h.servo_calls,[-50])
         self.h.set(B,'unavailable');self.h.observe();self.h.set(B,60);self.h.observe()
         self.assertEqual(self.h.servo_calls,[-50,-50])
 
     def test_ha_start_recalculates_and_resends_fresh_absolute(self):
-        self.active_auto(d=61);self.h.transmitted(50,age=200);self.h.observe(trigger='homeassistant')
+        self.active_auto(d=62);self.h.transmitted(50,age=200);self.h.observe(trigger='homeassistant')
         self.assertEqual(self.h.servo_calls,[-50])
         self.h.set(B,60,attributes={'restored':True});self.h.observe(trigger='homeassistant')
         self.assertEqual(self.h.servo_calls,[-50])
@@ -494,15 +498,15 @@ class HeatingPackageTests(unittest.TestCase):
 
     def test_unsent_proposal_does_not_consume_increment_or_cooldown(self):
         self.active_auto();self.h.fail_servo=True
-        for _ in range(40):
+        for minute in range(40):
             self.h.tick()
-            self.assertEqual(self.h.read(OBS)['q'],62)
-        self.assertTrue(all(level==-2 for level in self.h.servo_calls))
+            self.assertEqual(self.h.read(OBS)['q'],50 if minute<2 else 54)
+        self.assertTrue(all(level in [-50,-34] for level in self.h.servo_calls))
         self.assertIsNone(self.h.read(TX)['t'])
 
     def test_success_time_does_not_freshen_when_only_status_changes(self):
-        self.active_auto(d=61);self.h.observe();date=self.h.status()['last_transmitted_at'];at=self.h.read(TX)['at']
-        self.h.tick(d=61)
+        self.active_auto(d=62);self.h.observe();date=self.h.status()['last_transmitted_at'];at=self.h.read(TX)['at']
+        self.h.tick(d=62)
         self.assertEqual(self.h.status()['last_transmitted_at'],date)
         self.assertEqual(self.h.read(TX)['at'],at)
         self.assertEqual(self.h.servo_calls,[-50])
@@ -527,19 +531,20 @@ class HeatingPackageTests(unittest.TestCase):
                 self.assertIsNone(h.read(TX)['t'])
 
     def test_new_hot_sample_between_calculation_and_api_blocks_old_raise(self):
-        self.active_auto();self.h.before_service=lambda h:h.set(D,61);self.h.observe()
+        self.active_auto();self.h.before_service=lambda h:h.set(D,62);self.h.observe()
         self.assertEqual(self.h.servo_calls,[])
-        self.h.time+=180;self.h.set(D,61);self.h.set(B,60);self.h.observe()
+        self.h.time+=180;self.h.set(D,62);self.h.set(B,60);self.h.observe()
         self.assertEqual(self.h.servo_calls,[-50])
 
-    def test_plateau_59_releases_70_to_66(self):
-        self.active_auto(d=59);self.h.history([59]*7);self.h.transmitted(70)
-        result=self.h.observe()
-        self.assertEqual(result['q'],66);self.assertEqual(result['s'],'release_support')
-        self.assertEqual(self.h.servo_calls,[14])
+    def test_plateau_59_releases_70_to_68_after_confirmation(self):
+        self.active_auto(d=59);self.h.history([59]*7);self.h.transmitted(70,age=1800)
+        self.assertEqual(self.h.observe()['q'],70)
+        self.h.tick(d=59);result=self.h.tick(d=59)
+        self.assertEqual(result['q'],68);self.assertEqual(result['s'],'release_support')
+        self.assertEqual(self.h.servo_calls,[22])
 
     def test_hot_priority_over_cooldown_and_no_response(self):
-        self.active_auto(d=60);self.h.transmitted(70,age=20)
+        self.active_auto(d=62);self.h.transmitted(70,age=20)
         self.h.set(OBS,json.dumps(dict(r=1,a=1,ba=self.h.time-4000,bv=56,tick=self.h.time-60)))
         self.assertEqual(self.h.observe()['q'],50)
         self.assertEqual(self.h.servo_calls,[-50])
@@ -563,14 +568,14 @@ class HeatingPackageTests(unittest.TestCase):
         self.assertEqual(self.h.read(OBS)['s'],'warming_up')
 
     def test_recent_cooling_prevents_release_based_on_old_rise(self):
-        self.active_auto(d=59);self.h.history([55,55.5,56,57,58,60,59.5]);self.h.transmitted(65)
+        self.active_auto(d=59);self.h.history([55,56,58,60,60,59.5,59.2]);self.h.transmitted(65)
         self.h.set(OBS,json.dumps(dict(r=1,a=1,tick=self.h.time-60)))
         result=self.h.observe()
         self.assertNotEqual(result['s'],'release_support');self.assertGreaterEqual(result['q'],65)
         self.assertLess(result['tip'],0)
 
     def test_recent_rise_prevents_increase_based_on_old_drop(self):
-        self.active_auto(d=58);self.h.history([62,61,60,59,57,57.5,57.7]);self.h.transmitted(65)
+        self.active_auto(d=58.6);self.h.history([62,61,57,57.1,57.4,57.8,58.2]);self.h.transmitted(65)
         self.h.set(OBS,json.dumps(dict(r=1,a=1,tick=self.h.time-60)))
         result=self.h.observe()
         self.assertEqual(result['s'],'recent_recovery');self.assertEqual(result['q'],65)
@@ -587,7 +592,7 @@ class HeatingPackageTests(unittest.TestCase):
         self.h.env.filters['to_json']=lambda value:json.dumps(value)
         self.h.configure(request_id='x'*48,mode='automatic',manual_temperature=70,minimum_d=59)
         self.h.set(ACTIVE,'on');self.h.history([109.99]*8);self.h.set(D,109.99);self.h.set(B,109.99);self.h.observe()
-        for entity in [CFG,OBS,TX,HIST]:
+        for entity in [CFG,OBS,TX,HIST,STABILITY]:
             self.assertLessEqual(len(self.h.entities[entity].state),255,entity)
 
     def test_absent_configuration_cannot_send_default_with_restored_flag(self):
@@ -597,36 +602,36 @@ class HeatingPackageTests(unittest.TestCase):
             self.assertEqual(h.status()['reason'],'configuration_invalid')
 
     def test_reconnect_obligation_survives_failed_final_guard(self):
-        self.active_auto(d=61);self.h.transmitted(50,online=0)
+        self.active_auto(d=62);self.h.transmitted(50,online=0)
         self.h.before_guard=lambda h:h.set(B,61)
         self.h.observe();self.assertEqual(self.h.servo_calls,[])
         self.h.observe();self.assertEqual(self.h.servo_calls,[-50])
 
     def test_reconnect_while_disabled_is_sent_on_reactivation(self):
-        self.active_auto(d=61);self.h.transmitted(50,online=0);self.h.set(ACTIVE,'off');self.h.observe()
+        self.active_auto(d=62);self.h.transmitted(50,online=0);self.h.set(ACTIVE,'off');self.h.observe()
         self.assertEqual(self.h.servo_calls,[])
         self.h.set(ACTIVE,'on');self.h.observe()
         self.assertEqual(self.h.servo_calls,[-50])
 
     def test_reconnect_obligation_survives_d_unavailable_until_next_fresh_sample(self):
-        self.active_auto(d=61);self.h.transmitted(50,online=0)
+        self.active_auto(d=62);self.h.transmitted(50,online=0)
         self.h.set(D,'unavailable');self.h.observe()
         self.assertEqual(self.h.servo_calls,[])
         self.assertEqual(self.h.read(TX)['need'],1)
-        self.h.set(D,61);self.h.observe()
+        self.h.set(D,62);self.h.observe()
         self.assertEqual(self.h.servo_calls,[-50])
 
     def test_start_resend_obligation_survives_initial_d_restored_sample(self):
-        self.active_auto(d=61);self.h.transmitted(50)
+        self.active_auto(d=62);self.h.transmitted(50)
         self.h.set(D,61,attributes={'restored':True});self.h.observe(trigger='homeassistant')
         self.assertEqual(self.h.servo_calls,[])
         self.assertEqual(self.h.read(TX)['need'],1)
-        self.h.set(D,61);self.h.observe()
+        self.h.set(D,62);self.h.observe()
         self.assertEqual(self.h.servo_calls,[-50])
 
     def test_new_connection_and_new_hot_target_bypass_failed_old_backoff_once(self):
         for disconnected in [True,False]:
-            h=Harness();h.configure();h.set(ACTIVE,'on');h.set(D,61)
+            h=Harness();h.configure();h.set(ACTIVE,'on');h.set(D,62)
             h.set(TX,json.dumps({'t':70,'at':h.time-1000,'r':1,'try':h.time-1,'n':4,'s':'uncertain','online':0 if disconnected else 1,'seen':h.time-1,'want':65,'need':1,'force':0}))
             h.fail_servo=True;h.observe()
             self.assertEqual(h.servo_calls,[-50])
@@ -634,22 +639,90 @@ class HeatingPackageTests(unittest.TestCase):
             self.assertEqual(h.read(TX)['t'],70)
 
     def test_support_memory_preserved_during_gradual_reduction(self):
-        self.active_auto(d=59);self.h.history([59]*7);self.h.transmitted(70)
-        first=self.h.observe();self.assertEqual(first['q'],66);self.assertEqual(first['a'],1)
+        self.active_auto(d=59);self.h.history([59]*7);self.h.transmitted(70,age=1800)
+        self.h.observe();self.h.tick(d=59)
+        first=self.h.tick(d=59);self.assertEqual(first['q'],68);self.assertEqual(first['a'],1)
         self.h.time+=300;self.h.set(D,58.3);self.h.set(B,60);self.h.history([58.3]*7)
-        second=self.h.observe();self.assertEqual(second['q'],66);self.assertEqual(second['a'],1)
+        second=self.h.observe();self.assertEqual(second['q'],68);self.assertEqual(second['a'],1)
 
     def test_actual_useful_transmission_starts_response_timer_and_blocks_only_increase(self):
         self.active_auto(d=56,b=60);self.h.transmitted(62)
         self.h.set(OBS,json.dumps({'r':1,'a':1,'tick':self.h.time-60,'ba':self.h.time-1900,'bv':56}))
         result=self.h.observe();self.assertEqual(result['s'],'response_not_observed');self.assertEqual(result['q'],62)
-        self.h.set(D,60);result=self.h.observe();self.assertEqual(result['q'],50)
+        self.h.set(D,62);result=self.h.observe();self.assertEqual(result['q'],50)
 
     def test_midpoint_target_for_each_supported_minimum(self):
         for minimum in range(55,60):
             h=Harness();h.configure(minimum_d=minimum);h.set(ACTIVE,'on');h.set(D,minimum-1);h.set(B,40)
-            expected=math.ceil((minimum+60)/2+2)
-            self.assertEqual(h.observe()['q'],expected)
+            self.assertEqual(h.observe()['q'],50)
+            for _ in range(10): result=h.tick(d=minimum-1,b=40)
+            self.assertEqual(result['q'],54)
+
+    def test_ordinary_changes_are_two_degrees_and_thirty_minutes_apart(self):
+        self.active_auto(d=56.5,b=64);self.h.history([56.5]*7);self.h.transmitted(50,age=1800)
+        self.assertEqual(self.h.observe()['q'],50)
+        self.assertEqual(self.h.tick(d=56.5,b=64)['q'],50)
+        self.assertEqual(self.h.tick(d=56.5,b=64)['q'],52)
+        first=self.h.read(TX)['at']
+        for _ in range(29):self.assertEqual(self.h.tick(d=56.5,b=64)['q'],52)
+        self.assertEqual(self.h.tick(d=56.5,b=64)['q'],54)
+        self.assertEqual(self.h.read(TX)['at']-first,1800)
+        self.assertEqual(self.h.servo_calls,[-42,-34])
+
+    def test_one_warm_pump_spike_does_not_return_to_fifty(self):
+        self.active_auto(d=58,b=64);self.h.history([58]*7);self.h.transmitted(64,age=60)
+        self.h.observe()
+        self.assertEqual(self.h.tick(d=61,b=64)['q'],64)
+        for _ in range(4):self.assertEqual(self.h.tick(d=58,b=64)['q'],64)
+        self.assertEqual(self.h.servo_calls,[])
+
+    def test_five_minutes_of_sixty_confirm_return_before_cooldown(self):
+        self.active_auto(d=60,b=64);self.h.history([59]*7);self.h.transmitted(64,age=60)
+        self.assertEqual(self.h.observe()['q'],64)
+        for _ in range(4):self.assertEqual(self.h.tick(d=60,b=64)['q'],64)
+        self.assertEqual(self.h.tick(d=60,b=64)['q'],50)
+        self.assertEqual(self.h.servo_calls,[-50])
+
+    def test_pump_oscillations_do_not_produce_repeated_corrections(self):
+        self.active_auto(d=58,b=64);self.h.history([58]*7);self.h.transmitted(64,age=1800)
+        self.h.observe()
+        for minute in range(40):
+            self.assertEqual(self.h.tick(d=61 if minute%2==0 else 58,b=64)['q'],64)
+        self.assertEqual(self.h.servo_calls,[])
+
+    def test_single_low_spike_is_filtered_but_persistent_low_accelerates(self):
+        self.active_auto(d=58,b=64);self.h.history([58]*7);self.h.transmitted(60,age=600)
+        self.h.observe();self.assertEqual(self.h.tick(d=55,b=64)['q'],60)
+        self.assertEqual(self.h.tick(d=58,b=64)['q'],60)
+        for _ in range(5):self.h.tick(d=55,b=64)
+        self.assertEqual(self.h.read(TX)['t'],62)
+        at=self.h.read(TX)['at']
+        while self.h.time-at<540:self.assertEqual(self.h.tick(d=55,b=64)['q'],62)
+        self.assertEqual(self.h.tick(d=55,b=64)['q'],64)
+        self.assertEqual(self.h.read(TX)['at']-at,600)
+
+    def test_confirmation_resets_on_source_gap_and_configuration_revision(self):
+        self.active_auto(d=60);self.h.transmitted(64,age=60)
+        self.h.observe()
+        for _ in range(4):self.h.tick(d=60)
+        self.h.set(D,'unavailable');self.h.observe()
+        self.assertEqual(self.h.tick(d=60)['q'],64)
+        for _ in range(4):self.assertEqual(self.h.tick(d=60)['q'],64)
+        self.h.configure(request_id='changed',expected_revision=1)
+        self.assertEqual(self.h.observe()['q'],64)
+        for _ in range(4):self.assertEqual(self.h.tick(d=60)['q'],64)
+        self.assertEqual(self.h.tick(d=60)['q'],50)
+
+    def test_resending_same_target_does_not_restart_half_hour_clock(self):
+        self.active_auto(d=56.5,b=64);self.h.history([56.5]*7);self.h.transmitted(60,age=600)
+        self.h.observe();changed=self.h.read(STABILITY)['ca']
+        for _ in range(19):
+            self.h.set(B,'unavailable');self.h.observe()
+            self.assertEqual(self.h.tick(d=56.5,b=64)['q'],60)
+            self.assertEqual(self.h.read(STABILITY)['ca'],changed)
+        self.h.set(B,'unavailable');self.h.observe()
+        self.assertEqual(self.h.tick(d=56.5,b=64)['q'],62)
+        self.assertEqual(self.h.read(TX)['at']-changed,1800)
 
     def test_malformed_configuration_never_transmits(self):
         for value in ['not-json','[]','null','{"v":2}',json.dumps(dict(v=1,r=True,m='manual',t=60,d=57)),json.dumps(dict(v=1,r=1,m='manual',t=90,d=57))]:

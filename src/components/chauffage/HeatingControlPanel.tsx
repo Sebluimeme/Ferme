@@ -162,9 +162,9 @@ function ControlSheet({ status, loading, offline, busy, error, onSave, onClose }
             <div><dt>Limite basse</dt><dd>{validMinimum ? temperature(minimumValue) : "—"}</dd></div>
             <div><dt>Retour au minimum fioul</dt><dd>{temperature(HEATING_RELEASE_D)}</dd></div>
           </dl>
-          <p>L’appoint vise environ {validMinimum ? temperature((minimumValue + HEATING_RELEASE_D) / 2) : "le milieu de ces deux repères"}. La tendance récente aide à anticiper la baisse. Au démarrage, le fioul passe à une première consigne utile, puis les hausses se font par étapes, avec un maximum de <b>70 °C</b>.</p>
-          <p>Quand D remonte vers 60 °C, la consigne fioul baisse par étapes. Dès que D atteint <b>60 °C</b>, elle revient à <b>50 °C</b>.</p>
-          <p>Le délai entre les corrections évite les mouvements répétés à chaque variation de température.</p>
+          <p>L’appoint vise environ {validMinimum ? temperature((minimumValue + HEATING_RELEASE_D) / 2) : "le milieu de ces deux repères"}. Les variations brèves sont filtrées sur environ quatre minutes. Les corrections ordinaires sont limitées à <b>2 °C toutes les 30 minutes</b>, après confirmation de la tendance, avec un maximum de <b>70 °C</b>.</p>
+          <p>Retour à <b>50 °C</b> lorsque D reste à au moins <b>60 °C pendant cinq minutes</b> et que la mesure filtrée le confirme. Dès <b>62 °C</b>, le retour à 50 °C est immédiat.</p>
+          <p>Si D reste au moins 1 °C sous ta limite basse pendant deux minutes et que la mesure filtrée le confirme, l’appoint peut augmenter toutes les dix minutes : 4 °C au premier pas depuis 50 °C, puis 2 °C. Le mode manuel reste immédiat.</p>
           <p>Le seuil physique de 55 °C de la chaudière reste inchangé. Il est mesuré par une autre sonde.</p>
         </div></div></details>
       </>}
@@ -191,7 +191,7 @@ export default function HeatingControlPanel(props: HeatingControlPanelProps) {
       <header className={styles.header}><h3>Pilotage fioul</h3>{known && <span className={styles.modeBadge}>{status.mode === "manual" ? "Manuel" : "Automatique"}</span>}</header>
       <Availability status={status} loading={loading} offline={offline} />
       {known && <Delivery status={status} offline={offline} />}
-      {known && status.mode === "automatic" && <p className={styles.muted}>Sonde de régulation : <b>haut du ballon D · {temperature(status.temperatureD)}</b>{offline || !status.fresh ? " (dernier relevé connu)" : ""}. Minimum : {temperature(status.minimumD)}. Fioul à 50 °C dès que ce ballon atteint 60 °C.</p>}
+      {known && status.mode === "automatic" && <p className={styles.muted}>Sonde de régulation : <b>haut du ballon D · {temperature(status.temperatureD)}</b>{offline || !status.fresh ? " (dernier relevé connu)" : ""}. Minimum : {temperature(status.minimumD)}. Corrections espacées de 30 min. Retour à 50 °C après confirmation de 60 °C.</p>}
       <p className={styles.feedback}>Position mécanique non mesurée.</p>
       {error && <Notice tone="error">{error}</Notice>}
       {result && <p className={styles.result} role="status">Demande enregistrée dans Home Assistant.</p>}

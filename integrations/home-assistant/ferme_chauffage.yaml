@@ -23,6 +23,9 @@ input_text:
   ferme_chauffage_historique_d:
     name: Ferme chauffage historique D
     max: 255
+  ferme_chauffage_stabilisation:
+    name: Ferme chauffage stabilisation
+    max: 255
 script:
   ferme_chauffage_configurer:
     alias: Ferme chauffage — mémoriser les réglages
@@ -164,6 +167,8 @@ automation:
         {} }}'
       stored_history: '{% set p = states(''input_text.ferme_chauffage_historique_d'') | from_json({}) %}{{ p if p is
         mapping else {} }}'
+      stability: >-
+        {% set p = states('input_text.ferme_chauffage_stabilisation') | from_json({}) %}{{ p if p is mapping else {} }}
       d_state: '{{ states(''sensor.esphome_web_61063e_tampon_haut'') }}'
       b_state: '{{ states(''sensor.batiment_b_ballon_b'') }}'
       d_source_at: >-
@@ -259,33 +264,59 @@ automation:
 
         {{ {'at':anchor,'v':ns.v} | to_json }}
   - variables:
+      filtered_history: >-
+        {% set ns = namespace(v=[]) %}{% for p in history %}
+        {% set i=loop.index0 %}{% set window=history[[0,i-2] | max:i+1] %}
+        {% set values=window | map(attribute=1) | sort | list %}
+        {% set value=values[1] if values | length == 3 and p[0]-window[0][0] <= 300 else p[1] %}
+        {% set ns.v=ns.v+[[p[0],value]] %}{% endfor %}{{ ns.v }}
+      filtered_d: '{{ filtered_history[-1][1] if d_usable and filtered_history | length else none }}'
+      stability_fresh: >-
+        {{ config_valid and config.m == 'automatic' and d_usable and stability.get('r') == config.r
+           and stability.get('tick') is number and 0 <= current_time-stability.tick <= 180 }}
+      hot_since: >-
+        {{ (stability.hot if stability_fresh and stability.get('hot',0) is number and 0 < stability.hot <= current_time else current_time)
+           if config_valid and config.m == 'automatic' and d_usable and d_state | float >= 60 else 0 }}
+      low_since: >-
+        {{ (stability.low if stability_fresh and stability.get('low',0) is number and 0 < stability.low <= current_time else current_time)
+           if config_valid and config.m == 'automatic' and d_usable and d_state | float <= config.d-1 else 0 }}
+      urgent_low: >-
+        {{ low_since > 0 and current_time-low_since >= 120 and filtered_d is number and filtered_d <= config.d-1 }}
+      hot_confirmed: >-
+        {{ d_usable and (d_state | float >= 62 or (hot_since > 0 and current_time-hot_since >= 300
+           and filtered_d is number and filtered_d >= 60)) }}
+      changed_at: >-
+        {{ stability.ca if last_temperature is number and stability.get('ct') == last_temperature
+           and stability.get('ca') is number and 0 < stability.ca <= current_time else last_at }}
+      effective_d: '{{ d_state | float if urgent_low else filtered_d }}'
+  - variables:
       tip: >-
-        {% set ns = namespace(p=none) %}{% if history | length >= 2 %}
+        {% set ns = namespace(p=none) %}{% if filtered_history | length >= 2 %}
 
-        {% for p in history[:-1] %}{% if 120 <= history[-1][0]-p[0] <= 360 %}{% set ns.p = p %}{% endif %}{% endfor %}{%
+        {% for p in filtered_history[:-1] %}{% if 120 <= filtered_history[-1][0]-p[0] <= 360 %}{% set ns.p = p %}{% endif %}{% endfor %}{%
         endif %}
 
-        {{ [[(history[-1][1]-ns.p[1])/((history[-1][0]-ns.p[0])/60),-0.5] | max,0.5] | min | round(3) if ns.p is not
+        {{ [[(filtered_history[-1][1]-ns.p[1])/((filtered_history[-1][0]-ns.p[0])/60),-0.5] | max,0.5] | min | round(3) if ns.p is not
         none else none }}
       recent: >-
-        {% set ns = namespace(p=none) %}{% if history | length >= 3 %}
+        {% set ns = namespace(p=none) %}{% if filtered_history | length >= 3 %}
 
-        {% for p in history[:-1] %}{% if ns.p is none and 240 <= history[-1][0]-p[0] <= 420 %}{% set ns.p=p %}{% endif
+        {% for p in filtered_history[:-1] %}{% if ns.p is none and 240 <= filtered_history[-1][0]-p[0] <= 420 %}{% set ns.p=p %}{% endif
         %}{% endfor %}{% endif %}
 
-        {{ [[(history[-1][1]-ns.p[1])/((history[-1][0]-ns.p[0])/60),-0.5] | max,0.5] | min | round(3) if ns.p is not
+        {{ [[(filtered_history[-1][1]-ns.p[1])/((filtered_history[-1][0]-ns.p[0])/60),-0.5] | max,0.5] | min | round(3) if ns.p is not
         none else none }}
       slow: >-
-        {{ [[(history[-1][1]-history[0][1])/((history[-1][0]-history[0][0])/60),-0.5] | max,0.5] | min | round(3)
+        {{ [[(filtered_history[-1][1]-filtered_history[0][1])/((filtered_history[-1][0]-filtered_history[0][0])/60),-0.5] | max,0.5] | min | round(3)
 
-        if history | length >= 6 and history[-1][0]-history[0][0] >= 600 else none }}
+        if filtered_history | length >= 6 and filtered_history[-1][0]-filtered_history[0][0] >= 600 else none }}
       target_d: '{{ (config.d+60)/2 if config_valid else 58.5 }}'
   - variables:
       history_ready: '{{ tip is number and recent is number and slow is number }}'
       forecast10: >-
-        {{ d_state | float + [tip,recent,slow] | min * 10 if d_usable and tip is number and recent is number and slow
+        {{ effective_d + [tip,recent,slow] | min * 10 if d_usable and tip is number and recent is number and slow
         is number else none }}
-      forecast5: '{{ d_state | float + [tip,recent] | min * 5 if d_usable and tip is number and recent is number else
+      forecast5: '{{ effective_d + [tip,recent] | min * 5 if d_usable and tip is number and recent is number else
         none }}'
       response_useful: >-
         {{ d_usable and b_usable and last_temperature is number and last_temperature >= [d_state | float,b_state | float]
@@ -304,10 +335,10 @@ automation:
       response_blocked: '{{ response_useful and response_at > 0 and current_time-response_at >= 1800 }}'
   - variables:
       decision: >-
-        {% set d=d_state | float(0) %}{% set b=b_state | float if b_usable else target_d %}{% set current=last_temperature if last_temperature
+        {% set d=effective_d | float(0) %}{% set b=b_state | float if b_usable else target_d %}{% set current=last_temperature if last_temperature
         is number else 50 %}
 
-        {% set age=current_time-last_at %}{% set demand=previous.get('a',0) == 1 if same_revision else false %}
+        {% set age=current_time-changed_at %}{% set demand=previous.get('a',0) == 1 if same_revision else false %}
 
         {% set result=namespace(q=none,s='warming_up',a=demand) %}
 
@@ -320,7 +351,9 @@ automation:
 
         {% elif not d_usable %}{% set result.s='sensor_d_stale' %}
 
-        {% elif d >= 60 %}{% set result.q=50 %}{% set result.s='rest_hot' %}{% set result.a=false %}
+        {% elif hot_confirmed %}{% set result.q=50 %}{% set result.s='rest_hot' %}{% set result.a=false %}
+
+        {% elif d_state | float >= 60 %}{% set result.q=last_temperature %}{% set result.s='temperature_confirmation' %}
 
         {% elif not history_ready and d > config.d %}{% set result.q=last_temperature %}
 
@@ -364,7 +397,28 @@ automation:
 
         {{ {'q':result.q,'s':result.s,'a':1 if result.a else 0} }}
   - variables:
-      desired: '{{ decision.q }}'
+      proposed_direction: >-
+        {% set current=last_temperature if last_temperature is number else 50 %}
+        {{ (1 if decision.q > current else -1 if decision.q < current else 0) if decision.q is number else 0 }}
+      proposal_since: >-
+        {{ (stability.since if stability_fresh and stability.get('dir') == proposed_direction
+           and stability.get('since') is number and 0 < stability.since <= current_time else current_time)
+           if proposed_direction != 0 else 0 }}
+      settled: >-
+        {% set current=last_temperature if last_temperature is number else 50 %}
+        {% set interval=600 if urgent_low and proposed_direction > 0 else 1800 %}
+        {% if not config_valid or config.m != 'automatic' or decision.q is not number or proposed_direction == 0 or hot_confirmed %}
+          {{ decision }}
+        {% elif changed_at > 0 and current_time-changed_at < interval %}
+          {{ {'q':current,'s':'stabilisation_wait','a':1 if current > 50 else 0} }}
+        {% elif not urgent_low and current_time-proposal_since < 120 %}
+          {{ {'q':current,'s':'temperature_confirmation','a':1 if current > 50 else 0} }}
+        {% else %}
+          {% set step=4 if urgent_low and current <= 50 and proposed_direction > 0 else 2 %}
+          {% set q=[[decision.q,current-step] | max,current+step] | min %}
+          {{ {'q':q,'s':decision.s,'a':1 if q > 50 else 0} }}
+        {% endif %}
+      desired: '{{ settled.q }}'
       delivery: >-
         {{ 'disabled' if not enabled else 'blocked' if not config_valid or not calibration_ready or not legacy_off else
         'waiting_module' if not b_usable else 'waiting_sensor' if config.m == 'automatic' and (not d_usable or desired
@@ -383,10 +437,17 @@ automation:
         {% else %}{{ none }}{% endif %}
   - action: input_text.set_value
     target:
+      entity_id: input_text.ferme_chauffage_stabilisation
+    data:
+      value: >-
+        {{ {'r':config.get('r',-1),'tick':current_time,'hot':hot_since,'low':low_since,'dir':proposed_direction,
+            'since':proposal_since,'ct':last_temperature,'ca':changed_at,'wait':600 if urgent_low else 1800} | to_json }}
+  - action: input_text.set_value
+    target:
       entity_id: input_text.ferme_chauffage_observation
     data:
       value: >-
-        {{ {'r':config.get('r',-1),'q':desired,'s':decision.s,'a':decision.a,'tick':current_time,'ba':response_at,'bv':response_value,'slow':slow,'tip':tip}
+        {{ {'r':config.get('r',-1),'q':desired,'s':settled.s,'a':settled.a,'tick':current_time,'ba':response_at,'bv':response_value,'slow':slow,'tip':tip}
         | to_json }}
   - variables:
       needs_send: >-
@@ -544,6 +605,8 @@ template:
       }}'
     stored_history: '{% set p = states(''input_text.ferme_chauffage_historique_d'') | from_json({}) %}{{ p if p is mapping
       else {} }}'
+    stability: >-
+      {% set p = states('input_text.ferme_chauffage_stabilisation') | from_json({}) %}{{ p if p is mapping else {} }}
     d_state: '{{ states(''sensor.esphome_web_61063e_tampon_haut'') }}'
     b_state: '{{ states(''sensor.batiment_b_ballon_b'') }}'
     d_source_at: >-
@@ -638,8 +701,9 @@ template:
       heat_demand: '{{ previous.get("a",0) == 1 }}'
       last_proposal_at: '{{ previous.get("tick") if observation_fresh else none }}'
       next_adjustment_at: >-
-        {{ last_at + (300 if previous.get("s") == "decrease_cooldown" or last_temperature == 50 else 600) if previous.get("s")
-        in ["decrease_cooldown","increase_cooldown"] else none }}
+        {% set at=stability.get('ca',last_at) %}{% set delay=stability.get('wait',1800) %}
+        {{ at+delay if at is number and delay in [600,1800] and at+delay > current_time
+           and previous.get('s') in ['stabilisation_wait','decrease_cooldown','increase_cooldown'] else none }}
       updated_at: '{{ now().isoformat() }}'
   - name: Ferme chauffage consigne envoyee
     unique_id: ferme_chauffage_consigne_envoyee
