@@ -1,0 +1,341 @@
+# Ferme — réglages et régulation fioul en observation uniquement.
+# Charger comme package Home Assistant. Aucun service physique n'est appelé.
+# Les limites 50–85 °C sont celles de la simulation, pas une calibration.
+# La mise en service du servo exige une modification revue de ce package :
+# correspondance mécanique mesurée, limites chaudière validées, conflits des
+# anciennes automations supprimés et liaison B stable. Aucun helper ne déverrouille
+# les mouvements. Les pompes et le thermostat physique restent indépendants.
+
+input_text:
+  ferme_chauffage_configuration:
+    name: Ferme chauffage configuration
+    max: 255
+    # Pas d'initial : conserver la configuration atomique après redémarrage.
+  ferme_chauffage_observation:
+    name: Ferme chauffage observation
+    max: 255
+
+script:
+  ferme_chauffage_configurer:
+    alias: Ferme chauffage — mémoriser les réglages
+    description: Réglages en observation, sans mouvement du servo.
+    mode: queued
+    max: 10
+    fields:
+      mode:
+        required: true
+        selector:
+          select:
+            options: [manual, automatic]
+      manual_temperature:
+        required: true
+        selector:
+          number: {min: 50, max: 90, step: 1}
+      minimum_d:
+        required: true
+        selector:
+          number: {min: 40, max: 75, step: 1}
+      request_id:
+        required: true
+        selector:
+          text:
+      expires_at:
+        required: true
+        description: Date limite UTC en secondes Unix, au plus 120 secondes dans le futur.
+        selector:
+          number: {min: 0, max: 9999999999, mode: box}
+      expected_revision:
+        required: true
+        selector:
+          number: {min: 0, max: 999999999, mode: box}
+    sequence:
+      - variables:
+          current: >-
+            {% set raw = states('input_text.ferme_chauffage_configuration') %}
+            {{ {'v':1,'r':0,'m':'manual','t':60,'d':58,'id':''}
+               if raw in ['', 'unknown', 'unavailable'] else raw | from_json({}) }}
+          request_valid: >-
+            {{ mode is defined and mode in ['manual','automatic']
+               and manual_temperature is defined and manual_temperature is number
+               and 50 <= manual_temperature <= 90
+               and manual_temperature == manual_temperature | int(-1)
+               and minimum_d is defined and minimum_d is number and 40 <= minimum_d <= 75
+               and minimum_d == minimum_d | int(-1)
+               and request_id is defined and request_id is string
+               and request_id | regex_match('^[A-Za-z0-9_-]{1,48}$')
+               and expires_at is defined and expires_at is number
+               and is_number(expires_at)
+               and expected_revision is defined and expected_revision is number
+               and expected_revision is not boolean
+               and expected_revision == expected_revision | int(-1)
+               and 0 <= expected_revision < 999999999 }}
+      - if: "{{ not request_valid }}"
+        then:
+          - stop: invalid_request
+            error: true
+      - if: >-
+          {{ current is not mapping or current.get('v') != 1
+             or current.get('r') is not number or current.get('r') != current.get('r') | int(-1)
+             or current.get('r') is boolean or not 0 <= current.get('r') < 999999999
+             or current.get('m') not in ['manual','automatic']
+             or current.get('t') is not number or not 50 <= current.get('t') <= 90
+             or current.get('t') != current.get('t') | int(-1)
+             or current.get('d') is not number or not 40 <= current.get('d') <= 75
+             or current.get('d') != current.get('d') | int(-1) }}
+        then:
+          - stop: configuration_invalid
+            error: true
+      - if: "{{ request_id == current.get('id') }}"
+        then:
+          - if: >-
+              {{ mode != current.m or manual_temperature != current.t or minimum_d != current.d }}
+            then:
+              - stop: request_id_reused
+                error: true
+          - stop: already_applied
+      - if: >-
+          {{ expires_at <= as_timestamp(now()) or expires_at > as_timestamp(now()) + 120 }}
+        then:
+          - stop: request_expired
+            error: true
+      - if: "{{ expected_revision != current.r }}"
+        then:
+          - stop: revision_conflict
+            error: true
+      - variables:
+          next_configuration: >-
+            {{ {'v':1,'r':current.r + 1,'m':mode,'t':manual_temperature,
+                'd':minimum_d,'id':request_id} | to_json }}
+      - if: "{{ next_configuration | string | length > 255 }}"
+        then:
+          - stop: configuration_too_long
+            error: true
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.ferme_chauffage_configuration
+        data:
+          value: "{{ next_configuration }}"
+
+automation:
+  - id: ferme_chauffage_observer
+    alias: Ferme chauffage — observer la régulation sans mouvement
+    description: Proposition progressive uniquement. Ne commande aucun appareil.
+    mode: single
+    triggers:
+      - trigger: time_pattern
+        minutes: /1
+      - trigger: state
+        entity_id: input_text.ferme_chauffage_configuration
+      - trigger: homeassistant
+        event: start
+    actions:
+      - variables:
+          current_time: "{{ as_timestamp(now()) | int }}"
+          config: >-
+            {% set raw = states('input_text.ferme_chauffage_configuration') %}
+            {% set parsed = raw | from_json({}) %}
+            {{ {'v':1,'r':0,'m':'manual','t':60,'d':58,'id':''}
+               if raw in ['', 'unknown', 'unavailable'] else parsed if parsed is mapping else {} }}
+          previous: >-
+            {% set parsed = states('input_text.ferme_chauffage_observation') | from_json({}) %}
+            {{ parsed if parsed is mapping and parsed.get('r') is number and parsed.get('q') is number
+                 and 50 <= parsed.q <= 90 and parsed.get('at') is number and parsed.get('w') is number
+                 and parsed.get('tick') is number and parsed.get('n') is number and parsed.get('dir') is number
+                 and parsed.get('bt') is number and (parsed.bt == 0 or parsed.get('b') is number)
+                 and parsed.get('h') is sequence and parsed.h is not string and parsed.h is not mapping else {} }}
+          d_state: "{{ states('sensor.esphome_web_61063e_tampon_haut') }}"
+          b_state: "{{ states('sensor.batiment_b_ballon_b') }}"
+          d_at: >-
+            {% set s = states.sensor.esphome_web_61063e_tampon_haut %}
+            {{ as_timestamp(s.last_reported, 0) | int if s is defined else 0 }}
+          b_at: >-
+            {% set s = states.sensor.batiment_b_ballon_b %}
+            {{ as_timestamp(s.last_reported, 0) | int if s is defined else 0 }}
+      - variables:
+          config_valid: >-
+            {{ config is mapping and config.get('v') == 1
+               and config.get('r') is number and config.get('r') == config.get('r') | int(-1)
+               and config.get('r') is not boolean and 0 <= config.get('r') < 999999999
+               and config.get('m') in ['manual','automatic']
+               and config.get('t') is number and 50 <= config.get('t') <= 90
+               and config.get('t') == config.get('t') | int(-1)
+               and config.get('d') is number and 40 <= config.get('d') <= 75
+               and config.get('d') == config.get('d') | int(-1) }}
+          d_valid: >-
+            {{ is_number(d_state) and 0 <= d_state | float <= 110
+               and state_attr('sensor.esphome_web_61063e_tampon_haut','unit_of_measurement') in ['°C','C']
+               and not state_attr('sensor.esphome_web_61063e_tampon_haut','restored') }}
+          b_valid: >-
+            {{ is_number(b_state) and 0 <= b_state | float <= 110
+               and state_attr('sensor.batiment_b_ballon_b','unit_of_measurement') in ['°C','C']
+               and not state_attr('sensor.batiment_b_ballon_b','restored') }}
+          reset: >-
+            {{ previous is not mapping or previous.get('r') != config.get('r')
+               or previous.get('w',0) <= 0 or current_time - previous.get('tick',0) > 180
+               or current_time < previous.get('tick',0)
+               or (trigger is defined and trigger.platform == 'homeassistant') }}
+      - variables:
+          healthy: "{{ config_valid and d_valid and b_valid and 0 <= current_time - d_at <= 300 and 0 <= current_time - b_at <= 300 }}"
+          old_history: "{{ [] if reset else previous.get('h',[]) }}"
+          q: >-
+            {% set initial = state_attr('climate.chaudiere_fioul','temperature') %}
+            {% set value = initial if initial is number and 50 <= initial <= 90 else 60 %}
+            {{ [[value if reset else previous.get('q',value), 50] | max,85] | min }}
+          last: "{{ current_time if reset else previous.get('at',current_time) }}"
+          warming_since: "{{ current_time if reset or not healthy else previous.get('w',current_time) }}"
+      - variables:
+          history: >-
+            {% set ns = namespace(items=[]) %}
+            {% if healthy %}
+              {% for p in old_history %}
+                {% if p is sequence and p | length == 2 and p[0] is number and p[1] is number
+                      and 0 <= current_time - p[0] <= 1200 and p[0] < d_at
+                      and (ns.items | length == 0 or p[0] - ns.items[-1][0] >= 300) %}
+                  {% set ns.items = ns.items + [p] %}
+                {% endif %}
+              {% endfor %}
+              {% set ns.items = (ns.items + [[d_at,d_state | float | round(2)]])[-4:] %}
+            {% endif %}
+            {{ ns.items }}
+          new_sample: >-
+            {{ healthy and (old_history | length == 0 or old_history[-1] is not sequence
+                 or old_history[-1] | length != 2 or old_history[-1][0] != d_at) }}
+      - variables:
+          slope: >-
+            {% if history | length >= 2 and history[-1][0] - history[0][0] >= 600 %}
+              {{ [[(history[-1][1] - history[0][1]) / ((history[-1][0] - history[0][0]) / 60), -0.5] | max, 0.5] | min | round(3) }}
+            {% else %}{{ none }}{% endif %}
+          target: "{{ config.d + 2 if config_valid else 60 }}"
+          no_response: >-
+            {{ healthy and not reset and previous.get('bt',0) > 0
+               and current_time - previous.bt >= 1800
+               and d_state | float < previous.get('b',0) + 0.3 }}
+      - variables:
+          direction: >-
+            {% if not healthy or config.get('m') != 'automatic' %}0
+            {% elif d_state | float >= target + 1 or (d_state | float >= target and slope is number and slope > 0.02) %}-1
+            {% elif not no_response and slope is number
+                 and d_state | float + slope * 10 < target - 1 %}1
+            {% else %}0{% endif %}
+          elapsed: "{{ current_time - last }}"
+      - variables:
+          confirmations: >-
+            {{ 0 if direction == 0 else
+               ([previous.get('n',0) + (1 if new_sample else 0), 3] | min
+                if not reset and direction == previous.get('dir',0) else (1 if new_sample else 0)) }}
+      - variables:
+          can_adjust: >-
+            {{ healthy and not no_response and config.get('m') == 'automatic'
+               and current_time - warming_since >= 600 and elapsed >= 600
+               and confirmations >= 3 and direction != 0 }}
+          reason_code: >-
+            {% if not config_valid %}10
+            {% elif not d_valid %}5
+            {% elif not b_valid %}6
+            {% elif not 0 <= current_time - d_at <= 300 %}7
+            {% elif not 0 <= current_time - b_at <= 300 %}8
+            {% elif config.m == 'manual' %}0
+            {% elif no_response %}9
+            {% elif current_time - warming_since < 600 or slope is not number %}1
+            {% elif direction != 0 and confirmations < 3 %}3
+            {% elif direction != 0 and elapsed < 600 %}4
+            {% else %}2{% endif %}
+      - variables:
+          proposed: >-
+            {% set step = 2 if healthy and d_state | float < config.get('d',58) - 2 and direction == 1 else 1 %}
+            {{ config.get('t',60) if config_valid and config.m == 'manual' else
+               ([[q + direction * step,50] | max,85] | min if can_adjust else q) }}
+      - variables:
+          changed: "{{ can_adjust and proposed != q }}"
+          response_pending: >-
+            {{ not reset and healthy and direction >= 0 and previous.get('bt',0) > 0
+               and previous.get('b') is number and d_state | float < previous.b + 0.3 }}
+      - variables:
+          response_base: >-
+            {{ previous.b if response_pending else d_state | float if changed and direction == 1 else none }}
+          response_at: >-
+            {{ previous.bt if response_pending else current_time if changed and direction == 1 else 0 }}
+      - variables:
+          next_observation: >-
+            {{ {'r':config.get('r',0),'q':proposed,'at':current_time if changed else last,
+                'h':history,'n':0 if changed else confirmations,'dir':direction,
+                'w':warming_since,'b':response_base,'bt':response_at,'s':reason_code,
+                'tick':current_time} | to_json }}
+      - condition: template
+        value_template: "{{ next_observation | string | length <= 255 }}"
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.ferme_chauffage_observation
+        data:
+          value: "{{ next_observation }}"
+
+template:
+  - sensor:
+      - name: Ferme chauffage controle
+        unique_id: ferme_chauffage_controle
+        default_entity_id: sensor.ferme_chauffage_controle
+        state: >-
+          {% set p = states('input_text.ferme_chauffage_observation') | from_json({}) %}
+            {% set o = p if p is mapping else {} %}
+          {% set expired = not 0 <= as_timestamp(now()) - o.get('tick',0) <= 180 %}
+          {{ 'suspended' if expired or o.get('s',10) in [5,6,7,8,9,10] else 'observation' }}
+        attributes:
+          schema_version: "{{ 1 }}"
+          configuration: >-
+            {% set raw = states('input_text.ferme_chauffage_configuration') %}
+            {{ {'v':1,'r':0,'m':'manual','t':60,'d':58,'id':''}
+               if raw in ['', 'unknown', 'unavailable'] else raw | from_json({}) }}
+          revision: >-
+            {% set p = states('input_text.ferme_chauffage_configuration') | from_json({}) %}
+            {{ p.get('r',0) if p is mapping else 0 }}
+          mode: >-
+            {% set p = states('input_text.ferme_chauffage_configuration') | from_json({}) %}
+            {{ p.get('m','manual') if p is mapping else 'manual' }}
+          manual_temperature: >-
+            {% set p = states('input_text.ferme_chauffage_configuration') | from_json({}) %}
+            {{ p.get('t',60) if p is mapping else 60 }}
+          minimum_d: >-
+            {% set p = states('input_text.ferme_chauffage_configuration') | from_json({}) %}
+            {{ p.get('d',58) if p is mapping else 58 }}
+          request_id: >-
+            {% set p = states('input_text.ferme_chauffage_configuration') | from_json({}) %}
+            {{ p.get('id','') if p is mapping else '' }}
+          calibration_valid: "{{ false }}"
+          actuation_enabled: "{{ false }}"
+          commissioned_minimum: "{{ none }}"
+          commissioned_maximum: "{{ none }}"
+          simulation_minimum: "{{ 50 }}"
+          simulation_maximum: "{{ 85 }}"
+          phase: >-
+            {% set p = states('input_text.ferme_chauffage_observation') | from_json({}) %}
+            {% set o = p if p is mapping else {} %}
+            {{ 'suspended' if not 0 <= as_timestamp(now()) - o.get('tick',0) <= 180 or o.get('s',10) in [5,6,7,8,9,10] else 'observation' }}
+          reason: >-
+            {% set p = states('input_text.ferme_chauffage_observation') | from_json({}) %}
+            {% set o = p if p is mapping else {} %}
+            {% set reasons = ['manual_observation','warming_up','automatic_observation','stabilizing','cooldown','sensor_d_unavailable','sensor_b_unavailable','sensor_d_stale','sensor_b_stale','no_heat_response','configuration_invalid'] %}
+            {{ 'observer_stale' if not 0 <= as_timestamp(now()) - o.get('tick',0) <= 180 else reasons[o.get('s',10) | int] if 0 <= o.get('s',10) | int < reasons | length else 'configuration_invalid' }}
+          recommended_temperature: >-
+            {% set p = states('input_text.ferme_chauffage_observation') | from_json({}) %}
+            {% set o = p if p is mapping else {} %}
+            {% set p = states('input_text.ferme_chauffage_configuration') | from_json({}) %}
+            {% set c = p if p is mapping else {} %}
+            {{ o.get('q') if o.get('s',10) not in [5,6,7,8,9,10] and o.get('r',-1) == c.get('r',0) and 0 <= as_timestamp(now()) - o.get('tick',0) <= 180 else none }}
+          observed_temperature_d: >-
+            {% set v = states('sensor.esphome_web_61063e_tampon_haut') %}
+            {{ v | float if is_number(v) and 0 <= v | float <= 110 else none }}
+          observed_temperature_b: >-
+            {% set v = states('sensor.batiment_b_ballon_b') %}
+            {{ v | float if is_number(v) and 0 <= v | float <= 110 else none }}
+          trend_c_per_minute: >-
+            {% set p = states('input_text.ferme_chauffage_observation') | from_json({}) %}
+            {% set h = p.get('h',[]) if p is mapping else [] %}
+            {{ ([[((h[-1][1] - h[0][1]) / ((h[-1][0] - h[0][0]) / 60)),-0.5] | max,0.5] | min | round(3)) if h | length >= 2 and h[-1][0] - h[0][0] >= 600 else none }}
+          last_proposal_at: >-
+            {% set p = states('input_text.ferme_chauffage_observation') | from_json({}) %}
+            {{ p.get('at') if p is mapping else none }}
+          next_adjustment_at: >-
+            {% set p = states('input_text.ferme_chauffage_observation') | from_json({}) %}
+            {% set o = p if p is mapping else {} %}
+            {{ [o.get('at',0) + 600,o.get('w',0) + 600] | max if o.get('at',0) > 0 else none }}
+          updated_at: "{{ now().isoformat() }}"

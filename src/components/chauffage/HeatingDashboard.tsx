@@ -1,6 +1,7 @@
 "use client";
 
-import { ChartNoAxesCombined, ChevronRight, CircleAlert, Clock3, Droplet, Gauge, Logs, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { ChartNoAxesCombined, CircleAlert, Clock3, Droplet, Gauge, Logs, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button, Card, Notice, farmStyles } from "@/components/ui/FarmUI";
 import type { ChauffageStatus, HeatingMetric } from "@/lib/chauffage";
 import type { HeatingHistoryKey } from "@/lib/chauffage-history";
@@ -23,6 +24,7 @@ export interface HeatingDashboardProps {
   onRefresh: () => void | Promise<void>;
   onSelectMetric?: (key: HeatingHistoryKey) => void;
   topology?: HeatingTopology;
+  controlPanel?: ReactNode;
 }
 
 const numberFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
@@ -120,12 +122,11 @@ function LocalPipes() {
   return <svg className={styles.localPipes} viewBox="0 0 100 180" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M28 48H72M28 137H72" /></svg>;
 }
 
-function ServoReading({ metric, sourceInterrupted, onSelectMetric }: { metric: HeatingMetric; sourceInterrupted: boolean; onSelectMetric?: (key: HeatingHistoryKey) => void }) {
-  const warning = needsAttention(metric, sourceInterrupted);
-  return <button type="button" className={`${styles.servo} ${warning ? styles.warning : ""}`} onClick={() => onSelectMetric?.("servo")} aria-label="Voir l’évolution de la position du servomoteur fioul">
-    <span className={styles.servoHeader}><Gauge aria-hidden="true" /><span>Servomoteur fioul</span><ChevronRight aria-hidden="true" /></span>
-    <span className={styles.servoBody}><Reading metric={metric} /><ReadingDate metric={metric} sourceInterrupted={sourceInterrupted} /></span>
-  </button>;
+function ServoReading() {
+  return <div className={`${styles.servo} ${styles.warning}`}>
+    <span className={styles.servoHeader}><Gauge aria-hidden="true" /><span>Servomoteur fioul</span></span>
+    <span className={styles.readingMeta}>Position non mesurée. L’ancien pourcentage ne constitue pas un retour de position.</span>
+  </div>;
 }
 
 function Installation({ status, topology, sourceInterrupted, onSelectMetric }: { status: ChauffageStatus; topology: HeatingTopology; sourceInterrupted: boolean; onSelectMetric?: (key: HeatingHistoryKey) => void }) {
@@ -141,14 +142,14 @@ function Installation({ status, topology, sourceInterrupted, onSelectMetric }: {
           {id === "B" && <Equipment metricKey="fuelSetpoint" title="Chaudière fioul" subtitle="Consigne mémorisée" metric={status.fuel.setpoint} kind="fuel" sourceInterrupted={sourceInterrupted || noBReturn} onSelectMetric={onSelectMetric} />}
           {id === "D" && <Equipment metricKey="woodBoiler" title="Chaudière bois" subtitle="Température mesurée" metric={status.measurements.woodBoiler} kind="wood" sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} />}
         </div>
-        {id === "B" && <><ServoReading metric={status.diagnostics.servo} sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} /><p className={styles.settingNote}>La consigne mémorisée ne confirme pas que le servomoteur l’a appliquée.</p></>}
+        {id === "B" && <><ServoReading /><p className={styles.settingNote}>La consigne mémorisée ne confirme pas que le servomoteur l’a appliquée.</p></>}
       </section>)}
     </div>
     <p className={styles.diagramNote}>{topology.description || (topology.confirmed ? "Les ballons partagent le réseau de chauffage." : "Réseau partagé représenté en pointillés. Le tracé entre les bâtiments reste à confirmer.")}</p>
   </Card>;
 }
 
-export default function HeatingDashboard({ status, loading, error, refreshing, offline, onRefresh, onSelectMetric, topology = provisionalTopology }: HeatingDashboardProps) {
+export default function HeatingDashboard({ status, loading, error, refreshing, offline, onRefresh, onSelectMetric, topology = provisionalTopology, controlPanel }: HeatingDashboardProps) {
   const checked = displayDate(status.checkedAt);
   const connected = status.connected && status.relayFreshness === "fresh" && !offline;
   const sourceInterrupted = !connected;
@@ -165,6 +166,7 @@ export default function HeatingDashboard({ status, loading, error, refreshing, o
     {error && !offline && <Notice tone="error" className={styles.notice}>L’actualisation a échoué. Les dernières valeurs connues restent affichées.</Notice>}
     {!loading && !status.hasData && !error && !offline && <Notice className={styles.notice}>Les températures apparaîtront dès les premiers relevés disponibles.</Notice>}
     {status.hasData && !status.connected && !offline && !error && <Notice tone="warning" className={styles.notice}>Home Assistant ne répond pas. Les valeurs affichées correspondent à leur dernière date de relevé.</Notice>}
+    {controlPanel}
     <Installation status={status} topology={topology} sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} />
     <p className={styles.help}><CircleAlert aria-hidden="true" /><span>En orange : une valeur ancienne ou une liaison interrompue. La date indique quand la valeur a été relevée.</span></p>
     <footer className={styles.actions}><Button variant="primary" fullWidth busy={refreshing} disabled={loading} onClick={() => { void onRefresh(); }}>{!refreshing && <RefreshCw aria-hidden="true" />}{refreshing ? "Actualisation…" : "Actualiser"}</Button></footer>
