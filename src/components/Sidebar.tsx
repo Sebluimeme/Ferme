@@ -25,6 +25,7 @@ import {
   Fuel,
   CloudSun,
   HeartPulse,
+  Thermometer,
   X,
 } from "lucide-react";
 
@@ -67,6 +68,12 @@ const sections = [
     title: "Ecobloc",
     items: [
       { icon: Fuel, label: "Carburant", route: "/carburant" },
+    ],
+  },
+  {
+    title: "Bâtiments",
+    items: [
+      { icon: Thermometer, label: "Chauffage", route: "/chauffage" },
     ],
   },
   {

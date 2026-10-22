@@ -13,7 +13,7 @@ import styles from "./AppFrame.module.css";
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const { state } = useAppStore();
   const pathname = usePathname();
-  const modernPage = pathname === "/couts" || pathname === "/reproduction";
+  const modernPage = pathname === "/couts" || pathname === "/reproduction" || pathname === "/chauffage";
 
   if (state.authLoading) {
     return (
