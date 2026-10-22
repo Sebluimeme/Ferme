@@ -543,6 +543,18 @@ class HeatingPackageTests(unittest.TestCase):
             self.assertEqual(o['bt'],0)
         self.assertEqual(o['q'],85)
 
+    def test_full_observation_fits_input_text_with_maximum_revision(self):
+        template = next(step['variables']['next_observation'] for step in PACKAGE['automation'][0]['actions'] if 'next_observation' in step.get('variables', {}))
+        context = {'config':{'r':999999998}, 'proposed':85, 'current_time':1792684800,
+                   'changed':True, 'last':1792684200,
+                   'history':[[1792683900,109.99],[1792684200,109.99],[1792684500,109.99],[1792684800,109.99]],
+                   'confirmations':3, 'direction':1, 'warming_since':1792683000,
+                   'response_base':109.99, 'response_at':1792684000, 'reason_code':12,
+                   'heat_demand':True, 'same_configuration':True, 'previous':{'a':1}}
+        rendered = str(self.h.render(template,context))
+        self.assertLessEqual(len(rendered),255)
+        self.assertEqual(json.loads(rendered)['a'],1)
+
     def test_lost_observer_is_visible_and_recommendation_expires(self):
         self.h.observe()
         self.h.time += 181
