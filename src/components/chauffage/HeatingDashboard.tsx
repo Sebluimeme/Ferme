@@ -1,8 +1,9 @@
 "use client";
 
-import { Activity, CircleAlert, Clock3, Gauge, Network, RefreshCw, Settings2, Thermometer, Wifi, WifiOff } from "lucide-react";
+import { ChartNoAxesCombined, ChevronRight, CircleAlert, Clock3, Droplet, Gauge, Logs, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { Button, Card, Notice, farmStyles } from "@/components/ui/FarmUI";
 import type { ChauffageStatus, HeatingMetric } from "@/lib/chauffage";
+import type { HeatingHistoryKey } from "@/lib/chauffage-history";
 import styles from "./HeatingDashboard.module.css";
 
 type BuildingId = "A" | "B" | "D";
@@ -20,6 +21,7 @@ export interface HeatingDashboardProps {
   refreshing: boolean;
   offline: boolean;
   onRefresh: () => void | Promise<void>;
+  onSelectMetric?: (key: HeatingHistoryKey) => void;
   topology?: HeatingTopology;
 }
 
@@ -35,166 +37,136 @@ function displayDate(value: string | null) {
   return { short: dateFormat.format(date), full: fullDateFormat.format(date), iso: date.toISOString() };
 }
 
-function metricState(metric: HeatingMetric) {
-  const reportedPosition = metric.unit === "%";
-  if (metric.availability === "missing") return reportedPosition ? "Retour non disponible" : "Mesure non disponible";
-  if (metric.availability === "unavailable") return reportedPosition ? "Retour du module indisponible" : "Capteur indisponible";
-  if (metric.availability === "invalid") return reportedPosition ? "Valeur non exploitable" : "Mesure non exploitable";
-  if (metric.freshness === "stale") return "Ancien relevé";
-  if (metric.freshness === "aging") return "Relevé à vérifier";
-  if (metric.freshness === "unknown") return "Date inconnue";
-  return "Relevé récent";
+function readingAge(metric: HeatingMetric) {
+  if (!metric.reportedAt) return "Date inconnue";
+  const elapsed = Date.now() - Date.parse(metric.reportedAt);
+  if (!Number.isFinite(elapsed) || elapsed < -60_000) return "Date à vérifier";
+  const minutes = Math.max(0, Math.floor(elapsed / 60_000));
+  if (minutes < 1) return "Il y a moins d’une minute";
+  if (minutes < 60) return `Il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Il y a ${hours} h${minutes % 60 ? ` ${minutes % 60}` : ""}`;
+  const days = Math.floor(hours / 24);
+  return `Il y a ${days} jour${days > 1 ? "s" : ""}`;
 }
 
-function needsAttention(metric: HeatingMetric) {
-  return metric.availability !== "available" || metric.freshness !== "fresh";
+function needsAttention(metric: HeatingMetric, sourceInterrupted: boolean) {
+  return sourceInterrupted || metric.isFallback || metric.availability !== "available" || metric.freshness !== "fresh";
 }
 
-function Reading({ metric, compact = false }: { metric: HeatingMetric; compact?: boolean }) {
-  const available = metric.availability === "available" && metric.value !== null;
-  const spokenUnit = metric.unit === "%" ? "pour cent" : "degrés Celsius";
-  const unavailableLabel = metric.unit === "%" ? "Position rapportée indisponible" : "Température indisponible";
-  return <span className={compact ? styles.compactValue : styles.value} aria-label={available ? `${numberFormat.format(metric.value!)} ${spokenUnit}` : unavailableLabel}>
-    {available ? numberFormat.format(metric.value!) : "—"}<span className={styles.unit} aria-hidden="true">{metric.unit}</span>
+function Reading({ metric }: { metric: HeatingMetric }) {
+  return <span className={styles.value}>{metric.value === null ? "—" : numberFormat.format(metric.value)}<span className={styles.unit}>{metric.unit}</span></span>;
+}
+
+function ReadingDate({ metric, setpoint = false, sourceInterrupted = false }: { metric: HeatingMetric; setpoint?: boolean; sourceInterrupted?: boolean }) {
+  const date = displayDate(metric.reportedAt);
+  const warning = needsAttention(metric, sourceInterrupted);
+  const hasValue = metric.value !== null;
+  return <span className={`${styles.readingMeta} ${warning ? styles.warning : ""}`}>
+    <span className={styles.readingState}>
+      {warning ? <CircleAlert aria-hidden="true" /> : <Clock3 aria-hidden="true" />}
+      {!hasValue ? "Aucun relevé conservé" : setpoint ? "Réglage mémorisé" : warning ? "Dernier relevé" : "Relevé récent"}
+    </span>
+    {hasValue && !setpoint && <span>{readingAge(metric)}</span>}
+    {date ? <time dateTime={date.iso} title={date.full}>{date.short}</time> : hasValue ? <span>Date inconnue</span> : <span>En attente du capteur</span>}
+    {hasValue && (metric.isFallback || metric.availability !== "available") && <span className={styles.sourceUnavailable}>Capteur indisponible</span>}
   </span>;
 }
 
-function ReadingDate({ metric, setpoint = false }: { metric: HeatingMetric; setpoint?: boolean }) {
-  const date = displayDate(metric.reportedAt);
-  const warning = needsAttention(metric);
-  return <div className={styles.readingMeta}>
-    <span className={`${styles.measurementState} ${warning ? styles.warning : ""}`}>
-      {warning ? <CircleAlert aria-hidden="true" /> : <Clock3 aria-hidden="true" />}
-      {setpoint && !warning ? "Réglage mémorisé dans Home Assistant" : metricState(metric)}
+function TankDrawing() {
+  return <svg viewBox="0 0 144 180" className={styles.equipmentDrawing} aria-hidden="true" focusable="false">
+    <path className={styles.pipeStub} d="M17 48H7M127 48H137M17 137H7M127 137H137" />
+    <path className={styles.tankBody} d="M21 29C21 7 123 7 123 29V145C123 167 21 167 21 145Z" />
+    <ellipse className={styles.tankTop} cx="72" cy="29" rx="51" ry="16" />
+    <path className={styles.tankContour} d="M21 144C21 166 123 166 123 144M34 48V130M42 160V172M102 160V172" />
+    <path className={styles.tankRing} d="M23 54C39 64 105 64 121 54M23 126C39 136 105 136 121 126" />
+  </svg>;
+}
+
+function BoilerDrawing({ fuel }: { fuel: boolean }) {
+  return <svg viewBox="0 0 144 180" className={styles.equipmentDrawing} aria-hidden="true" focusable="false">
+    <path className={styles.pipeStub} d="M20 48H7M20 137H7M106 31V13H124" />
+    <rect className={styles.boilerBody} x="23" y="32" width="100" height="128" rx="13" />
+    <rect className={styles.boilerPanel} x="35" y="77" width="76" height="46" rx="9" />
+    <path className={styles.tankContour} d="M38 160V172M106 160V172M46 139H98" />
+    {!fuel && <path className={styles.tankContour} d="M47 146H97" />}
+  </svg>;
+}
+
+function Equipment({ metricKey, title, subtitle, metric, kind = "tank", sourceInterrupted, onSelectMetric }: {
+  metricKey: HeatingHistoryKey;
+  title: string;
+  subtitle: string;
+  metric: HeatingMetric;
+  kind?: "tank" | "wood" | "fuel";
+  sourceInterrupted: boolean;
+  onSelectMetric?: (key: HeatingHistoryKey) => void;
+}) {
+  const warning = needsAttention(metric, sourceInterrupted);
+  return <button type="button" className={`${styles.equipment} ${warning ? styles.equipmentWarning : ""} ${metric.value === null ? styles.equipmentEmpty : ""}`} onClick={() => onSelectMetric?.(metricKey)} aria-label={`Voir l’évolution : ${title}, ${metric.label}`}>
+    <span className={styles.equipmentVisual}>
+      {kind === "tank" ? <TankDrawing /> : <BoilerDrawing fuel={kind === "fuel"} />}
+      {kind !== "tank" && <span className={styles.boilerIcon}>{kind === "fuel" ? <Droplet aria-hidden="true" /> : <Logs aria-hidden="true" />}</span>}
+      <span className={`${styles.visualReading} ${kind === "tank" ? styles.tankValue : styles.boilerValue}`}><Reading metric={metric} /></span>
     </span>
-    {date && <time dateTime={date.iso} title={date.full}>{setpoint || metric.availability !== "available" ? "Dernier état : " : "Reçu le "}{date.short}</time>}
-  </div>;
+    <span className={styles.equipmentTitle}>{title}</span>
+    <span className={styles.equipmentSubtitle}>{subtitle}</span>
+    <ReadingDate metric={metric} setpoint={kind === "fuel"} sourceInterrupted={sourceInterrupted} />
+    <span className={styles.chartLink}><ChartNoAxesCombined aria-hidden="true" />Historique</span>
+  </button>;
 }
 
-function TankDrawing({ unavailable }: { unavailable: boolean }) {
-  return <svg viewBox="0 0 112 116" className={`${styles.tankDrawing} ${unavailable ? styles.unavailableDrawing : ""}`} aria-hidden="true" focusable="false">
-    <path className={styles.buildingOutline} d="M10 50V108H102V50M4 51L56 9L108 51M79 28V13H91V38" />
-    <path className={styles.tankBody} d="M34 48C34 38 78 38 78 48V91C78 102 34 102 34 91Z" />
-    <ellipse className={styles.tankTop} cx="56" cy="48" rx="22" ry="7" />
-    <path className={styles.tankLine} d="M34 91C34 101 78 101 78 91M56 61V79M53 61A3 3 0 0 1 59 61V78A7 7 0 1 1 53 78Z" />
-    <path className={styles.buildingOutline} d="M56 99V116" />
-  </svg>;
+function LocalPipes() {
+  return <svg className={styles.localPipes} viewBox="0 0 100 180" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M28 48H72M28 137H72" /></svg>;
 }
 
-function Circuit({ topology }: { topology: HeatingTopology }) {
-  const positions: Record<BuildingId, number> = { A: 50, B: 150, D: 250 };
-  return <svg viewBox="0 0 300 36" className={`${styles.circuit} ${topology.confirmed ? "" : styles.provisionalCircuit}`} preserveAspectRatio="none" aria-hidden="true" focusable="false">
-    {topology.connections?.length ? topology.connections.map(({ from, to }, index) => <path key={`${from}-${to}-${index}`} d={`M${positions[from]} 0V24H${positions[to]}V0`} />) : <>
-      <path d="M50 0V24H250V0M150 0V24" />
-      <circle cx="150" cy="24" r="3" />
-    </>}
-  </svg>;
+function ServoReading({ metric, sourceInterrupted, onSelectMetric }: { metric: HeatingMetric; sourceInterrupted: boolean; onSelectMetric?: (key: HeatingHistoryKey) => void }) {
+  const warning = needsAttention(metric, sourceInterrupted);
+  return <button type="button" className={`${styles.servo} ${warning ? styles.warning : ""}`} onClick={() => onSelectMetric?.("servo")} aria-label="Voir l’évolution de la position du servomoteur fioul">
+    <span className={styles.servoHeader}><Gauge aria-hidden="true" /><span>Servomoteur fioul</span><ChevronRight aria-hidden="true" /></span>
+    <span className={styles.servoBody}><Reading metric={metric} /><ReadingDate metric={metric} sourceInterrupted={sourceInterrupted} /></span>
+  </button>;
 }
 
-function InstallationOverview({ status, topology }: { status: ChauffageStatus; topology: HeatingTopology }) {
-  const tanks: Array<{ id: BuildingId; metric: HeatingMetric; subtitle: string }> = [
-    { id: "A", metric: status.measurements.tankA, subtitle: "Ballon d’eau chaude" },
-    { id: "B", metric: status.measurements.tankB, subtitle: "Ballon · 2 000 L" },
-    { id: "D", metric: status.measurements.tankD, subtitle: "Haut · 2 000 L" },
-  ];
-  return <Card className={styles.overview} role="region" aria-labelledby="installation-heading">
-    <div className={styles.sectionHeading}><Network aria-hidden="true" /><h2 id="installation-heading">Les trois bâtiments</h2></div>
-    <div className={styles.diagram}>
-      <div className={styles.buildings}>
-        {tanks.map(({ id, metric }) => <a href={`#chauffage-batiment-${id}`} className={styles.building} key={id} aria-label={`Voir le détail du bâtiment ${id}`}>
-          <span className={styles.buildingLabel}>Bâtiment <strong>{id}</strong></span>
-          <TankDrawing unavailable={metric.availability !== "available"} />
-        </a>)}
-      </div>
-      <Circuit topology={topology} />
-      <div className={styles.overviewReadings}>{tanks.map(({ id, metric, subtitle }) => <div className={styles.overviewReading} key={id}>
-        <span className={styles.overviewTemperature}><Reading metric={metric} compact /></span>
-        <span className={styles.tankCaption}>{subtitle}</span>
-        <span className={`${styles.overviewState} ${needsAttention(metric) ? styles.warning : ""}`}>{metricState(metric)}</span>
-      </div>)}</div>
+function Installation({ status, topology, sourceInterrupted, onSelectMetric }: { status: ChauffageStatus; topology: HeatingTopology; sourceInterrupted: boolean; onSelectMetric?: (key: HeatingHistoryKey) => void }) {
+  const noBReturn = status.measurements.tankB.availability !== "available" || status.diagnostics.servo.availability !== "available";
+  return <Card className={styles.installation} role="region" aria-label="Vue de l’installation de chauffage">
+    <p className={styles.diagramHint}><ChartNoAxesCombined aria-hidden="true" />Touche un ballon ou une chaudière pour ouvrir son graphique.</p>
+    <div className={`${styles.buildings} ${topology.confirmed ? styles.confirmedNetwork : ""}`}>
+      {(["A", "B", "D"] as const).map((id) => <section className={styles.building} key={id} aria-labelledby={`building-heading-${id}`}>
+        <header className={styles.buildingHeader}><span className={styles.buildingBadge} aria-hidden="true">{id}</span><h2 id={`building-heading-${id}`}>Bâtiment {id}</h2></header>
+        <div className={`${styles.equipmentPair} ${id === "A" ? styles.singleEquipment : ""}`}>
+          {id !== "A" && <LocalPipes />}
+          <Equipment metricKey={`tank${id}`} title={id === "D" ? "Haut du ballon" : "Ballon d’eau chaude"} subtitle={id === "A" ? "Température du ballon" : "2 000 litres"} metric={status.measurements[`tank${id}`]} sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} />
+          {id === "B" && <Equipment metricKey="fuelSetpoint" title="Chaudière fioul" subtitle="Consigne mémorisée" metric={status.fuel.setpoint} kind="fuel" sourceInterrupted={sourceInterrupted || noBReturn} onSelectMetric={onSelectMetric} />}
+          {id === "D" && <Equipment metricKey="woodBoiler" title="Chaudière bois" subtitle="Température mesurée" metric={status.measurements.woodBoiler} kind="wood" sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} />}
+        </div>
+        {id === "B" && <><ServoReading metric={status.diagnostics.servo} sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} /><p className={styles.settingNote}>La consigne mémorisée ne confirme pas que le servomoteur l’a appliquée.</p></>}
+      </section>)}
     </div>
-    <p className={styles.diagramNote}>{topology.description || (topology.confirmed ? "Les trois ballons sont reliés au réseau de chauffage." : "Réseau partagé · vue fonctionnelle. Le tracé des liaisons reste à confirmer.")}</p>
+    <p className={styles.diagramNote}>{topology.description || (topology.confirmed ? "Les ballons partagent le réseau de chauffage." : "Réseau partagé représenté en pointillés. Le tracé entre les bâtiments reste à confirmer.")}</p>
   </Card>;
 }
 
-function BoilerReading({ metric, type }: { metric: HeatingMetric; type: "wood" | "fuel" }) {
-  const fuel = type === "fuel";
-  const Icon = fuel ? Settings2 : Thermometer;
-  return <section className={styles.boilerReading} aria-label={fuel ? "Consigne de la chaudière fioul" : "Température de la chaudière bois"}>
-    <div className={styles.boilerLabel}><Icon aria-hidden="true" /><div><h3>{fuel ? "Chaudière fioul" : "Chaudière bois"}</h3><p>{fuel ? "Consigne mémorisée" : "Température mesurée"}</p></div></div>
-    <Reading metric={metric} />
-    <ReadingDate metric={metric} setpoint={fuel} />
-    {fuel && <p className={styles.settingNote}>Valeur conservée dans Home Assistant. Elle ne confirme pas que le module B a appliqué ce réglage.</p>}
-  </section>;
-}
-
-function ServoReading({ metric }: { metric: HeatingMetric }) {
-  return <section className={styles.boilerReading} aria-label="Position rapportée du servomoteur fioul">
-    <div className={styles.boilerLabel}><Gauge aria-hidden="true" /><div><h3>Servomoteur fioul</h3><p>Position rapportée par le module</p></div></div>
-    <Reading metric={metric} />
-    <ReadingDate metric={metric} />
-    <p className={styles.settingNote}>La température du ballon et ce retour proviennent du même module.</p>
-  </section>;
-}
-
-function TankCard({ id, metric, status }: { id: BuildingId; metric: HeatingMetric; status: ChauffageStatus }) {
-  const noReturn = (reading: HeatingMetric) => reading.availability === "unavailable" || reading.availability === "missing";
-  const noBuildingBReturn = id === "B" && status.hasData && noReturn(metric) && noReturn(status.diagnostics.servo);
-  return <Card className={styles.tankCard} id={`chauffage-batiment-${id}`} role="region" aria-labelledby={`building-heading-${id}`}>
-    <header className={styles.tankHeader}>
-      <span className={styles.buildingBadge} aria-hidden="true">{id}</span>
-      <div><h2 id={`building-heading-${id}`}>Bâtiment {id}</h2><p>{id === "A" ? "Ballon d’eau chaude" : "Ballon tampon · 2 000 litres"}</p></div>
-    </header>
-    {noBuildingBReturn && <Notice tone="warning" className={styles.moduleNotice}>Aucun retour du module B. La consigne mémorisée ne confirme pas son application.</Notice>}
-    <div className={styles.tankReading}>
-      <div className={styles.measurementLabel}><Thermometer aria-hidden="true" />{id === "D" ? "Haut du ballon" : "Température du ballon"}</div>
-      <Reading metric={metric} />
-      <ReadingDate metric={metric} />
-    </div>
-    {id === "B" && <>
-      <BoilerReading metric={status.fuel.setpoint} type="fuel" />
-      <ServoReading metric={status.diagnostics.servo} />
-    </>}
-    {id === "D" && <BoilerReading metric={status.measurements.woodBoiler} type="wood" />}
-  </Card>;
-}
-
-export default function HeatingDashboard({ status, loading, error, refreshing, offline, onRefresh, topology = provisionalTopology }: HeatingDashboardProps) {
+export default function HeatingDashboard({ status, loading, error, refreshing, offline, onRefresh, onSelectMetric, topology = provisionalTopology }: HeatingDashboardProps) {
   const checked = displayDate(status.checkedAt);
   const connected = status.connected && status.relayFreshness === "fresh" && !offline;
-  const connectionLabel = offline ? "Application hors connexion" : !status.hasData ? "En attente des relevés" : !status.connected ? "Synchronisation Home Assistant interrompue" : status.relayFreshness !== "fresh" ? "Synchronisation en retard" : "Synchronisation Home Assistant active";
+  const sourceInterrupted = !connected;
+  const connectionLabel = offline ? "Connexion interrompue" : !status.hasData ? "En attente des relevés" : !status.connected ? "Home Assistant ne répond pas" : status.relayFreshness !== "fresh" ? "Synchronisation en retard" : "Synchronisation active";
   const ConnectionIcon = offline || (status.hasData && !status.connected) ? WifiOff : connected ? Wifi : Clock3;
 
   return <div className={`${farmStyles.theme} ${styles.page}`}>
-    <header className={styles.header}>
-      <h1>Chauffage</h1>
-      <p>Les ballons et les chaudières de la ferme.</p>
-    </header>
-
+    <header className={styles.header}><h1>Chauffage</h1><p>Toute l’installation, en un regard.</p></header>
     <div className={styles.connection} aria-live="polite">
-      <span className={`${styles.connectionStatus} ${connected ? styles.connected : ""}`}><ConnectionIcon aria-hidden="true" />{loading && !status.hasData ? "Chargement des relevés…" : connectionLabel}</span>
-      {checked && <span className={styles.checked}>Dernière vérification <time dateTime={checked.iso} title={checked.full}>{checked.short}</time></span>}
+      <span className={`${styles.connectionStatus} ${connected ? styles.connected : styles.warning}`}><ConnectionIcon aria-hidden="true" />{loading && !status.hasData ? "Chargement des relevés…" : connectionLabel}</span>
+      {checked && <span className={styles.checked}>Vérifié le <time dateTime={checked.iso} title={checked.full}>{checked.short}</time></span>}
     </div>
-
-    {offline && <Notice tone="warning" className={styles.notice}>Le suivi en direct est interrompu. Les dernières données disponibles restent visibles ; leur date figure sous chaque température.</Notice>}
-    {error && !offline && <Notice tone="error" className={styles.notice}>Les relevés n’ont pas pu être actualisés. Tu peux réessayer avec « Actualiser ».</Notice>}
-    {!loading && !status.hasData && !error && !offline && <Notice className={styles.notice}>Les températures apparaîtront dès que les premiers relevés seront disponibles.</Notice>}
-    {status.hasData && !status.connected && !offline && !error && <Notice tone="warning" className={styles.notice}>Home Assistant ne répond pas. Les valeurs conservées correspondent à leur dernière date de relevé.</Notice>}
-
-    <InstallationOverview status={status} topology={topology} />
-
-    <div className={styles.detailsHeading}><h2>Températures et réglages</h2><p>Chaque mesure conserve sa propre date.</p></div>
-    <div className={styles.tankCards}>
-      <TankCard id="D" metric={status.measurements.tankD} status={status} />
-      <TankCard id="B" metric={status.measurements.tankB} status={status} />
-      <TankCard id="A" metric={status.measurements.tankA} status={status} />
-    </div>
-    <p className={styles.help}><Activity aria-hidden="true" />Les températures sont affichées telles qu’elles sont reçues. Un ancien relevé n’indique pas la température actuelle.</p>
-
-    <footer className={styles.actions}>
-      <Button variant="primary" fullWidth busy={refreshing} disabled={loading} onClick={() => { void onRefresh(); }}>
-        {!refreshing && <RefreshCw aria-hidden="true" />}{refreshing ? "Actualisation…" : "Actualiser"}
-      </Button>
-    </footer>
+    {offline && <Notice tone="warning" className={styles.notice}>Le suivi en direct est interrompu. Les derniers relevés conservés restent visibles avec leur date.</Notice>}
+    {error && !offline && <Notice tone="error" className={styles.notice}>L’actualisation a échoué. Les dernières valeurs connues restent affichées.</Notice>}
+    {!loading && !status.hasData && !error && !offline && <Notice className={styles.notice}>Les températures apparaîtront dès les premiers relevés disponibles.</Notice>}
+    {status.hasData && !status.connected && !offline && !error && <Notice tone="warning" className={styles.notice}>Home Assistant ne répond pas. Les valeurs affichées correspondent à leur dernière date de relevé.</Notice>}
+    <Installation status={status} topology={topology} sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} />
+    <p className={styles.help}><CircleAlert aria-hidden="true" /><span>En orange : une valeur ancienne ou une liaison interrompue. La date indique quand la valeur a été relevée.</span></p>
+    <footer className={styles.actions}><Button variant="primary" fullWidth busy={refreshing} disabled={loading} onClick={() => { void onRefresh(); }}>{!refreshing && <RefreshCw aria-hidden="true" />}{refreshing ? "Actualisation…" : "Actualiser"}</Button></footer>
   </div>;
 }

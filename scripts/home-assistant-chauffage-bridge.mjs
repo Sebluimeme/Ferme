@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Read-only heating relay: HA GET /api/states → one Firebase telemetry node.
+ * Read-only heating relay: HA GET states/history → dedicated Firebase telemetry.
  * It never calls HA services and has no command listener.
  * Environment is supplied by the caller (e.g. systemd EnvironmentFile).
- * node --experimental-strip-types scripts/home-assistant-chauffage-bridge.mjs [--once]
+ * node --experimental-strip-types scripts/home-assistant-chauffage-bridge.mjs [--once] [--backfill-days 1..7]
  */
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
@@ -13,7 +13,13 @@ import {
   buildHeatingSnapshot,
   heatingFailureSnapshot,
   selectHeatingEntities,
+  mergeHeatingLastValid,
+  HEATING_ENTITY_IDS,
 } from "../src/lib/chauffage.ts";
+import {
+  HEATING_HISTORY_PATH, HEATING_HISTORY_KEYS, heatingHistoryUpdates,
+  mergeHeatingHistoryUpdates, validateHeatingHistoryUpdates, importHeatingRecorderHistory,
+} from "../src/lib/chauffage-history.ts";
 
 const DEFAULT_POLL_MS = 30_000;
 const MAX_BACKOFF_MS = 5 * 60_000;
@@ -61,6 +67,24 @@ export function createHeatingHaReader({ baseUrl, token, fetchImpl = fetch, timeo
   };
 }
 
+/** Recorder access is GET-only, targeted to six known entities and at most seven days. */
+export function createHeatingHaHistoryReader({ baseUrl, token, fetchImpl = fetch, timeoutMs = DEFAULT_TIMEOUT_MS }) {
+  const base = checkedUrl(baseUrl, "ha");
+  return async function readHistory(fromMs, toMs) {
+    if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || fromMs < 0 || toMs <= fromMs || toMs - fromMs > 7 * 86_400_000) {
+      throw new RelayError("invalid-history-range");
+    }
+    const url = new URL(`${base}/api/history/period/${new Date(fromMs).toISOString()}`);
+    url.searchParams.set("end_time", new Date(toMs).toISOString());
+    url.searchParams.set("filter_entity_id", HEATING_HISTORY_KEYS.map((key) => HEATING_ENTITY_IDS[key]).join(","));
+    const history = await jsonRequest(url, {
+      method: "GET", headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, cache: "no-store",
+    }, { fetchImpl, timeoutMs, errorPrefix: "ha-history" });
+    if (!Array.isArray(history)) throw new RelayError("invalid-response");
+    return history;
+  };
+}
+
 /** Authenticated REST prevents a Firebase SDK write being queued past a timeout. */
 export function createHeatingFirebaseClient({
   databaseUrl, apiKey, email, password, fetchImpl = fetch, timeoutMs = DEFAULT_TIMEOUT_MS, now = Date.now,
@@ -81,13 +105,13 @@ export function createHeatingFirebaseClient({
     tokenExpiresAt = now() + Number(result.expiresIn) * 1_000;
     return cachedToken;
   }
-  async function request(method, snapshot) {
-    const url = new URL(`${base}/${HEATING_STATUS_PATH}.json`);
+  async function request(method, snapshot, path = HEATING_STATUS_PATH) {
+    const url = new URL(`${base}/${path}.json`);
     url.searchParams.set("auth", await token());
     try {
       return await jsonRequest(url, {
         method, headers: { "Content-Type": "application/json" }, cache: "no-store",
-        ...(method === "PUT" ? { body: JSON.stringify(snapshot) } : {}),
+        ...(["PUT", "PATCH"].includes(method) ? { body: JSON.stringify(snapshot) } : {}),
       }, { fetchImpl, timeoutMs, errorPrefix: "firebase" });
     } catch (error) {
       // Refresh credentials on the next bounded attempt; never retry a write invisibly.
@@ -98,6 +122,10 @@ export function createHeatingFirebaseClient({
   return {
     read: () => request("GET"),
     write: (snapshot) => request("PUT", snapshot),
+    writeHistory: (updates) => {
+      const safe = validateHeatingHistoryUpdates(updates);
+      return Object.keys(safe).length ? request("PATCH", safe, HEATING_HISTORY_PATH) : Promise.resolve(null);
+    },
   };
 }
 
@@ -105,7 +133,7 @@ export async function collectHeatingSnapshot({ readStates, previous = null, now 
   try {
     const states = await readStates();
     if (!Array.isArray(states)) throw new RelayError("invalid-response");
-    return buildHeatingSnapshot(states, new Date(now()).toISOString());
+    return buildHeatingSnapshot(states, new Date(now()).toISOString(), previous);
   } catch (error) {
     const code = ["ha-unreachable", "ha-http-error", "invalid-response"].includes(error?.code)
       ? error.code : "ha-unreachable";
@@ -114,17 +142,30 @@ export async function collectHeatingSnapshot({ readStates, previous = null, now 
 }
 
 /** Only retain data from the supported schema when recovering after a restart. */
-export function restoreHeatingSnapshot(value) {
+export function restoreHeatingSnapshot(value, nowMs = Date.now()) {
   if (!value || value.version !== 1 || typeof value.checkedAt !== "string") return null;
   return {
     version: 1, connected: value.connected === true, checkedAt: value.checkedAt,
     lastSuccessfulAt: typeof value.lastSuccessfulAt === "string" ? value.lastSuccessfulAt : null,
     entities: selectHeatingEntities(value.entities),
+    lastValid: mergeHeatingLastValid(value.lastValid, value.entities, {}, nowMs),
   };
 }
 
 export function heatingBackoffMs(consecutiveFailures, pollMs = DEFAULT_POLL_MS) {
   return Math.min(MAX_BACKOFF_MS, pollMs * (2 ** Math.min(Math.max(0, consecutiveFailures), 8)));
+}
+
+/** Keep history retries idempotent and independent from live-status publication. */
+export async function publishHeatingCycle({ firebase, current, previous = null, pendingHistory = {} }) {
+  mergeHeatingHistoryUpdates(pendingHistory, heatingHistoryUpdates(current, previous));
+  await firebase.write(current);
+  try {
+    await firebase.writeHistory(pendingHistory);
+    return { pendingHistory: {}, historyError: null };
+  } catch (error) {
+    return { pendingHistory, historyError: error instanceof RelayError ? error.code : "unexpected-failure" };
+  }
 }
 
 function requireEnv(env, key) {
@@ -134,9 +175,11 @@ function requireEnv(env, key) {
 }
 
 export async function main(args = process.argv.slice(2), env = process.env) {
-  if (args.some((argument) => argument !== "--once")) throw new RelayError("usage: --once only");
-  const once = args.includes("--once");
+  const { once, backfillDays } = parseHeatingRelayArgs(args);
   const readStates = createHeatingHaReader({
+    baseUrl: requireEnv(env, "HOME_ASSISTANT_URL"), token: requireEnv(env, "HOME_ASSISTANT_TOKEN"),
+  });
+  const readHistory = createHeatingHaHistoryReader({
     baseUrl: requireEnv(env, "HOME_ASSISTANT_URL"), token: requireEnv(env, "HOME_ASSISTANT_TOKEN"),
   });
   const firebase = createHeatingFirebaseClient({
@@ -153,6 +196,10 @@ export async function main(args = process.argv.slice(2), env = process.env) {
   let previous = null;
   let restored = false;
   let failures = 0;
+  let historyImported = false;
+  let nextHistoryAttempt = 0;
+  let historyBootstrapError = false;
+  let pendingHistory = {};
   try {
     do {
       try {
@@ -161,12 +208,31 @@ export async function main(args = process.argv.slice(2), env = process.env) {
           previous = restoreHeatingSnapshot(await firebase.read());
           restored = true;
         }
-        previous = await collectHeatingSnapshot({ readStates, previous });
-        await firebase.write(previous);
+        if (!historyImported && Date.now() >= nextHistoryAttempt) {
+          try {
+            const end = Date.now();
+            const start = end - backfillDays * 86_400_000;
+            const imported = importHeatingRecorderHistory(await readHistory(start, end), start, end);
+            mergeHeatingHistoryUpdates(pendingHistory, imported.updates);
+            if (previous) previous.lastValid = mergeHeatingLastValid(imported.lastValid, previous.lastValid, previous.entities, end);
+            else previous = { version: 1, connected: false, checkedAt: new Date(end).toISOString(), lastSuccessfulAt: null, entities: {}, lastValid: imported.lastValid };
+            historyImported = true;
+            historyBootstrapError = false;
+          } catch (error) {
+            nextHistoryAttempt = Date.now() + MAX_BACKOFF_MS;
+            historyBootstrapError = true;
+            console.error(`[chauffage] history-bootstrap ${error instanceof RelayError ? error.code : "unexpected-failure"}`);
+          }
+        }
+        const current = await collectHeatingSnapshot({ readStates, previous });
+        const published = await publishHeatingCycle({ firebase, current, previous, pendingHistory });
+        previous = current;
+        pendingHistory = published.pendingHistory;
+        if (published.historyError) console.error(`[chauffage] history-publish ${published.historyError}`);
         failures = previous.connected ? 0 : failures + 1;
         console.log(`[chauffage] published connected=${previous.connected} entities=${Object.keys(previous.entities).length}`);
         if (once) {
-          if (!previous.connected) process.exitCode = 1;
+          if (!previous.connected || published.historyError || historyBootstrapError) process.exitCode = 1;
           return;
         }
       } catch (error) {
@@ -183,6 +249,17 @@ export async function main(args = process.argv.slice(2), env = process.env) {
     process.removeListener("SIGTERM", stop);
     process.removeListener("SIGINT", stop);
   }
+}
+
+export function parseHeatingRelayArgs(args) {
+  let once = false;
+  let backfillDays = 1;
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === "--once") once = true;
+    else if (args[index] === "--backfill-days" && /^[1-7]$/.test(args[index + 1] ?? "")) backfillDays = Number(args[++index]);
+    else throw new RelayError("usage: --once [--backfill-days 1..7]");
+  }
+  return { once, backfillDays };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

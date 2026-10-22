@@ -38,12 +38,18 @@ export interface HeatingSnapshot {
   errorCode?: HeatingSourceError;
   /** Role keys (tankA, etc.), because Firebase keys cannot contain HA's dots. */
   entities: Partial<Record<HeatingEntityKey, HeatingEntity>>;
+  /** Last valid numeric observations, with their original source timestamps. */
+  lastValid?: Partial<Record<HeatingEntityKey, HeatingEntity>>;
 }
 
 export interface HeatingMetric {
   value: number | null;
   unit: "°C" | "%";
   reportedAt: string | null;
+  /** True when value is retained from an earlier valid source observation. */
+  isFallback: boolean;
+  /** Timestamp of the current source state, distinct from the value timestamp. */
+  sourceStateAt: string | null;
   freshness: HeatingFreshness;
   availability: HeatingAvailability;
   label: string;
@@ -100,10 +106,11 @@ export function selectHeatingEntities(states: unknown): HeatingSnapshot["entitie
   return output;
 }
 
-export function buildHeatingSnapshot(states: unknown, checkedAt: string): HeatingSnapshot {
+export function buildHeatingSnapshot(states: unknown, checkedAt: string, previous: HeatingSnapshot | null = null): HeatingSnapshot {
+  const entities = selectHeatingEntities(states);
   return {
-    version: 1, connected: true, checkedAt, lastSuccessfulAt: checkedAt,
-    entities: selectHeatingEntities(states),
+    version: 1, connected: true, checkedAt, lastSuccessfulAt: checkedAt, entities,
+    lastValid: mergeHeatingLastValid(previous?.lastValid, previous?.entities, entities, Date.parse(checkedAt)),
   };
 }
 
@@ -116,13 +123,14 @@ export function heatingFailureSnapshot(
     version: 1, connected: false, checkedAt, errorCode,
     lastSuccessfulAt: previous?.lastSuccessfulAt ?? null,
     entities: selectHeatingEntities(previous?.entities),
+    lastValid: mergeHeatingLastValid(previous?.lastValid, previous?.entities, {}, Date.parse(checkedAt)),
   };
 }
 
 function validTimestamp(value: unknown, nowMs: number): string | null {
   if (typeof value !== "string" || !value.trim()) return null;
   const time = Date.parse(value);
-  if (!Number.isFinite(time) || time > nowMs + MAX_FUTURE_SKEW_MS) return null;
+  if (!Number.isFinite(time) || time < 0 || time > nowMs + MAX_FUTURE_SKEW_MS) return null;
   return new Date(time).toISOString();
 }
 
@@ -150,9 +158,10 @@ function metric(
 ): HeatingMetric {
   const unit = options.percentage ? "%" : "°C";
   const reportedAt = validTimestamp(entity?.last_reported ?? entity?.last_updated ?? entity?.last_changed, nowMs);
+  const sourceStateAt = validTimestamp(entity?.last_updated ?? entity?.last_changed ?? entity?.last_reported, nowMs);
   const base: HeatingMetric = {
-    value: null, unit, reportedAt,
-    freshness: classifyHeatingFreshness(reportedAt, nowMs),
+    value: null, unit, reportedAt: null, isFallback: false, sourceStateAt,
+    freshness: classifyHeatingFreshness(sourceStateAt, nowMs),
     availability: entity ? "unavailable" : "missing", label,
   };
   if (!entity || UNAVAILABLE.has(entity.state.trim().toLowerCase())) return base;
@@ -164,13 +173,56 @@ function metric(
   const supportedUnit = options.percentage
     ? sourceUnit === "%"
     : sourceUnit === "°C" || sourceUnit === "C" || (options.setpoint && sourceUnit === undefined);
-  if (value === null || !supportedUnit || (options.percentage && (value < 0 || value > 100))) {
+  if (value === null || !reportedAt || !supportedUnit || (options.percentage && (value < 0 || value > 100))) {
     return { ...base, availability: "invalid" };
   }
   return {
-    ...base, value, availability: "available",
+    ...base, value, reportedAt, availability: "available",
     // An unchanged persisted setting is not an old physical measurement.
-    freshness: options.setpoint ? "fresh" : base.freshness,
+    freshness: options.setpoint ? "fresh" : classifyHeatingFreshness(reportedAt, nowMs),
+  };
+}
+
+
+export const HEATING_METRIC_KEYS = ["tankA", "tankB", "tankD", "woodBoiler", "fuelSetpoint", "servo"] as const;
+export type HeatingMetricKey = typeof HEATING_METRIC_KEYS[number];
+
+function metricOptions(key: HeatingMetricKey) {
+  return { setpoint: key === "fuelSetpoint", percentage: key === "servo" };
+}
+
+/** Never promote malformed values, unknown units or untrustworthy dates to a last-good observation. */
+export function mergeHeatingLastValid(
+  retained: unknown, priorEntities: unknown, currentEntities: unknown, nowMs = Date.now(),
+): NonNullable<HeatingSnapshot["lastValid"]> {
+  const result: NonNullable<HeatingSnapshot["lastValid"]> = {};
+  for (const source of [retained, priorEntities, currentEntities]) {
+    const entities = selectHeatingEntities(source);
+    for (const key of HEATING_METRIC_KEYS) {
+      const entity = entities[key];
+      const value = metric(entity, key, nowMs, metricOptions(key));
+      if (entity && value.availability === "available" && value.reportedAt) {
+        const oldValue = metric(result[key], key, nowMs, metricOptions(key));
+        if (!oldValue.reportedAt || Date.parse(value.reportedAt) >= Date.parse(oldValue.reportedAt)) result[key] = entity;
+      }
+    }
+  }
+  return result;
+}
+
+function retainedMetric(
+  entity: HeatingEntity | undefined, retained: HeatingEntity | undefined, label: string,
+  nowMs: number, options: { setpoint?: boolean; percentage?: boolean } = {},
+): HeatingMetric {
+  const current = metric(entity, label, nowMs, options);
+  const previous = metric(retained, label, nowMs, options);
+  if (current.value !== null && (!previous.reportedAt || !current.reportedAt
+    || Date.parse(current.reportedAt) >= Date.parse(previous.reportedAt))) return current;
+  if (previous.value === null) return current;
+  return {
+    ...current, value: previous.value, reportedAt: previous.reportedAt, isFallback: true,
+    // Retained settings must also be visibly dated when their source is unavailable.
+    freshness: classifyHeatingFreshness(previous.reportedAt, nowMs),
   };
 }
 
@@ -178,6 +230,7 @@ function metric(
 export function normalizeHeatingSnapshot(raw: unknown, nowMs = Date.now()): ChauffageStatus {
   const snapshot = record(raw) && raw.version === 1 ? raw : null;
   const entities = selectHeatingEntities(snapshot?.entities);
+  const lastValid = mergeHeatingLastValid(snapshot?.lastValid, {}, {}, nowMs);
   const fuelEntity = entities.fuelSetpoint;
   const checkedAt = validTimestamp(snapshot?.checkedAt, nowMs);
   const lastSuccessfulAt = validTimestamp(snapshot?.lastSuccessfulAt, nowMs);
@@ -189,20 +242,20 @@ export function normalizeHeatingSnapshot(raw: unknown, nowMs = Date.now()): Chau
     ...(typeof snapshot?.errorCode === "string" && ERROR_CODES.has(snapshot.errorCode as HeatingSourceError)
       ? { errorCode: snapshot.errorCode as HeatingSourceError } : {}),
     measurements: {
-      tankA: metric(entities.tankA, "Ballon bâtiment A", nowMs),
-      tankB: metric(entities.tankB, "Ballon bâtiment B", nowMs),
-      tankD: metric(entities.tankD, "Ballon bâtiment D", nowMs),
-      woodBoiler: metric(entities.woodBoiler, "Chaudière à bois", nowMs),
+      tankA: retainedMetric(entities.tankA, lastValid.tankA, "Ballon bâtiment A", nowMs),
+      tankB: retainedMetric(entities.tankB, lastValid.tankB, "Ballon bâtiment B", nowMs),
+      tankD: retainedMetric(entities.tankD, lastValid.tankD, "Ballon bâtiment D", nowMs),
+      woodBoiler: retainedMetric(entities.woodBoiler, lastValid.woodBoiler, "Chaudière à bois", nowMs),
     },
     fuel: {
-      setpoint: metric(fuelEntity, "Consigne chaudière fioul", nowMs, { setpoint: true }),
+      setpoint: retainedMetric(fuelEntity, lastValid.fuelSetpoint, "Consigne chaudière fioul", nowMs, { setpoint: true }),
       mode: fuelEntity && !UNAVAILABLE.has(fuelEntity.state.trim().toLowerCase()) ? fuelEntity.state : null,
     },
     diagnostics: {
-      servo: metric(entities.servo, "Position du servomoteur", nowMs, { percentage: true }),
+      servo: retainedMetric(entities.servo, lastValid.servo, "Position du servomoteur", nowMs, { percentage: true }),
       woodFault: fault === "on" ? true : fault === "off" ? false : null,
     },
-    hasData: Object.keys(entities).length > 0,
+    hasData: Object.keys(entities).length > 0 || Object.keys(lastValid).length > 0,
   };
 }
 

@@ -18,7 +18,7 @@
     "typecheck": "tsc --noEmit --incremental false",
     "test:aides": "node scripts/test-subsidy.mjs",
     "ha:chauffage": "node --experimental-strip-types scripts/home-assistant-chauffage-bridge.mjs",
-    "test:chauffage": "node --experimental-strip-types scripts/test-chauffage.mjs"
+    "test:chauffage": "node --experimental-strip-types scripts/test-chauffage.mjs && node --experimental-strip-types scripts/test-heating-chart.mjs"
   },
   "keywords": [],
   "author": "",

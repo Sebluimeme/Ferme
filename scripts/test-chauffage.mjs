@@ -3,11 +3,18 @@ import assert from "node:assert/strict";
 import {
   HEATING_ENTITY_IDS, HEATING_STATUS_PATH, buildHeatingSnapshot, heatingFailureSnapshot,
   normalizeHeatingSnapshot, classifyHeatingFreshness, selectHeatingEntities, formatHeatingValue,
+  mergeHeatingLastValid,
 } from "../src/lib/chauffage.ts";
 import {
   createHeatingHaReader, createHeatingFirebaseClient, collectHeatingSnapshot,
   restoreHeatingSnapshot, heatingBackoffMs,
+  createHeatingHaHistoryReader, parseHeatingRelayArgs,
+  publishHeatingCycle,
 } from "./home-assistant-chauffage-bridge.mjs";
+import {
+  HEATING_HISTORY_PATH, heatingHistoryUpdates, heatingHistoryPointPath, normalizeHeatingHistory,
+  heatingHistoryDays, mergeHeatingHistoryUpdates, validateHeatingHistoryUpdates, importHeatingRecorderHistory,
+} from "../src/lib/chauffage-history.ts";
 
 const now = Date.parse("2026-10-22T12:00:00Z");
 const iso = (ageMs = 0) => new Date(now - ageMs).toISOString();
@@ -74,7 +81,7 @@ await test("Seuils physiques : cinq minutes puis trente minutes", () => {
 });
 
 await test("Date future ou illisible ne donne jamais un indicateur frais", () => {
-  for (const date of [iso(-10 * 60_000), "wrong-date", null]) {
+  for (const date of [iso(-10 * 60_000), "1960-01-01T00:00:00Z", "wrong-date", null]) {
     assert.equal(classifyHeatingFreshness(date, now), "unknown");
   }
 });
@@ -95,9 +102,9 @@ await test("Ancien HA : last_updated est conservé sans utiliser l'heure du rela
   assert.equal(value.reportedAt, entity.last_updated);
 });
 
-await test("Date de mesure future conservée comme inconnue malgré une relève récente du relais", () => {
+await test("Date de mesure future rejetée même après une relève récente du relais", () => {
   const status = normalizeHeatingSnapshot(snapshot([sensor("tankA", "41", -10 * 60_000)]), now);
-  assert.equal(status.measurements.tankA.value, 41);
+  assert.equal(status.measurements.tankA.value, null);
   assert.equal(status.measurements.tankA.reportedAt, null);
   assert.equal(status.measurements.tankA.freshness, "unknown");
 });
@@ -234,6 +241,186 @@ await test("Reprise après redémarrage et backoff plafonné à cinq minutes", (
   assert.equal(heatingBackoffMs(0), 30_000);
   assert.equal(heatingBackoffMs(1), 60_000);
   assert.equal(heatingBackoffMs(10), 300_000);
+});
+
+await test("Une sonde indisponible conserve sa dernière température sans rajeunir sa date", () => {
+  const good = snapshot([sensor("tankB", "59.8", 2 * 60 * 60_000)]);
+  const outage = buildHeatingSnapshot([sensor("tankB", "unavailable", 60_000)], iso(), good);
+  const value = normalizeHeatingSnapshot(outage, now).measurements.tankB;
+  assert.equal(value.value, 59.8);
+  assert.equal(value.isFallback, true);
+  assert.equal(value.availability, "unavailable");
+  assert.equal(value.reportedAt, iso(2 * 60 * 60_000));
+  assert.equal(value.sourceStateAt, iso(60_000));
+  assert.equal(value.freshness, "stale");
+  assert.equal(outage.lastValid.tankB.state, "59.8");
+});
+
+await test("Redémarrer pendant une panne conserve lastValid puis accepte la reprise du capteur", () => {
+  const good = snapshot([sensor("tankA", "43", 2 * 60 * 60_000)]);
+  const unavailable = buildHeatingSnapshot([sensor("tankA", "unavailable")], iso(), good);
+  const restored = restoreHeatingSnapshot(JSON.parse(JSON.stringify(unavailable)), now);
+  const failed = heatingFailureSnapshot(restored, iso(), "ha-unreachable");
+  assert.equal(normalizeHeatingSnapshot(failed, now).measurements.tankA.value, 43);
+  const recovered = buildHeatingSnapshot([sensor("tankA", "44", 0)], iso(), failed);
+  const value = normalizeHeatingSnapshot(recovered, now).measurements.tankA;
+  assert.equal(value.value, 44);
+  assert.equal(value.isFallback, false);
+  assert.equal(value.reportedAt, iso());
+});
+
+await test("Unités invalides et dates futures ne remplacent jamais une dernière valeur valide ; zéro est valide", () => {
+  const good = snapshot([sensor("tankA", "0", 120_000)]);
+  for (const invalid of [sensor("tankA", "100", 0, {unit_of_measurement: "°F"}), sensor("tankA", "42", -120_000)]) {
+    const retained = buildHeatingSnapshot([invalid], iso(), good);
+    const value = normalizeHeatingSnapshot(retained, now).measurements.tankA;
+    assert.equal(value.value, 0);
+    assert.equal(value.isFallback, true);
+    assert.equal(value.reportedAt, iso(120_000));
+    assert.equal(value.availability, "invalid");
+  }
+});
+
+await test("Un ancien import n'écrase pas une observation plus récente", () => {
+  const newer = sensor("tankA", "43", 60_000);
+  const older = sensor("tankA", "40", 120_000);
+  const merged = mergeHeatingLastValid({tankA:newer}, {}, {tankA:older}, now);
+  assert.equal(merged.tankA.state, "43");
+  const status = normalizeHeatingSnapshot({ version:1, connected:true, checkedAt:iso(), lastSuccessfulAt:iso(), entities:{tankA:older}, lastValid:merged }, now);
+  assert.equal(status.measurements.tankA.value,43);
+  assert.equal(status.measurements.tankA.isFallback,true);
+});
+
+await test("Sans dernière valeur, la date de l'état indisponible n'est pas une date de mesure", () => {
+  const value = normalizeHeatingSnapshot(snapshot([sensor("tankA", "unavailable")]), now).measurements.tankA;
+  assert.equal(value.value, null);
+  assert.equal(value.reportedAt, null);
+  assert.equal(value.sourceStateAt, iso(60_000));
+});
+
+await test("L'historique utilise la date réelle de mesure et ne réarchive pas les polls identiques", () => {
+  const first = snapshot([sensor("tankA", "41", 120_000)]);
+  const points = Object.values(heatingHistoryUpdates(first)).filter((point) => point.kind === "measurement");
+  assert.deepEqual(points, [{at: now - 120_000, value: 41, kind: "measurement"}]);
+  const next = buildHeatingSnapshot(Object.values(first.entities), iso(-30_000), first);
+  assert.equal(Object.keys(heatingHistoryUpdates(next, first)).length, 0);
+});
+
+await test("Une coupure produit un gap, pas des températures maintenues artificiellement", () => {
+  const first = snapshot([sensor("tankA", "41", 120_000)]);
+  const outage = buildHeatingSnapshot([sensor("tankA", "unavailable", 60_000)], iso(), first);
+  const changes = heatingHistoryUpdates(outage, first);
+  const points = Object.entries(changes).filter(([key]) => key.startsWith("tankA/"));
+  assert.equal(points.length, 1);
+  assert.equal(points[0][1].kind, "gap");
+  assert.equal(points[0][1].at, now - 60_000);
+  assert.equal(points[0][1].value, null);
+  assert.equal(Object.keys(heatingHistoryUpdates(outage, outage)).length, 0);
+});
+
+await test("Coupure réseau globale : un gap par série, une seule fois", () => {
+  const first = snapshot([sensor("tankA", "41")]);
+  const outage = heatingFailureSnapshot(first, iso(), "ha-unreachable");
+  assert.equal(Object.values(heatingHistoryUpdates(outage, first)).length, 6);
+  const again = heatingFailureSnapshot(outage, iso(-30_000), "ha-unreachable");
+  assert.equal(Object.keys(heatingHistoryUpdates(again, outage)).length, 0);
+});
+
+await test("Mesure, panne et reprise dans une même minute conservent la rupture", () => {
+  const minute = Math.floor(now / 60_000) * 60_000;
+  const a = {at:minute + 1000, value:41, kind:"measurement"};
+  const gap = {at:minute + 2000, value:null, kind:"gap"};
+  const b = {at:minute + 3000, value:42, kind:"measurement"};
+  const updates = {};
+  for (const point of [a, gap, b, a]) mergeHeatingHistoryUpdates(updates, {[heatingHistoryPointPath("tankA", point)]:point});
+  assert.equal(Object.keys(updates).length, 2);
+  assert.deepEqual(normalizeHeatingHistory(updates), [gap, b]);
+});
+
+await test("Décodage d'archives multi-jours, tri, déduplication et rejet des points invalides", () => {
+  const valid = {at:now, value:42, kind:"measurement"};
+  const gap = {at:now-1000, value:null, kind:"gap"};
+  assert.deepEqual(normalizeHeatingHistory({"2026-10-22":{a:valid,b:valid,c:gap,d:{at:"wrong",value:1,kind:"measurement"}}}), [gap,valid]);
+  assert.deepEqual(heatingHistoryDays(Date.parse("2026-10-21T23:00:00Z"), now), ["2026-10-21","2026-10-22"]);
+});
+
+await test("Un import Recorder retrouve une température antérieure à une panne avec ses dates originales", () => {
+  const from = now - 86_400_000;
+  const good = sensor("tankB", "59.8", 2 * 60 * 60_000);
+  const outage = sensor("tankB", "unavailable", 60_000);
+  const imported = importHeatingRecorderHistory([[good,outage]], from, now);
+  assert.equal(imported.lastValid.tankB.state, "59.8");
+  assert.equal(imported.lastValid.tankB.last_reported, good.last_updated);
+  assert.deepEqual(normalizeHeatingHistory(imported.updates).map((p)=>p.kind), ["measurement","gap"]);
+});
+
+await test("Le point initial synthétique Recorder ne rajeunit pas la dernière valeur", () => {
+  const from = now - 86_400_000;
+  const originalAt = now - 3 * 86_400_000;
+  const synthetic = {...sensor("tankB","55"),last_updated:new Date(from).toISOString(),last_changed:new Date(originalAt).toISOString()};
+  const imported = importHeatingRecorderHistory([[synthetic]],from,now);
+  assert.equal(imported.lastValid.tankB.last_reported,new Date(originalAt).toISOString());
+  assert.equal(Object.keys(imported.updates).length,0);
+  const uncertain = {...synthetic,last_changed:new Date(from).toISOString()};
+  assert.equal(Object.keys(importHeatingRecorderHistory([[uncertain]],from,now).lastValid).length,0);
+});
+
+await test("Recorder refuse une unité incorrecte et une observation postérieure à la requête", () => {
+  const imported = importHeatingRecorderHistory([[sensor("tankA","100",0,{unit_of_measurement:"°F"}),sensor("tankB","50",-120_000)]],now-86_400_000,now);
+  assert.equal(Object.keys(imported.lastValid).length,0);
+  assert.equal(Object.values(imported.updates).some((p)=>p.kind==="measurement"),false);
+});
+
+await test("Historique Home Assistant : GET seulement, six entités ciblées et sept jours maximum", async () => {
+  const calls=[];
+  const read = createHeatingHaHistoryReader({baseUrl:"http://ha.test:8123",token:"test",fetchImpl:async(url,init)=>{calls.push({url:new URL(url),init});return ok([]);}});
+  await read(now-86_400_000,now);
+  assert.equal(calls[0].init.method,"GET");
+  assert.equal(calls[0].init.body,undefined);
+  assert.equal(calls[0].url.searchParams.get("filter_entity_id").split(",").length,6);
+  assert.equal(calls[0].url.searchParams.has("minimal_response"),false);
+  await assert.rejects(read(now-8*86_400_000,now),/invalid-history-range/);
+  assert.deepEqual(parseHeatingRelayArgs(["--once","--backfill-days","7"]),{once:true,backfillDays:7});
+  assert.throws(()=>parseHeatingRelayArgs(["--backfill-days","30"]),/usage/);
+});
+
+await test("Firebase historique : PATCH limité au nœud dédié, clé idempotente, aucune suppression", async () => {
+  const calls=[];
+  const firebase=createHeatingFirebaseClient({databaseUrl:"https://db.test",apiKey:"test",email:"x@example.invalid",password:"test",now:()=>now,fetchImpl:async(url,init)=>{
+    calls.push({url:String(url),init});return String(url).includes("signInWithPassword")?ok({idToken:"test",expiresIn:"3600"}):ok(null);
+  }});
+  const point={at:now,value:41,kind:"measurement"};
+  const updates={[heatingHistoryPointPath("tankA",point)]:point};
+  await firebase.writeHistory(updates);
+  await firebase.writeHistory(updates);
+  assert.equal(calls.length,3);
+  for (const call of calls.slice(1)) {
+    assert.equal(new URL(call.url).pathname,`/${HEATING_HISTORY_PATH}.json`);
+    assert.equal(call.init.method,"PATCH");
+    assert.deepEqual(JSON.parse(call.init.body),updates);
+  }
+  for (const malicious of [{"../finance":point},{"tankA/2026-10-22/x":null},{"woodFault/2026-10-22/1":point}]) {
+    assert.throws(()=>validateHeatingHistoryUpdates(malicious),/invalid-history-updates/);
+    assert.throws(()=>firebase.writeHistory(malicious),/invalid-history-updates/);
+  }
+  assert.equal(calls.length,3);
+});
+
+await test("Un échec d'archive ne bloque pas le statut ; le lot en attente est réessayé sans nouvelles dates", async () => {
+  const current=snapshot([sensor("tankA","42")]);
+  const writes=[];
+  let fail=true;
+  const firebase={write:async(value)=>writes.push(value),writeHistory:async()=>{if(fail)throw new Error("offline");}};
+  const result=await publishHeatingCycle({firebase,current});
+  assert.equal(writes.length,1);
+  assert.equal(result.historyError,"unexpected-failure");
+  const firstPayload=JSON.stringify(result.pendingHistory);
+  fail=false;
+  const next=await publishHeatingCycle({firebase,current,previous:current,pendingHistory:result.pendingHistory});
+  assert.equal(writes.length,2);
+  assert.equal(next.historyError,null);
+  assert.deepEqual(next.pendingHistory,{});
+  assert.equal(JSON.stringify(result.pendingHistory),firstPayload);
 });
 
 console.log(`\n${passed} tests chauffage réussis.`);
