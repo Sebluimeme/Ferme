@@ -85,7 +85,7 @@ function TankDrawing() {
     <path className={styles.pipeStub} d="M17 48H7M127 48H137M17 137H7M127 137H137" />
     <path className={styles.tankBody} d="M21 29C21 7 123 7 123 29V145C123 167 21 167 21 145Z" />
     <ellipse className={styles.tankTop} cx="72" cy="29" rx="51" ry="16" />
-    <path className={styles.tankContour} d="M21 144C21 166 123 166 123 144M34 48V130M42 160V172M102 160V172" />
+    <path className={styles.tankContour} d="M21 144C21 166 123 166 123 144M42 160V172M102 160V172" />
     <path className={styles.tankRing} d="M23 54C39 64 105 64 121 54M23 126C39 136 105 136 121 126" />
   </svg>;
 }
