@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { ChevronDown, CircleAlert, Clock3, Minus, Plus, Send, SlidersHorizontal, Thermometer, Wifi, WifiOff } from "lucide-react";
 import { Button, Field, Notice, Sheet, farmStyles } from "@/components/ui/FarmUI";
-import { HEATING_DEFAULT_MINIMUM_D, HEATING_FUEL_MINIMUM, HEATING_FUEL_MAXIMUM, HEATING_RELEASE_D, heatingControlReason, heatingSettingsFromDraft, type HeatingControlSettings, type HeatingControlStatus } from "@/lib/heating-control";
+import { HEATING_DEFAULT_MINIMUM_D, HEATING_FUEL_MINIMUM, HEATING_FUEL_MAXIMUM, HEATING_RELEASE_D, heatingControlReason, heatingDisplayedTarget, heatingSettingsFromDraft, type HeatingControlSettings, type HeatingControlStatus } from "@/lib/heating-control";
 import styles from "./HeatingControlPanel.module.css";
 
 export interface HeatingControlPanelProps {
@@ -40,7 +40,7 @@ function Delivery({ status, offline, detailed = false }: { status: HeatingContro
   const stale = offline || !status.fresh;
   const transmitted = displayDate(status.lastTransmittedAt);
   const lastSeen = displayDate(status.moduleLastSeenAt);
-  const target = status.mode === "manual" ? status.manualTemperature : status.desiredTemperature ?? status.recommendedTemperature;
+  const target = heatingDisplayedTarget(status, offline);
   const labels = {
     disabled: "Pilotage désactivé",
     waiting_module: "En attente du module B",
@@ -54,7 +54,7 @@ function Delivery({ status, offline, detailed = false }: { status: HeatingContro
   const showDeliveryState = !stale && (!status.calibrationValid || !status.actuationEnabled || status.deliveryState !== "transmitted");
   return <div className={styles.delivery}>
     <div className={styles.targets}>
-      <div className={styles.deliveryTarget}><span>{status.mode === "manual" ? "Consigne souhaitée" : "Consigne théorique"}</span><strong>{temperature(target)}</strong><span>{status.mode === "manual" ? "Mode manuel" : "Calcul automatique"}</span></div>
+      <div className={styles.deliveryTarget}><span>{target.label}</span><strong>{temperature(target.value)}</strong><span>{target.detail}</span></div>
       <div className={styles.lastTransmission}><span>Dernier envoi via API</span><strong>{transmitted ? temperature(status.lastTransmittedTemperature) : "—"}</strong>{transmitted ? <time dateTime={transmitted.iso}>{transmitted.text}</time> : <span>Aucun envoi enregistré</span>}</div>
     </div>
     {!stale && <p className={styles.connection}>{status.moduleOnline ? <Wifi aria-hidden="true" /> : <WifiOff aria-hidden="true" />}<span>{status.moduleOnline ? "Module en ligne" : "Module hors ligne"}{!status.moduleOnline && status.actuationEnabled ? " · demande conservée" : ""}</span></p>}
@@ -191,7 +191,7 @@ export default function HeatingControlPanel(props: HeatingControlPanelProps) {
       <header className={styles.header}><h3>Pilotage fioul</h3>{known && <span className={styles.modeBadge}>{status.mode === "manual" ? "Manuel" : "Automatique"}</span>}</header>
       <Availability status={status} loading={loading} offline={offline} />
       {known && <Delivery status={status} offline={offline} />}
-      {known && status.mode === "automatic" && <p className={styles.muted}>Minimum D : {temperature(status.minimumD)}. Fioul à 50 °C dès que D atteint 60 °C.</p>}
+      {known && status.mode === "automatic" && <p className={styles.muted}>Sonde de régulation : <b>haut du ballon D · {temperature(status.temperatureD)}</b>{offline || !status.fresh ? " (dernier relevé connu)" : ""}. Minimum : {temperature(status.minimumD)}. Fioul à 50 °C dès que ce ballon atteint 60 °C.</p>}
       <p className={styles.feedback}>Position mécanique non mesurée.</p>
       {error && <Notice tone="error">{error}</Notice>}
       {result && <p className={styles.result} role="status">Demande enregistrée dans Home Assistant.</p>}

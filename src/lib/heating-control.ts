@@ -50,6 +50,25 @@ export interface HeatingControlRequest extends HeatingControlSettings {
   processedAt?: number;
 }
 
+/** Display-only fallback: a remembered API setting never becomes a new control decision. */
+export function heatingDisplayedTarget(status: HeatingControlStatus, offline = false) {
+  if (!status.available) return { value: null, label: "Consigne indisponible", detail: "En attente des réglages" };
+  const stale = offline || !status.fresh;
+  if (status.mode === "manual") return { value: status.manualTemperature, label: "Consigne souhaitée", detail: stale ? "Mode manuel · état ancien" : "Mode manuel" };
+  const calculated = status.desiredTemperature ?? status.recommendedTemperature;
+  if (calculated !== null) return {
+    value: calculated,
+    label: stale ? "Dernière consigne calculée" : "Consigne théorique",
+    detail: stale ? "Calcul ancien" : status.phase === "suspended" ? "En attente de transmission" : "Calcul automatique",
+  };
+  if (status.lastTransmittedTemperature !== null && status.lastTransmittedAt !== null) return {
+    value: status.lastTransmittedTemperature,
+    label: "Consigne conservée",
+    detail: stale ? "Dernier état connu" : "Calcul suspendu",
+  };
+  return { value: null, label: "Consigne à calculer", detail: "Aucune consigne connue" };
+}
+
 const finite = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const iso = (value: unknown): string | null => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value)) ? value : null;

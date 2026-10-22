@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeHeatingControl, controlStatusFromHa, validateHeatingControlRequest, parseHaHeatingConfiguration, validHeatingSettings, heatingConfigurationReceiptState, heatingSettingsFromDraft } from "../src/lib/heating-control.ts";
+import { normalizeHeatingControl, controlStatusFromHa, validateHeatingControlRequest, parseHaHeatingConfiguration, validHeatingSettings, heatingConfigurationReceiptState, heatingSettingsFromDraft, heatingDisplayedTarget } from "../src/lib/heating-control.ts";
 import { createHeatingConfigurationHaClient, createHeatingControlFirebase, processHeatingControlRequests } from "./home-assistant-heating-control-bridge.mjs";
 
 const now = Date.now();
@@ -219,4 +219,24 @@ test("the HA client has exactly one configuration service and sends no physical 
   assert.equal(calls[0].url, "http://ha.local:8123/api/services/script/ferme_chauffage_configurer");
   assert.deepEqual(Object.keys(JSON.parse(calls[0].init.body)).sort(), ["mode", "manual_temperature", "minimum_d", "request_id", "expires_at", "expected_revision"].sort());
   assert.equal(JSON.parse(calls[0].init.body).expires_at, Math.floor((now + 90_000) / 1000));
+});
+
+test("offline module keeps a dated API setting visible without inventing an automatic decision", () => {
+  const status = { ...controlStatusFromHa(states(), now), mode: "automatic", phase: "suspended", reason: "sensor_b_unavailable", moduleOnline: false, deliveryState: "waiting_module", desiredTemperature: null, recommendedTemperature: null, lastTransmittedTemperature: 61, lastTransmittedAt: new Date(now - 600_000).toISOString() };
+  const original = structuredClone(status);
+  assert.deepEqual(heatingDisplayedTarget(status), { value: 61, label: "Consigne conservée", detail: "Calcul suspendu" });
+  assert.deepEqual(status, original);
+  assert.equal(heatingDisplayedTarget({ ...status, desiredTemperature: 50 }).value, 50);
+  assert.equal(heatingDisplayedTarget({ ...status, desiredTemperature: 50 }).label, "Consigne théorique");
+  assert.equal(heatingDisplayedTarget({ ...status, mode: "manual", manualTemperature: 55 }).value, 55);
+  assert.equal(heatingDisplayedTarget({ ...status, lastTransmittedAt: null }).value, null);
+  assert.equal(heatingDisplayedTarget({ ...status, lastTransmittedTemperature: null }).value, null);
+  assert.equal(heatingDisplayedTarget({ ...status, available: false }).value, null);
+});
+
+test("an old displayed calculation is labelled as old even if it has a numeric value", () => {
+  const status = { ...controlStatusFromHa(states(), now), mode: "automatic", desiredTemperature: 63 };
+  for (const [value, offline] of [[status, true], [{ ...status, fresh: false }, false]]) {
+    assert.deepEqual(heatingDisplayedTarget(value, offline), { value: 63, label: "Dernière consigne calculée", detail: "Calcul ancien" });
+  }
 });
