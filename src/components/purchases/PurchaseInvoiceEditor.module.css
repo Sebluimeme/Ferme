@@ -13,6 +13,7 @@
 .amount input { font-size: 40px; font-weight: 700; line-height: 1.15; letter-spacing: -1px; font-variant-numeric: tabular-nums; background: transparent; border: 0; border-radius: 0; padding: 3px 0; }
 .amount span { font-size: 28px; color: var(--farm-muted); }
 .formGrid { display: grid; gap: 16px; }
+.purchaseTitle { margin-bottom: 20px; }
 .sectionHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .sectionHeading h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
 .muted { color: var(--farm-muted); font-size: 15px; }

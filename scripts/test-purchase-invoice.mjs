@@ -110,6 +110,38 @@ try {
     assert.equal(invoice.fournisseur, undefined);
   });
 
+  await test("l’intitulé saisi identifie la facture, avec ou sans fournisseur", () => {
+    const input = draft({ montant: "23", allocations: [{ ...draft().allocations[2], description: "Boule de direction", montant: "23" }] });
+    const invoice = model.buildPurchaseInvoice(input);
+    assert.equal(model.purchaseInvoiceTitle(invoice), "Boule de direction");
+    assert.equal(model.purchaseInvoiceTitle({ ...invoice, fournisseur: undefined }), "Boule de direction");
+    assert.equal(invoice.fournisseur, "Fournisseur test");
+    assert.equal(invoice.produit, "Boule de direction");
+  });
+
+  await test("facture répartie : aperçu des achats, toutes les descriptions conservées pour le détail et la recherche", () => {
+    const input = draft();
+    input.allocations[0].description = "Aliment porcs";
+    input.allocations[1].description = "Aliment bovins";
+    input.allocations[2].description = "Réparation Aebi";
+    const invoice = model.buildPurchaseInvoice(input);
+    const original = structuredClone(invoice);
+    assert.equal(model.purchaseInvoiceTitle(invoice), "Aliment porcs · Aliment bovins · …");
+    const rows = model.expandPurchaseAllocations([invoice]);
+    assert.ok(rows.some(row => row.produit === "Réparation Aebi" && row.fournisseur === "Fournisseur test"));
+    assert.deepEqual(invoice, original);
+    const repeated = { ...invoice, allocations: invoice.allocations.map(line => ({ ...line, description: "Achat partagé" })) };
+    assert.equal(model.purchaseInvoiceTitle(repeated), "Achat partagé");
+  });
+
+  await test("anciennes factures sans description : repli sur le produit, puis le fournisseur", () => {
+    const invoice = model.buildPurchaseInvoice(draft());
+    const withoutDescriptions = { ...invoice, allocations: invoice.allocations.map(line => ({ ...line, description: "  " })), produit: "Ancien achat" };
+    assert.equal(model.purchaseInvoiceTitle(withoutDescriptions), "Ancien achat");
+    assert.equal(model.purchaseInvoiceTitle({ ...withoutDescriptions, produit: " " }), "Fournisseur test");
+    assert.equal(model.purchaseInvoiceTitle({ ...withoutDescriptions, produit: "", fournisseur: "" }), "Facture d’achat");
+  });
+
   await test("ancienne graphie Revolut acceptée en brouillon et enregistrée sous une seule identité", () => {
     for (const payeur of ["Revolut", "revolut", " REVOLUT "]) {
       const input = draft({ payeur });

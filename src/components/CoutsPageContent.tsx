@@ -14,7 +14,7 @@ import { readTransactionRecords } from "@/lib/transaction-records";
 import { FinanceEntryEditor, DebtEntryEditor } from "@/components/purchases/FinanceEntryEditor";
 import { getCategoriesConfig, deleteTransaction, searchTransactions, filterTransactions, type CategoriesConfig } from "@/services/comptabilite-service";
 import { deletePurchaseInvoice } from "@/services/purchase-invoice-service";
-import { expandPurchaseAllocations, isPurchaseInvoice, type PurchaseInvoice } from "@/types/purchase-invoice";
+import { expandPurchaseAllocations, isPurchaseInvoice, purchaseInvoiceTitle, type PurchaseInvoice } from "@/types/purchase-invoice";
 import { computeStats, computeCreditorBalances, formatDate, getTransactionNature, isOperatingTransaction, type Transaction, type FarmCreditor } from "@/types/comptabilite";
 import type { Vehicle } from "@/types/vehicle";
 import styles from "./CoutsPageContent.module.css";
@@ -141,9 +141,10 @@ export default function CoutsPageContent() {
         const nature = getTransactionNature(t);
         const selectedAmount = lines.reduce((sum, row) => sum + row.montant, 0);
         const partial = invoice && Math.round(selectedAmount * 100) !== Math.round(t.montant * 100);
-        const destinations = unique(lines.map(row => row.production));
+        const destinations = unique(lines.flatMap(row => [row.production, row.vehicleLabel || ""]));
         return <button className={styles.entry} key={t.id} type="button" onClick={() => setSelected(t)}>
-          <span className={styles.entryTop}><span className={styles.entryTitle}>{invoice ? t.fournisseur || "Facture d’achat" : t.produit || "Écriture"}</span><strong className={styles.entryAmount}>{t.operation === "Revenus" ? "+" : "−"}{money(t.montant)}</strong></span>
+          <span className={styles.entryTop}><span className={styles.entryTitle}>{invoice ? purchaseInvoiceTitle(t) : t.produit || "Écriture"}</span><strong className={styles.entryAmount}>{t.operation === "Revenus" ? "+" : "−"}{money(t.montant)}</strong></span>
+          {invoice && t.fournisseur && <span className={styles.entryDescription}>Fournisseur : {t.fournisseur}</span>}
           <span className={styles.entryDescription}>{invoice ? `${t.allocations.length} affectation${t.allocations.length > 1 ? "s" : ""} · ${destinations.join(", ")}` : t.production + " · " + t.sousCategorie}</span>
           {nature !== "exploitation" && <span className={styles.selectionAmount}>{nature === "avance" ? "Avance à la ferme" : "Remboursement personnel"} · hors total des achats</span>}
           {partial && <span className={styles.selectionAmount}>Dont {money(selectedAmount)} pour ces filtres</span>}
@@ -175,14 +176,16 @@ export default function CoutsPageContent() {
       onShowEntries={payeur => { setPanel(null); setFilters({ ...emptyFilters, payeur }); setSearch(""); setView("ecritures"); }}
     /></Sheet>}
     {selected && <Sheet title={isPurchaseInvoice(selected) ? "Facture d’achat" : "Détail de l’écriture"} onClose={() => setSelected(null)} footer={<Button variant="primary" fullWidth onClick={() => edit(selected)}>Modifier {isPurchaseInvoice(selected) ? "la facture" : "l’écriture"}</Button>}>
-      <p className={styles.detailAmount}>{money(selected.montant)}</p><p>{selected.fournisseur || selected.produit}</p><p className={styles.secondary}>{formatDate(selected.date)} · {payerName(selected.payeur)}</p>
+      <p className={styles.detailAmount}>{money(selected.montant)}</p><p>{isPurchaseInvoice(selected) ? purchaseInvoiceTitle(selected) : selected.produit || "Écriture"}</p>
+      {selected.fournisseur && <p className={styles.secondary}>Fournisseur : {selected.fournisseur}</p>}
+      <p className={styles.secondary}>{formatDate(selected.date)} · {payerName(selected.payeur)}</p>
       {selected.reference && <p className={styles.secondary}>Référence : {selected.reference}</p>}
       {isPurchaseInvoice(selected) ? <div className={styles.actions}>{expandPurchaseAllocations([selected]).map(line => <Card key={line.id}><strong>{line.production} · {money(line.montant)}</strong><p className={styles.secondary}>{line.produit}</p>{line.vehicleLabel && <p className={styles.secondary}>{line.vehicleLabel}</p>}</Card>)}</div> : <p className={styles.secondary}>{selected.production} · {selected.categorie} · {selected.sousCategorie}</p>}
       {selected.remarque && <p className={styles.detailNote}>{selected.remarque}</p>}
       {selected.pieceJointe && <a className={styles.actionLink} href={selected.pieceJointe.url} target="_blank" rel="noopener noreferrer"><Paperclip aria-hidden="true" />Ouvrir le justificatif</a>}
       <Button variant="danger" fullWidth onClick={() => { setDeleteTarget(selected); setSelected(null); setDeleteError(""); }}><Trash2 aria-hidden="true" />Supprimer {isPurchaseInvoice(selected) ? "la facture" : "l’écriture"}</Button>
     </Sheet>}
-    {deleteTarget && <Sheet title="Confirmer la suppression" onClose={() => setDeleteTarget(null)} busy={deleteBusy} footer={<Button variant="danger" fullWidth busy={deleteBusy} onClick={remove}>Supprimer définitivement</Button>}><p>{isPurchaseInvoice(deleteTarget) ? "La facture et toutes ses affectations seront supprimées." : "Cette écriture sera supprimée."}</p><p><strong>{deleteTarget.fournisseur || deleteTarget.produit} · {money(deleteTarget.montant)}</strong></p>{deleteError && <Notice tone="error">{deleteError}</Notice>}<Button fullWidth onClick={() => setDeleteTarget(null)} disabled={deleteBusy}>Conserver</Button></Sheet>}
+    {deleteTarget && <Sheet title="Confirmer la suppression" onClose={() => setDeleteTarget(null)} busy={deleteBusy} footer={<Button variant="danger" fullWidth busy={deleteBusy} onClick={remove}>Supprimer définitivement</Button>}><p>{isPurchaseInvoice(deleteTarget) ? "La facture et toutes ses affectations seront supprimées." : "Cette écriture sera supprimée."}</p><p><strong>{isPurchaseInvoice(deleteTarget) ? purchaseInvoiceTitle(deleteTarget) : deleteTarget.produit || "Écriture"} · {money(deleteTarget.montant)}</strong></p>{deleteError && <Notice tone="error">{deleteError}</Notice>}<Button fullWidth onClick={() => setDeleteTarget(null)} disabled={deleteBusy}>Conserver</Button></Sheet>}
     {invoiceEditor && <PurchaseInvoiceEditor invoice={invoiceEditor === "new" ? undefined : invoiceEditor} productions={productions} suppliers={suppliers} vehicles={vehicles} userId={state.user?.uid || ""} onClose={() => setInvoiceEditor(null)} onSaved={saved} />}
     {legacyEditor && <FinanceEntryEditor transaction={typeof legacyEditor === "string" ? undefined : legacyEditor} revenue={legacyEditor === "revenue"} config={config} transactions={transactions} onClose={() => setLegacyEditor(null)} onSaved={saved} onConfigChange={setConfig} />}
     {debtEditor && <DebtEntryEditor {...debtEditor} balance={balances[debtEditor.payeur]} transactions={transactions} onClose={() => setDebtEditor(null)} onSaved={() => saved()} />}

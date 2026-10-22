@@ -213,6 +213,17 @@ export function isPurchaseInvoice(transaction: Transaction | null | undefined): 
     && Array.isArray(invoice.allocations) && invoice.allocations.length > 0 && Number.isSafeInteger(invoice.totalCentimes);
 }
 
+/** Intitulé de lecture uniquement : ne remplace ni les affectations ni le fournisseur enregistrés. */
+export function purchaseInvoiceTitle(invoice: PurchaseInvoice): string {
+  const descriptions = Array.from(new Set(invoice.allocations
+    .map((allocation) => allocation.description?.trim())
+    .filter((description): description is string => Boolean(description))));
+  if (descriptions.length) {
+    return `${descriptions.slice(0, 2).join(" · ")}${descriptions.length > 2 ? " · …" : ""}`;
+  }
+  return invoice.produit?.trim() || invoice.fournisseur?.trim() || "Facture d’achat";
+}
+
 /** Vue analytique uniquement : remplace l’en-tête par ses affectations, sans ajouter de dépense. */
 export function expandPurchaseAllocations(transactions: Transaction[]): Transaction[] {
   return transactions.flatMap((transaction) => {
