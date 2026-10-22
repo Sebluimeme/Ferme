@@ -56,8 +56,13 @@ function needsAttention(metric: HeatingMetric, sourceInterrupted: boolean) {
   return sourceInterrupted || metric.isFallback || metric.availability !== "available" || metric.freshness !== "fresh";
 }
 
-function Reading({ metric }: { metric: HeatingMetric }) {
-  return <span className={styles.value}>{metric.value === null ? "—" : numberFormat.format(metric.value)}<span className={styles.unit}>{metric.unit}</span></span>;
+function Reading({ metric, boiler }: { metric: HeatingMetric; boiler: boolean }) {
+  const value = metric.value === null ? "—" : numberFormat.format(metric.value);
+  const size = boiler ? (value.length > 4 ? 20 : 26) : (value.length > 4 ? 28 : 32);
+  return <svg viewBox="0 0 144 180" className={styles.visualReading} role="img" aria-label={`${value} ${metric.unit}`}>
+    <text x={boiler ? 73 : 72} y={boiler ? 99 : 96} textAnchor="middle" className={styles.value} fontSize={size}>{value}</text>
+    <text x={boiler ? 73 : 72} y={boiler ? 115 : 116} textAnchor="middle" className={styles.unit}>{metric.unit}</text>
+  </svg>;
 }
 
 function ReadingDate({ metric, setpoint = false, sourceInterrupted = false }: { metric: HeatingMetric; setpoint?: boolean; sourceInterrupted?: boolean }) {
@@ -109,7 +114,7 @@ function Equipment({ metricKey, title, subtitle, metric, kind = "tank", sourceIn
     <span className={styles.equipmentVisual}>
       {kind === "tank" ? <TankDrawing /> : <BoilerDrawing fuel={kind === "fuel"} />}
       {kind !== "tank" && <span className={styles.boilerIcon}>{kind === "fuel" ? <Droplet aria-hidden="true" /> : <Logs aria-hidden="true" />}</span>}
-      <span className={`${styles.visualReading} ${kind === "tank" ? styles.tankValue : styles.boilerValue}`}><Reading metric={metric} /></span>
+      <Reading metric={metric} boiler={kind !== "tank"} />
     </span>
     <span className={styles.equipmentTitle}>{title}</span>
     {subtitle && <span className={styles.equipmentSubtitle}>{subtitle}</span>}

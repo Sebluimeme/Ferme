@@ -36,12 +36,10 @@
 .tankRing { opacity: .35; }
 .pipeStub { fill: none; stroke: var(--farm-border); stroke-width: 3; stroke-linecap: round; }
 .boilerPanel { fill: var(--farm-surface); stroke: var(--equipment-color); stroke-width: 1; }
-.visualReading { position: absolute; left: 0; right: 0; display: flex; justify-content: center; align-items: center; color: var(--equipment-color); pointer-events: none; }
-.tankValue { top: 74px; height: 35px; }
-.boilerValue { top: 83px; height: 34px; }
-.value { display: inline-flex; align-items: baseline; font-size: clamp(25px, 7vw, 32px); line-height: 1.1; font-weight: 750; letter-spacing: -1px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.unit { margin-left: 3px; font-size: 15px; font-weight: 550; letter-spacing: -.2px; }
-.boilerValue .value { font-size: 27px; }
+/* Shares the drawing's viewBox: values scale and stay centred with the equipment. */
+.visualReading { position: absolute; inset: 0; display: block; width: 100%; height: 180px; fill: var(--equipment-color); pointer-events: none; }
+.value { font-weight: 750; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+.unit { font-size: 12px; font-weight: 550; }
 .boilerIcon { position: absolute; top: 43px; left: 0; right: 0; display: flex; justify-content: center; color: var(--equipment-color); }
 .boilerIcon svg { width: 22px; height: 22px; }
 .equipmentTitle { display: block; margin-top: 4px; font-size: 16px; font-weight: 650; line-height: 1.3; text-wrap: balance; }
