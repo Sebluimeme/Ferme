@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, CircleAlert, Clock3, Network, RefreshCw, Settings2, Thermometer, Wifi, WifiOff } from "lucide-react";
+import { Activity, CircleAlert, Clock3, Gauge, Network, RefreshCw, Settings2, Thermometer, Wifi, WifiOff } from "lucide-react";
 import { Button, Card, Notice, farmStyles } from "@/components/ui/FarmUI";
 import type { ChauffageStatus, HeatingMetric } from "@/lib/chauffage";
 import styles from "./HeatingDashboard.module.css";
@@ -36,9 +36,10 @@ function displayDate(value: string | null) {
 }
 
 function metricState(metric: HeatingMetric) {
-  if (metric.availability === "missing") return "Mesure non disponible";
-  if (metric.availability === "unavailable") return "Capteur indisponible";
-  if (metric.availability === "invalid") return "Mesure non exploitable";
+  const reportedPosition = metric.unit === "%";
+  if (metric.availability === "missing") return reportedPosition ? "Retour non disponible" : "Mesure non disponible";
+  if (metric.availability === "unavailable") return reportedPosition ? "Retour du module indisponible" : "Capteur indisponible";
+  if (metric.availability === "invalid") return reportedPosition ? "Valeur non exploitable" : "Mesure non exploitable";
   if (metric.freshness === "stale") return "Ancien relevé";
   if (metric.freshness === "aging") return "Relevé à vérifier";
   if (metric.freshness === "unknown") return "Date inconnue";
@@ -51,8 +52,10 @@ function needsAttention(metric: HeatingMetric) {
 
 function Reading({ metric, compact = false }: { metric: HeatingMetric; compact?: boolean }) {
   const available = metric.availability === "available" && metric.value !== null;
-  return <span className={compact ? styles.compactValue : styles.value} aria-label={available ? `${numberFormat.format(metric.value!)} degrés Celsius` : "Température indisponible"}>
-    {available ? numberFormat.format(metric.value!) : "—"}<span className={styles.unit} aria-hidden="true">°C</span>
+  const spokenUnit = metric.unit === "%" ? "pour cent" : "degrés Celsius";
+  const unavailableLabel = metric.unit === "%" ? "Position rapportée indisponible" : "Température indisponible";
+  return <span className={compact ? styles.compactValue : styles.value} aria-label={available ? `${numberFormat.format(metric.value!)} ${spokenUnit}` : unavailableLabel}>
+    {available ? numberFormat.format(metric.value!) : "—"}<span className={styles.unit} aria-hidden="true">{metric.unit}</span>
   </span>;
 }
 
@@ -62,9 +65,9 @@ function ReadingDate({ metric, setpoint = false }: { metric: HeatingMetric; setp
   return <div className={styles.readingMeta}>
     <span className={`${styles.measurementState} ${warning ? styles.warning : ""}`}>
       {warning ? <CircleAlert aria-hidden="true" /> : <Clock3 aria-hidden="true" />}
-      {setpoint && !warning ? "Réglage relevé" : metricState(metric)}
+      {setpoint && !warning ? "Réglage mémorisé dans Home Assistant" : metricState(metric)}
     </span>
-    {date && <time dateTime={date.iso} title={date.full}>{metric.availability === "available" ? "Reçu le " : "Dernier état : "}{date.short}</time>}
+    {date && <time dateTime={date.iso} title={date.full}>{setpoint || metric.availability !== "available" ? "Dernier état : " : "Reçu le "}{date.short}</time>}
   </div>;
 }
 
@@ -118,25 +121,40 @@ function BoilerReading({ metric, type }: { metric: HeatingMetric; type: "wood" |
   const fuel = type === "fuel";
   const Icon = fuel ? Settings2 : Thermometer;
   return <section className={styles.boilerReading} aria-label={fuel ? "Consigne de la chaudière fioul" : "Température de la chaudière bois"}>
-    <div className={styles.boilerLabel}><Icon aria-hidden="true" /><div><h3>{fuel ? "Chaudière fioul" : "Chaudière bois"}</h3><p>{fuel ? "Consigne demandée" : "Température mesurée"}</p></div></div>
+    <div className={styles.boilerLabel}><Icon aria-hidden="true" /><div><h3>{fuel ? "Chaudière fioul" : "Chaudière bois"}</h3><p>{fuel ? "Consigne mémorisée" : "Température mesurée"}</p></div></div>
     <Reading metric={metric} />
     <ReadingDate metric={metric} setpoint={fuel} />
-    {fuel && <p className={styles.settingNote}>La consigne est le réglage demandé à la chaudière.</p>}
+    {fuel && <p className={styles.settingNote}>Valeur conservée dans Home Assistant. Elle ne confirme pas que le module B a appliqué ce réglage.</p>}
+  </section>;
+}
+
+function ServoReading({ metric }: { metric: HeatingMetric }) {
+  return <section className={styles.boilerReading} aria-label="Position rapportée du servomoteur fioul">
+    <div className={styles.boilerLabel}><Gauge aria-hidden="true" /><div><h3>Servomoteur fioul</h3><p>Position rapportée par le module</p></div></div>
+    <Reading metric={metric} />
+    <ReadingDate metric={metric} />
+    <p className={styles.settingNote}>La température du ballon et ce retour proviennent du même module.</p>
   </section>;
 }
 
 function TankCard({ id, metric, status }: { id: BuildingId; metric: HeatingMetric; status: ChauffageStatus }) {
+  const noReturn = (reading: HeatingMetric) => reading.availability === "unavailable" || reading.availability === "missing";
+  const noBuildingBReturn = id === "B" && status.hasData && noReturn(metric) && noReturn(status.diagnostics.servo);
   return <Card className={styles.tankCard} id={`chauffage-batiment-${id}`} role="region" aria-labelledby={`building-heading-${id}`}>
     <header className={styles.tankHeader}>
       <span className={styles.buildingBadge} aria-hidden="true">{id}</span>
       <div><h2 id={`building-heading-${id}`}>Bâtiment {id}</h2><p>{id === "A" ? "Ballon d’eau chaude" : "Ballon tampon · 2 000 litres"}</p></div>
     </header>
+    {noBuildingBReturn && <Notice tone="warning" className={styles.moduleNotice}>Aucun retour du module B. La consigne mémorisée ne confirme pas son application.</Notice>}
     <div className={styles.tankReading}>
       <div className={styles.measurementLabel}><Thermometer aria-hidden="true" />{id === "D" ? "Haut du ballon" : "Température du ballon"}</div>
       <Reading metric={metric} />
       <ReadingDate metric={metric} />
     </div>
-    {id === "B" && <BoilerReading metric={status.fuel.setpoint} type="fuel" />}
+    {id === "B" && <>
+      <BoilerReading metric={status.fuel.setpoint} type="fuel" />
+      <ServoReading metric={status.diagnostics.servo} />
+    </>}
     {id === "D" && <BoilerReading metric={status.measurements.woodBoiler} type="wood" />}
   </Card>;
 }
@@ -144,7 +162,7 @@ function TankCard({ id, metric, status }: { id: BuildingId; metric: HeatingMetri
 export default function HeatingDashboard({ status, loading, error, refreshing, offline, onRefresh, topology = provisionalTopology }: HeatingDashboardProps) {
   const checked = displayDate(status.checkedAt);
   const connected = status.connected && status.relayFreshness === "fresh" && !offline;
-  const connectionLabel = offline ? "Hors ligne" : !status.hasData ? "En attente des relevés" : !status.connected ? "Connexion interrompue" : status.relayFreshness !== "fresh" ? "Synchronisation en retard" : "Suivi connecté";
+  const connectionLabel = offline ? "Application hors connexion" : !status.hasData ? "En attente des relevés" : !status.connected ? "Synchronisation Home Assistant interrompue" : status.relayFreshness !== "fresh" ? "Synchronisation en retard" : "Synchronisation Home Assistant active";
   const ConnectionIcon = offline || (status.hasData && !status.connected) ? WifiOff : connected ? Wifi : Clock3;
 
   return <div className={`${farmStyles.theme} ${styles.page}`}>
