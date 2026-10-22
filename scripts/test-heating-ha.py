@@ -435,6 +435,28 @@ class HeatingPackageTests(unittest.TestCase):
         self.assertEqual(result['s'],'support_start')
         self.assertEqual(self.h.servo_calls,[-2])
 
+    def test_offline_b_calculates_from_d_without_sending_or_stair_stepping(self):
+        self.active_auto(d=56)
+        self.h.set(B,'unavailable')
+        for _ in range(20):
+            self.h.time+=60;self.h.set(D,56);self.h.observe()
+            self.assertEqual(self.h.status()['desired_temperature'],61)
+            self.assertEqual(self.h.status()['phase'],'active')
+            self.assertEqual(self.h.status()['delivery_state'],'waiting_module')
+            self.assertIsNone(self.h.status()['last_transmitted_temperature'])
+        self.assertEqual(self.h.servo_calls,[])
+        self.h.set(D,61);self.h.observe()
+        self.assertEqual(self.h.status()['desired_temperature'],50)
+        self.h.set(B,60);self.h.observe()
+        self.assertEqual(self.h.servo_calls,[-50])
+
+    def test_offline_b_never_replaces_missing_d_with_a_theoretical_value(self):
+        self.active_auto(d=56);self.h.set(B,'unavailable');self.h.observe()
+        self.h.set(D,'unavailable');self.h.observe()
+        self.assertIsNone(self.h.status()['desired_temperature'])
+        self.assertEqual(self.h.status()['phase'],'suspended')
+        self.assertEqual(self.h.servo_calls,[])
+
     def test_hot_d_priority_50_even_offline(self):
         self.active_auto(d=61); self.h.set(B,'unavailable'); self.h.transmitted(70,age=10)
         self.h.observe()

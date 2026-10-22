@@ -304,7 +304,7 @@ automation:
       response_blocked: '{{ response_useful and response_at > 0 and current_time-response_at >= 1800 }}'
   - variables:
       decision: >-
-        {% set d=d_state | float(0) %}{% set b=b_state | float(0) %}{% set current=last_temperature if last_temperature
+        {% set d=d_state | float(0) %}{% set b=b_state | float if b_usable else target_d %}{% set current=last_temperature if last_temperature
         is number else 50 %}
 
         {% set age=current_time-last_at %}{% set demand=previous.get('a',0) == 1 if same_revision else false %}
@@ -321,10 +321,6 @@ automation:
         {% elif not d_usable %}{% set result.s='sensor_d_stale' %}
 
         {% elif d >= 60 %}{% set result.q=50 %}{% set result.s='rest_hot' %}{% set result.a=false %}
-
-        {% elif not b_valid %}{% set result.s='sensor_b_unavailable' %}
-
-        {% elif not b_usable %}{% set result.s='sensor_b_stale' %}
 
         {% elif not history_ready and d > config.d %}{% set result.q=last_temperature %}
 
@@ -596,13 +592,12 @@ template:
       1 else 'transmitted' }}
     status_reason: >-
       {{ 'configuration_invalid' if not config_valid else 'calibration_required' if not calibration_ready else 'control_disabled'
-      if not enabled else 'legacy_conflict' if not legacy_off else 'sensor_b_unavailable' if not b_valid else 'sensor_b_stale'
-      if not b_usable else 'sensor_d_unavailable' if config.m == 'automatic' and not d_valid else 'sensor_d_stale' if
+      if not enabled else 'legacy_conflict' if not legacy_off else 'sensor_d_unavailable' if config.m == 'automatic' and not d_valid else 'sensor_d_stale' if
       config.m == 'automatic' and not d_usable else 'observer_stale' if not observation_fresh else 'transmission_uncertain'
       if status_delivery == 'uncertain' else 'awaiting_transmission' if status_delivery == 'pending' else previous.get('s','warming_up')
       }}
     phase: >-
-      {{ 'active' if enabled and config_valid and calibration_ready and legacy_off and b_usable and (config.m == 'manual'
+      {{ 'active' if enabled and config_valid and calibration_ready and legacy_off and (config.m == 'manual'
       or d_usable) and observation_fresh and status_desired is number else 'suspended' }}
   sensor:
   - name: Ferme chauffage controle

@@ -3,7 +3,7 @@
 import { ChartNoAxesCombined, CircleAlert, Clock3, Droplet, Logs, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button, Card, Notice, farmStyles } from "@/components/ui/FarmUI";
-import type { ChauffageStatus, HeatingMetric } from "@/lib/chauffage";
+import { heatingReadingNeedsAttention, type ChauffageStatus, type HeatingMetric } from "@/lib/chauffage";
 import type { HeatingHistoryKey } from "@/lib/chauffage-history";
 import styles from "./HeatingDashboard.module.css";
 
@@ -52,8 +52,8 @@ function readingAge(metric: HeatingMetric) {
   return `Il y a ${days} jour${days > 1 ? "s" : ""}`;
 }
 
-function needsAttention(metric: HeatingMetric, sourceInterrupted: boolean) {
-  return sourceInterrupted || metric.isFallback || metric.availability !== "available" || metric.freshness !== "fresh";
+function needsAttention(metric: HeatingMetric) {
+  return heatingReadingNeedsAttention(metric);
 }
 
 function Reading({ metric, boiler }: { metric: HeatingMetric; boiler: boolean }) {
@@ -67,12 +67,12 @@ function Reading({ metric, boiler }: { metric: HeatingMetric; boiler: boolean })
 
 function ReadingDate({ metric, setpoint = false, sourceInterrupted = false }: { metric: HeatingMetric; setpoint?: boolean; sourceInterrupted?: boolean }) {
   const date = displayDate(metric.reportedAt);
-  const warning = needsAttention(metric, sourceInterrupted);
+  const warning = needsAttention(metric);
   const hasValue = metric.value !== null;
   return <span className={`${styles.readingMeta} ${warning ? styles.warning : ""}`}>
     <span className={styles.readingState}>
       {warning ? <CircleAlert aria-hidden="true" /> : <Clock3 aria-hidden="true" />}
-      {!hasValue ? "Aucun relevé conservé" : setpoint ? metric.label : warning ? "Dernier relevé" : "Relevé récent"}
+      {!hasValue ? "Aucun relevé conservé" : setpoint ? metric.label : warning || sourceInterrupted || metric.isFallback || metric.availability !== "available" ? "Dernier relevé" : "Relevé récent"}
     </span>
     {hasValue && !setpoint && <span>{readingAge(metric)}</span>}
     {date ? <time dateTime={date.iso} title={date.full}>{date.short}</time> : hasValue ? <span>Date inconnue</span> : <span>En attente du capteur</span>}
@@ -109,7 +109,7 @@ function Equipment({ metricKey, title, subtitle, metric, kind = "tank", sourceIn
   sourceInterrupted: boolean;
   onSelectMetric?: (key: HeatingHistoryKey) => void;
 }) {
-  const warning = needsAttention(metric, sourceInterrupted);
+  const warning = needsAttention(metric);
   return <button type="button" className={`${styles.equipment} ${warning ? styles.equipmentWarning : ""} ${metric.value === null ? styles.equipmentEmpty : ""}`} onClick={() => onSelectMetric?.(metricKey)} aria-label={`Voir l’évolution : ${title}, ${metric.label}`}>
     <span className={styles.equipmentVisual}>
       {kind === "tank" ? <TankDrawing /> : <BoilerDrawing fuel={kind === "fuel"} />}
@@ -162,7 +162,7 @@ export default function HeatingDashboard({ status, loading, error, refreshing, o
     {error && !offline && <Notice tone="error" className={styles.notice}>L’actualisation a échoué. Les dernières valeurs connues restent affichées.</Notice>}
     {!loading && !status.hasData && !error && !offline && <Notice className={styles.notice}>Les températures apparaîtront dès les premiers relevés disponibles.</Notice>}
     <Installation status={status} topology={topology} sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} controlPanel={controlPanel} />
-    <p className={styles.help}><CircleAlert aria-hidden="true" /><span>En orange : une valeur ancienne ou une liaison interrompue. La date indique quand la valeur a été relevée.</span></p>
+    <p className={styles.help}><CircleAlert aria-hidden="true" /><span>En orange : aucun nouveau relevé du capteur depuis plus de 30 minutes. Une coupure plus courte conserve la couleur habituelle.</span></p>
     <footer className={styles.actions}><Button variant="primary" fullWidth busy={refreshing} disabled={loading} onClick={() => { void onRefresh(); }}>{!refreshing && <RefreshCw aria-hidden="true" />}{refreshing ? "Actualisation…" : "Actualiser"}</Button></footer>
   </div>;
 }

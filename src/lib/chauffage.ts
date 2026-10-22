@@ -146,6 +146,11 @@ export function classifyHeatingFreshness(timestamp: string | null, nowMs: number
   return "stale";
 }
 
+/** Orange is an age indication, independent of a temporary connection loss. */
+export function heatingReadingNeedsAttention(metric: HeatingMetric): boolean {
+  return metric.value !== null && metric.freshness === "stale";
+}
+
 function numberValue(value: unknown): number | null {
   if (typeof value !== "number" && typeof value !== "string") return null;
   if (typeof value === "string" && !value.trim()) return null;

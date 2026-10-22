@@ -114,7 +114,7 @@ function previousState(raw) {
  * @param {object} input
  * @param {number} input.now UTC Unix seconds
  * @param {object} input.tankD { value, reportedAt, unit:'°C', available:true }
- * @param {object} input.tankB Same shape; retained/offline samples are forbidden.
+ * @param {object} input.tankB Optional refinement for initial support; offline samples are ignored.
  * @param {{at:number,value:number}[]} [input.historyD]
  * @param {{temperature:number,at:number}|null} [input.lastTransmitted]
  *   Last setpoint whose Home Assistant API call returned without error, not a draft or
@@ -147,12 +147,13 @@ export function evaluateHeatingRegulation(input) {
     authorizesActuation: false,
   });
 
-  for (const [key, sample] of [["tank_d", input.tankD], ["tank_b", input.tankB]]) {
+  for (const [key, sample] of [["tank_d", input.tankD]]) {
     const problem = sampleProblem(sample, now, config.sampleMaxAgeSeconds);
     if (problem) return finish(null, "suspend", `${key}_${problem}`, { ...state, responseAt: null, responseD: null });
   }
   const d = input.tankD.value;
-  const b = input.tankB.value;
+  const bUsable = !sampleProblem(input.tankB, now, config.sampleMaxAgeSeconds);
+  const b = bUsable ? input.tankB.value : config.targetD;
   const slopes = heatingTrends(input.historyD, input.tankD, now, config.sampleMaxAgeSeconds);
   const ready = finite(slopes.recent) && finite(slopes.slow);
   const conservativeSlope = ready ? Math.min(slopes.recent, slopes.slow, finite(slopes.tip) ? slopes.tip : slopes.recent) : null;
@@ -203,7 +204,7 @@ export function evaluateHeatingRegulation(input) {
 
   // No response clock starts for an untransmitted proposal or a setpoint too low
   // to heat B/D. A rapid return to 50 above the upper threshold remains possible.
-  const responseEligible = hasTransmitted && current >= Math.max(d, b) + config.usefulMargin;
+  const responseEligible = bUsable && hasTransmitted && current >= Math.max(d, b) + config.usefulMargin;
   if (!responseEligible || (finite(state.responseD) && d >= state.responseD + config.responseRise)) {
     nextState = { ...nextState, responseAt: null, responseD: null };
   } else if (!finite(state.responseAt) || !finite(state.responseD) || state.responseAt > now) {

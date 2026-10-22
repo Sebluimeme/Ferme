@@ -142,14 +142,13 @@ test("untransmitted proposals neither stair-step nor consume a delivery cooldown
   }
 });
 
-test("disconnect preserves demand but generates no executable stale proposal", () => {
-  const state = { version: 1, support: true, responseAt: NOW - 60, responseD: 56 };
-  const result = evaluate({ tankB: sample(60, NOW, { available: false }), state });
-  assert.equal(result.temperature, null);
-  assert.equal(result.action, "suspend");
-  assert.equal(result.validUntil, NOW);
-  assert.equal(result.nextState.support, true);
+test("B disconnect keeps a theoretical proposal without granting dispatch authority", () => {
+  const result = evaluate({ tankD: sample(56), historyD: [], tankB: sample(60, NOW, { available: false }) });
+  assert.equal(result.temperature, 61);
+  assert.equal(result.reason, "support_start");
+  assert.equal(result.authorizesActuation, false);
   assert.equal(result.nextState.responseAt, null);
+  assert.equal(evaluate({ tankD: sample(61), tankB: null }).temperature, 50);
 });
 
 test("reconnection reevaluates current temperatures and replaces pending support with 50", () => {
@@ -172,7 +171,7 @@ test("incomplete history within the band holds the transmitted setting, not an o
 test("invalid, stale, future, restored and Fahrenheit samples cannot control", () => {
   for (const patch of [{ value: NaN }, { value: Infinity }, { value: "60" }, { value: -1 }, { value: 111 },
     { reportedAt: NOW + 1 }, { reportedAt: NOW - 181 }, { available: false }, { restored: true }, { unit: "°F" }]) {
-    for (const key of ["tankD", "tankB"]) {
+    for (const key of ["tankD"]) {
       const result = evaluate({ [key]: sample(60, NOW, patch) });
       assert.equal(result.temperature, null, `${key} ${JSON.stringify(patch)}`);
       assert.equal(result.action, "suspend");

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   HEATING_ENTITY_IDS, HEATING_STATUS_PATH, buildHeatingSnapshot, heatingFailureSnapshot,
   normalizeHeatingSnapshot, classifyHeatingFreshness, selectHeatingEntities, formatHeatingValue,
-  mergeHeatingLastValid, HEATING_TRANSMITTED_ENTITY_ID,
+  mergeHeatingLastValid, HEATING_TRANSMITTED_ENTITY_ID, heatingReadingNeedsAttention,
 } from "../src/lib/chauffage.ts";
 import {
   createHeatingHaReader, createHeatingFirebaseClient, collectHeatingSnapshot,
@@ -78,6 +78,14 @@ await test("Seuils physiques : cinq minutes puis trente minutes", () => {
   assert.equal(classifyHeatingFreshness(iso(5 * 60_000 + 1), now), "aging");
   assert.equal(classifyHeatingFreshness(iso(30 * 60_000), now), "aging");
   assert.equal(classifyHeatingFreshness(iso(30 * 60_000 + 1), now), "stale");
+});
+
+await test("Orange seulement après trente minutes, même si le module est hors ligne", () => {
+  for (const minutes of [1, 8, 29, 30, 31]) {
+    const metric = normalizeHeatingSnapshot(snapshot([sensor("tankB", "60.9", minutes * 60_000)]), now).measurements.tankB;
+    assert.equal(heatingReadingNeedsAttention(metric), minutes > 30);
+    assert.equal(heatingReadingNeedsAttention({ ...metric, isFallback: true, availability: "unavailable" }), minutes > 30);
+  }
 });
 
 await test("Date future ou illisible ne donne jamais un indicateur frais", () => {
