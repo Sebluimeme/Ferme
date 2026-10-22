@@ -1,0 +1,28 @@
+.stack { display: grid; gap: 12px; }
+.form { margin: 0; }
+.fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.fields { display: grid; gap: 16px; }
+.fields > div + div { margin-top: 0; }
+.section { margin-top: 20px; }
+.grid { display: grid; gap: 16px; }
+.details { border: 1px solid var(--farm-border); border-radius: 16px; margin-top: 20px; }
+.details summary { min-height: 52px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; cursor: pointer; }
+.details summary::-webkit-details-marker { display: none; }
+.details summary svg { width: 20px; height: 20px; flex: none; transition: transform 140ms; }
+.details[open] summary svg { transform: rotate(90deg); }
+.detailsBody { padding: 0 14px 16px; }
+.note { margin: 8px 0 0; color: var(--farm-muted); font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.footerError { margin-bottom: 12px; max-height: 20vh; overflow: auto; }
+.attachment { margin-top: 20px; }
+.fileInput { display: none !important; }
+.fileRow { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.fileName { min-width: 0; flex: 1; font-size: 15px; overflow-wrap: anywhere; }
+.fileName a { color: var(--farm-accent); display: inline-flex; gap: 6px; align-items: center; min-height: 44px; }
+.fileName svg { width: 17px; height: 17px; flex: none; }
+.removeFile { min-width: 48px; padding: 10px; flex: none; }
+.restore { margin-bottom: 16px; border: 1px solid var(--farm-border); }
+.restore h3 { margin: 0 0 8px; font-size: 20px; }
+.restore p { margin: 0 0 16px; color: var(--farm-muted); font-size: 15px; }
+.alerts { display: grid; gap: 12px; margin-bottom: 16px; }
+@media(min-width:500px) { .grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(prefers-reduced-motion:reduce) { .details summary svg { transition: none; } }

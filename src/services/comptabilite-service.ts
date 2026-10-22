@@ -6,6 +6,7 @@ import {
   deleteTransactionWithAttachment,
   parsePositiveDecimal,
   requiresInvoiceService,
+  requiresSubsidyService,
   saveTransactionWithAttachment,
   type TransactionMutationResult,
 } from "./comptabilite-write-safety";
@@ -194,6 +195,7 @@ export async function updateTransaction(id: string, data: TransactionFormData, p
   if (!validation.valid) return { success: false, error: validation.errors.join(", ") };
   const current = await firebaseService.getById<Transaction>(PATH, id);
   if (!current.success || !current.data) return { success: false, error: current.error || "Impossible de vérifier l'écriture avant modification" };
+  if (requiresSubsidyService(current.data)) return { success: false, error: "Ce versement d’aide doit être modifié depuis le formulaire d’aide pour conserver son dispositif et sa campagne." };
   if (requiresInvoiceService(current.data)) return { success: false, error: "Cette facture d'achat doit être modifiée depuis son formulaire de facture pour préserver ses affectations." };
   const parsed = { ...parseFormData(data), id };
   const debtValidation = validateNoNegativeDebt(parsed as Transaction, await getDebtReferenceTransactions(existingTransactions));
@@ -217,6 +219,7 @@ export async function updateTransaction(id: string, data: TransactionFormData, p
 export async function deleteTransaction(id: string, _storagePath?: string): Promise<TransactionMutationResult> {
   const current = await firebaseService.getById<Transaction>(PATH, id);
   if (!current.success || !current.data) return { success: false, error: current.error || "Impossible de vérifier l'écriture avant suppression" };
+  if (requiresSubsidyService(current.data)) return { success: false, error: "Ce versement d’aide doit être supprimé depuis le formulaire d’aide." };
   if (requiresInvoiceService(current.data)) return { success: false, error: "Cette facture d'achat doit être supprimée depuis son formulaire de facture pour préserver ses affectations." };
   return deleteTransactionWithAttachment({
     storagePath: current.data.pieceJointe?.storagePath,

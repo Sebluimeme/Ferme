@@ -50,6 +50,12 @@ export function requiresInvoiceService(transaction: unknown): boolean {
   return entry.typeFacture === "achat" || entry.factureVersion !== undefined || entry.allocations !== undefined;
 }
 
+export function requiresSubsidyService(transaction: unknown): boolean {
+  if (!transaction || typeof transaction !== "object") return false;
+  const entry = transaction as { subvention?: unknown; versionSubvention?: unknown };
+  return entry.subvention !== undefined || entry.versionSubvention !== undefined;
+}
+
 function message(error: unknown): string {
   return error instanceof Error ? error.message : "Connexion indisponible";
 }

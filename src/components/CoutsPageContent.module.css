@@ -18,7 +18,7 @@
 .search { position: relative; min-width: 0; flex: 1; }
 .search > svg { position: absolute; width: 20px; height: 20px; left: 14px; top: 14px; color: var(--farm-muted); }
 .search input { padding-left: 42px; background: var(--farm-surface); min-height: 48px; }
-.tabs { display: grid; grid-template-columns: repeat(3,1fr); background: var(--farm-input); border: 1px solid var(--farm-border); border-radius: 15px; padding: 4px; margin: 0 0 12px; }
+.tabs { display: grid; grid-template-columns: repeat(4,1fr); background: var(--farm-input); border: 1px solid var(--farm-border); border-radius: 15px; padding: 4px; margin: 0 0 12px; }
 .tabs button { min-width: 0; min-height: 44px; border: 0; border-radius: 11px; padding: 8px 4px; font: inherit; font-size: 15px; font-weight: 600; background: transparent; color: var(--farm-muted); cursor: pointer; }
 .tabs button[aria-pressed="true"] { color: var(--farm-text); background: var(--farm-surface); box-shadow: 0 1px 4px #00000010; }
 .entries { display: flex; flex-direction: column; gap: 12px; }
@@ -60,3 +60,5 @@
 @media(min-width:1024px) { .page { padding-bottom: 100px; } .purchaseAction { left: 220px; bottom: 0; padding: 16px 32px; } }
 @media(max-width:359px) { .page { padding-left: 0; padding-right: 0; } .entryTop { flex-wrap: wrap; gap: 6px; } .summaryDetails { gap: 8px; } .summaryDetails strong { font-size: 16px; } .groupTitle { flex-wrap: wrap; } }
 @media(prefers-reduced-motion:reduce) { .entry { transition: none; } }
+
+@media(max-width:359px) { .tabs { grid-template-columns: repeat(2,1fr); } }

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node scripts/test-reproduction.mjs && node --experimental-strip-types scripts/test-comptabilite-finance.mjs && npm run test:achats && npm run test:payeurs && node --experimental-strip-types scripts/test-transaction-records.mjs",
+    "test": "node scripts/test-reproduction.mjs && node --experimental-strip-types scripts/test-comptabilite-finance.mjs && npm run test:achats && npm run test:payeurs && node --experimental-strip-types scripts/test-transaction-records.mjs && npm run test:aides",
     "test:comptabilite": "node --experimental-strip-types scripts/test-comptabilite-finance.mjs",
     "test:payeurs": "node scripts/test-comptabilite-payers.mjs",
     "test:irrigation": "node --experimental-strip-types scripts/test-irrigation-scheduler.mjs",
@@ -15,7 +15,8 @@
     "test:request-cache": "node --experimental-strip-types scripts/test-request-cache.mjs",
     "ha:bridge": "node --experimental-strip-types scripts/home-assistant-irrigation-bridge.mjs",
     "test:achats": "node scripts/test-purchase-invoice.mjs && node --experimental-strip-types scripts/test-comptabilite-write-safety.mjs",
-    "typecheck": "tsc --noEmit --incremental false"
+    "typecheck": "tsc --noEmit --incremental false",
+    "test:aides": "node scripts/test-subsidy.mjs"
   },
   "keywords": [],
   "author": "",

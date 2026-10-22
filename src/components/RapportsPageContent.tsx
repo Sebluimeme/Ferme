@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useAppStore } from "@/store/store";
 import { computeStats, isOperatingTransaction, type Transaction } from "@/types/comptabilite";
+import SubsidyImpact from "@/components/subsidies/SubsidyImpact";
 import FinancingSummary from "@/components/FinancingSummary";
 import { expandPurchaseAllocations } from "@/types/purchase-invoice";
 import {
@@ -227,7 +228,8 @@ export default function RapportsPageContent() {
             <KpiCard label="Transactions" value={transactionCount} icon={<Receipt className="w-3.5 h-3.5" />} />
           </div>
 
-          <p className="text-[15px] text-stone-500">L’écart recettes − achats exclut les avances et remboursements. Il inclut les achats de matériel et ne mesure pas, à lui seul, la rentabilité d’un élevage.</p>
+          <p className="text-[15px] text-stone-500">L’écart recettes − achats exclut les avances et remboursements personnels. Il inclut les achats de matériel et ne mesure pas, à lui seul, la rentabilité d’un élevage.</p>
+          <SubsidyImpact transactions={filtered} />
           <FinancingSummary transactions={canonicalTransactions} />
 
           {/* Coût par tête */}

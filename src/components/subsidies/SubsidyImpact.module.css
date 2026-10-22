@@ -1,0 +1,10 @@
+.card h2 { margin: 0 0 8px; font-size: 22px; font-weight: 700; }
+.card p { margin: 8px 0 16px; color: var(--farm-muted); font-size: 15px; }
+.card dl { margin: 0; }
+.card dl > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 12px 0; }
+.card dt { font-size: 16px; }
+.card dd { margin: 0; flex: none; font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.total { border-top: 1px solid var(--farm-border); }
+.total dt, .total dd { font-weight: 700; }
+.card a { display: flex; align-items: center; min-height: 48px; color: var(--farm-accent); text-decoration: underline; text-underline-offset: 3px; font-size: 17px; }
+@media(max-width:359px) { .card dl > div { flex-wrap: wrap; gap: 4px; } }

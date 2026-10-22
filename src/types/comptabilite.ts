@@ -1,6 +1,7 @@
 /**
  * Types pour la comptabilité de la ferme
  */
+import type { SubsidyMetadata } from "@/types/subsidy";
 
 // ==================== Opérations ====================
 
@@ -36,6 +37,8 @@ export interface Transaction {
   vehicleId?: string; // Axe matériel, indépendant de la production
   vehicleLabel?: string;
   typeAchat?: string;
+  subvention?: SubsidyMetadata;
+  versionSubvention?: number;
   pieceJointe?: {
     url: string;
     storagePath: string;
