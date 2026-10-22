@@ -64,6 +64,22 @@ test("strict v2 status rejects fake booleans, numeric strings, invalid limits an
   assert.equal(badMeasurements.temperatureD, null); assert.equal(badMeasurements.temperatureB, null);
   assert.equal(badMeasurements.recommendedTemperature, null); assert.equal(badMeasurements.nextAdjustmentAt, null);
 });
+test("incomplete HA calibration remains readable with configuration available and physical delivery blocked", () => {
+  const raw = states();
+  Object.assign(raw[0].attributes, {
+    phase: "suspended", reason: "calibration_required", calibration_valid: false,
+    actuation_enabled: false, delivery_state: "disabled", desired_temperature: null,
+  });
+  const status = controlStatusFromHa(raw, now);
+  assert.equal(status.available, true); assert.equal(status.fresh, true);
+  assert.equal(status.phase, "suspended"); assert.equal(status.reason, "calibration_required");
+  assert.equal(status.calibrationValid, false); assert.equal(status.actuationEnabled, false);
+  assert.equal(status.deliveryState, "disabled"); assert.equal(status.desiredTemperature, null);
+  assert.equal(status.positionFeedback, "unmeasured");
+  raw[0].attributes.actuation_enabled = true;
+  const invalid = controlStatusFromHa(raw, now);
+  assert.equal(invalid.available, false); assert.equal(invalid.actuationEnabled, false);
+});
 test("waiting desired temperature stays separate from the previous API transmission", () => {
   const raw = states();
   const sentAt = new Date(now - 3_600_000).toISOString();

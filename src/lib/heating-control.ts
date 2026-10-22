@@ -81,6 +81,7 @@ export function heatingSettingsFromDraft(mode: HeatingControlMode, manualTempera
 export function heatingControlReason(reason: string): string {
   return ({
     control_disabled: "Le pilotage du servomoteur est désactivé.",
+    calibration_required: "Les trois points de calibration du servomoteur ne sont pas encore validés. Les réglages peuvent être mémorisés, mais aucune consigne n’est transmise.",
     legacy_conflict: "Pilotage suspendu : une autre automatisation commande encore le servomoteur.",
     warming_up: "Premières mesures en cours pour calculer la tendance.",
     manual_ready: "La consigne manuelle est mémorisée. Son état de transmission apparaît ci-dessous.",

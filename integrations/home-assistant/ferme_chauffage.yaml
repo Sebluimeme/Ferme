@@ -2,7 +2,9 @@
 # Une réussite API ne prouve ni la réception ESPHome ni la position mécanique du servo.
 # D/B ESPHome fixes : une valeur inchangée ne rafraîchit pas last_reported ; disponibilité native utilisée.
 # Les points de tendance sont des observations locales, pas des dates de conversion matérielle.
-# Positions 50/60/70 °C confirmées par le propriétaire ; aucune action sur les pompes ou sécurités.
+# Calibration physique confirmée : 50 °C → −56 (retour vérifié), 60 °C → −18, 70 °C → +24.
+# Plage du contrôleur limitée à 50–70 °C ; aucune extrapolation vers le point 80 °C.
+# Aucun contrôle des pompes ou des sécurités de la chaudière.
 
 input_boolean:
   ferme_chauffage_commande_active:
@@ -171,6 +173,9 @@ automation:
       b_at: >-
         {% set s = states.sensor.batiment_b_ballon_b %}{{ as_timestamp(s.last_reported,0) | int if s is defined else
         0 }}
+      calibration_points: >-
+        {{ [{'temperature':50,'level':-56,'verified':true},{'temperature':60,'level':-18,'verified':true},{'temperature':70,'level':24,'verified':true}]
+        }}
   - variables:
       config_valid: >-
         {{ config.get('v') == 1 and config.get('r') is number and config.get('r') is not boolean
@@ -190,6 +195,21 @@ automation:
         in ['°C','C'] and not state_attr('sensor.batiment_b_ballon_b','restored') }}
       enabled: '{{ is_state(''input_boolean.ferme_chauffage_commande_active'',''on'') }}'
       legacy_off: '{{ is_state(''automation.nouvelle_automatisation_2'',''off'') }}'
+      calibration_ready: >-
+        {% set ns=namespace(valid=calibration_points is sequence and calibration_points is not string and calibration_points
+        is not mapping and calibration_points | length == 3) %}
+
+        {% if ns.valid %}{% for p in calibration_points %}
+
+        {% if p is not mapping or p.get('temperature') != [50,60,70][loop.index0] or p.get('verified') is not sameas
+        true
+
+        or p.get('level') is not number or p.get('level') is boolean or not is_number(p.get('level')) or not -100 <=
+        p.level <= 100 %}{% set ns.valid=false %}{% endif %}
+
+        {% endfor %}{% endif %}
+
+        {{ ns.valid and calibration_points[0].level < calibration_points[1].level < calibration_points[2].level }}
   - variables:
       d_usable: '{{ d_valid and 0 < d_source_at <= current_time }}'
       b_usable: '{{ b_valid and 0 < b_at <= current_time }}'
@@ -350,10 +370,21 @@ automation:
   - variables:
       desired: '{{ decision.q }}'
       delivery: >-
-        {{ 'disabled' if not enabled else 'blocked' if not config_valid or not legacy_off else 'waiting_module' if not
-        b_usable else 'waiting_sensor' if config.m == 'automatic' and (not d_usable or desired is not number) else 'pending'
-        }}
+        {{ 'disabled' if not enabled else 'blocked' if not config_valid or not calibration_ready or not legacy_off else
+        'waiting_module' if not b_usable else 'waiting_sensor' if config.m == 'automatic' and (not d_usable or desired
+        is not number) else 'pending' }}
       seen: '{{ current_time if b_usable else tx.get("seen",0) }}'
+      servo_level: >-
+        {% if calibration_ready and desired is number and desired is not boolean and desired == desired | int and 50
+        <= desired <= 70 %}
+
+        {% set index=0 if desired <= 60 else 1 %}{% set first=calibration_points[index] %}{% set second=calibration_points[index+1]
+        %}
+
+        {{ (first.level+(desired-first.temperature)*(second.level-first.level)/(second.temperature-first.temperature))
+        | round(3) }}
+
+        {% else %}{{ none }}{% endif %}
   - action: input_text.set_value
     target:
       entity_id: input_text.ferme_chauffage_observation
@@ -392,7 +423,11 @@ automation:
       {% set now_s=as_timestamp(now()) %}{% set bs=states.sensor.batiment_b_ballon_b %}{% set ds=states.sensor.esphome_web_61063e_tampon_haut
       %}
 
-      {{ is_state('input_boolean.ferme_chauffage_commande_active','on') and is_state('automation.nouvelle_automatisation_2','off')
+      {{ calibration_ready and servo_level is number and servo_level is not boolean and -100 <= servo_level <= 100
+
+      and calibration_points[0].level <= servo_level <= calibration_points[2].level
+
+      and is_state('input_boolean.ferme_chauffage_commande_active','on') and is_state('automation.nouvelle_automatisation_2','off')
 
       and states('input_text.ferme_chauffage_configuration') | from_json({}) == config and config_valid
 
@@ -430,7 +465,11 @@ automation:
       {% set now_s=as_timestamp(now()) %}{% set bs=states.sensor.batiment_b_ballon_b %}{% set ds=states.sensor.esphome_web_61063e_tampon_haut
       %}
 
-      {{ is_state('input_boolean.ferme_chauffage_commande_active','on') and is_state('automation.nouvelle_automatisation_2','off')
+      {{ calibration_ready and servo_level is number and servo_level is not boolean and -100 <= servo_level <= 100
+
+      and calibration_points[0].level <= servo_level <= calibration_points[2].level
+
+      and is_state('input_boolean.ferme_chauffage_commande_active','on') and is_state('automation.nouvelle_automatisation_2','off')
 
       and states('input_text.ferme_chauffage_configuration') | from_json({}) == config and config_valid
 
@@ -458,7 +497,7 @@ automation:
       | float }}
   - action: esphome.batiment_b_control_servo
     data:
-      level: '{{ 4 * desired - 250 }}'
+      level: '{{ servo_level }}'
   - action: input_text.set_value
     target:
       entity_id: input_text.ferme_chauffage_transmission
@@ -486,6 +525,23 @@ template:
     config_raw: '{{ states(''input_text.ferme_chauffage_configuration'') }}'
     config: >-
       {% set p = states('input_text.ferme_chauffage_configuration') | from_json({}) %}{{ p if p is mapping else {} }}
+    calibration_points: >-
+      {{ [{'temperature':50,'level':-56,'verified':true},{'temperature':60,'level':-18,'verified':true},{'temperature':70,'level':24,'verified':true}]
+      }}
+    calibration_ready: >-
+      {% set ns=namespace(valid=calibration_points is sequence and calibration_points is not string and calibration_points
+      is not mapping and calibration_points | length == 3) %}
+
+      {% if ns.valid %}{% for p in calibration_points %}
+
+      {% if p is not mapping or p.get('temperature') != [50,60,70][loop.index0] or p.get('verified') is not sameas true
+
+      or p.get('level') is not number or p.get('level') is boolean or not is_number(p.get('level')) or not -100 <= p.level
+      <= 100 %}{% set ns.valid=false %}{% endif %}
+
+      {% endfor %}{% endif %}
+
+      {{ ns.valid and calibration_points[0].level < calibration_points[1].level < calibration_points[2].level }}
     previous: '{% set p = states(''input_text.ferme_chauffage_observation'') | from_json({}) %}{{ p if p is mapping else
       {} }}'
     tx: '{% set p = states(''input_text.ferme_chauffage_transmission'') | from_json({}) %}{{ p if p is mapping else {}
@@ -533,19 +589,21 @@ template:
       {{ previous.get('q') if observation_fresh and previous.get('q') is number and 50 <= previous.q <= 70 else none
       }}
     status_delivery: >-
-      {{ 'disabled' if not enabled else 'blocked' if not config_valid or not legacy_off else 'waiting_module' if not
-      b_usable else 'waiting_sensor' if not observation_fresh or (config.m == 'automatic' and not d_usable) or status_desired
-      is not number else 'uncertain' if tx.get('s') == 'uncertain' else 'pending' if tx.get('r') != config.get('r') or
-      tx.get('t') != status_desired or tx.get('online') != 1 or tx.get('need',0) == 1 else 'transmitted' }}
+      {{ 'disabled' if not enabled else 'blocked' if not config_valid or not calibration_ready or not legacy_off else
+      'waiting_module' if not b_usable else 'waiting_sensor' if not observation_fresh or (config.m == 'automatic' and
+      not d_usable) or status_desired is not number else 'uncertain' if tx.get('s') == 'uncertain' else 'pending' if
+      tx.get('r') != config.get('r') or tx.get('t') != status_desired or tx.get('online') != 1 or tx.get('need',0) ==
+      1 else 'transmitted' }}
     status_reason: >-
-      {{ 'configuration_invalid' if not config_valid else 'control_disabled' if not enabled else 'legacy_conflict' if
-      not legacy_off else 'sensor_b_unavailable' if not b_valid else 'sensor_b_stale' if not b_usable else 'sensor_d_unavailable'
-      if config.m == 'automatic' and not d_valid else 'sensor_d_stale' if config.m == 'automatic' and not d_usable else
-      'observer_stale' if not observation_fresh else 'transmission_uncertain' if status_delivery == 'uncertain' else
-      'awaiting_transmission' if status_delivery == 'pending' else previous.get('s','warming_up') }}
+      {{ 'configuration_invalid' if not config_valid else 'calibration_required' if not calibration_ready else 'control_disabled'
+      if not enabled else 'legacy_conflict' if not legacy_off else 'sensor_b_unavailable' if not b_valid else 'sensor_b_stale'
+      if not b_usable else 'sensor_d_unavailable' if config.m == 'automatic' and not d_valid else 'sensor_d_stale' if
+      config.m == 'automatic' and not d_usable else 'observer_stale' if not observation_fresh else 'transmission_uncertain'
+      if status_delivery == 'uncertain' else 'awaiting_transmission' if status_delivery == 'pending' else previous.get('s','warming_up')
+      }}
     phase: >-
-      {{ 'active' if enabled and config_valid and legacy_off and b_usable and (config.m == 'manual' or d_usable) and
-      observation_fresh and status_desired is number else 'suspended' }}
+      {{ 'active' if enabled and config_valid and calibration_ready and legacy_off and b_usable and (config.m == 'manual'
+      or d_usable) and observation_fresh and status_desired is number else 'suspended' }}
   sensor:
   - name: Ferme chauffage controle
     unique_id: ferme_chauffage_controle
@@ -560,8 +618,8 @@ template:
       request_id: '{{ config.get("id","") }}'
       phase: '{{ phase }}'
       reason: '{{ status_reason }}'
-      calibration_valid: '{{ true }}'
-      actuation_enabled: '{{ enabled }}'
+      calibration_valid: '{{ calibration_ready }}'
+      actuation_enabled: '{{ enabled and calibration_ready }}'
       fuel_minimum: '{{ 50 }}'
       fuel_maximum: '{{ 70 }}'
       release_temperature_d: '{{ 60 }}'

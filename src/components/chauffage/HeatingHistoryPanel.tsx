@@ -26,7 +26,7 @@ const labels: Record<HeatingHistoryKey, { title: string; description: string }> 
   tankB: { title: "Ballon · bâtiment B", description: "Évolution de la température du ballon de 2 000 L" },
   tankD: { title: "Ballon · bâtiment D", description: "Évolution de la température en haut du ballon de 2 000 L" },
   woodBoiler: { title: "Chaudière bois · D", description: "Évolution de la température mesurée" },
-  fuelSetpoint: { title: "Chaudière fioul · B", description: "Évolution de la consigne mémorisée" },
+  fuelSetpoint: { title: "Chaudière fioul · B", description: "Historique des consignes enregistrées" },
   servo: { title: "Servomoteur fioul · B", description: "Évolution de la position rapportée" },
 };
 const presets = [{ label: "6 h", span: 6 * 3_600_000 }, { label: "24 h", span: 86_400_000 }, { label: "7 j", span: 7 * 86_400_000 }, { label: "30 j", span: HEATING_CHART_MAX_SPAN }];
@@ -181,10 +181,10 @@ export default function HeatingHistoryPanel({ metricKey, metric, points, loading
       </header>
       <div className={styles.body}>
         <div className={styles.current}>
-          <div><span className={styles.caption}>{persistent ? "Consigne mémorisée" : "Dernier relevé disponible"}</span><strong className={old && valueAvailable ? styles.oldValue : ""}>{valueAvailable ? number.format(metric.value!) : "—"}<span>{metric.unit}</span></strong></div>
+          <div><span className={styles.caption}>{persistent ? metric.label : "Dernier relevé disponible"}</span><strong className={old && valueAvailable ? styles.oldValue : ""}>{valueAvailable ? number.format(metric.value!) : "—"}<span>{metric.unit}</span></strong></div>
           <div className={styles.currentDate}>{old && valueAvailable && <span className={styles.oldBadge}><Clock3 aria-hidden="true" />Ancien relevé</span>}{reported !== null ? <time dateTime={new Date(reported).toISOString()} title={fullDate.format(reported)}>{shortDate.format(reported)}</time> : <span>Pas de date disponible</span>}</div>
         </div>
-        {persistent && <p className={styles.note}>Ce réglage n’est pas une température mesurée et ne confirme pas son application par le servomoteur.</p>}
+        {persistent && <p className={styles.note}>Cet historique peut contenir d’anciens réglages mémorisés et des consignes transmises via l’API. La source n’est pas distinguée pour chaque point. Il ne mesure ni la position du servomoteur, ni la température réelle de la chaudière.</p>}
         {offline && <Notice className={styles.historyNotice} tone="warning">Hors connexion : seuls les relevés déjà chargés sont consultables.</Notice>}
         {error && !offline && <Notice className={styles.historyNotice} tone="warning">L’historique n’a pas pu être actualisé. Les relevés disponibles restent affichés.</Notice>}
         <div className={styles.presets} role="group" aria-label="Période du graphique">
@@ -207,7 +207,7 @@ export default function HeatingHistoryPanel({ metricKey, metric, points, loading
               {plotted.map((segment, index) => <g key={index}>{segment.length > 1 && <path className={styles.curve} d={segment.map((point, i) => i === 0 ? `M${x(point.at)},${y(point.value)}` : persistent ? `H${x(point.at)}V${y(point.value)}` : `L${x(point.at)},${y(point.value)}`).join(" ")} />}{(segment.length <= 3 || samples.length <= 80) && segment.map(point => <circle key={point.at} className={styles.sampleDot} cx={x(point.at)} cy={y(point.value)} r={segment.length === 1 ? 3.5 : 2.3} />)}</g>)}
               {selected && <><line className={styles.crosshair} x1={x(selected.at)} x2={x(selected.at)} y1={plot.top} y2={plot.bottom} /><circle className={styles.selectedDot} cx={x(selected.at)} cy={y(selected.value)} r="6" /></>}
             </g>
-          </svg> : <div className={styles.empty} role="status"><Clock3 aria-hidden="true" /><strong>{loading ? "Chargement des relevés…" : persistent ? "Aucun changement de consigne enregistré sur cette période" : "Aucun relevé sur cette période"}</strong><span>{loading ? "L’historique disponible est en cours de lecture." : persistent ? "La consigne mémorisée reste affichée au-dessus." : "Choisis un autre jour ou une période plus large."}</span></div>}
+          </svg> : <div className={styles.empty} role="status"><Clock3 aria-hidden="true" /><strong>{loading ? "Chargement des relevés…" : persistent ? "Aucun changement de consigne enregistré sur cette période" : "Aucun relevé sur cette période"}</strong><span>{loading ? "L’historique disponible est en cours de lecture." : persistent ? "La dernière valeur disponible reste affichée au-dessus, avec sa source." : "Choisis un autre jour ou une période plus large."}</span></div>}
           {loading && samples.length > 0 && <span className={styles.loading}>Actualisation…</span>}
         </div>
         <output className={styles.inspection} aria-live="polite">{selected ? <><strong>{number.format(selected.value)} {metric.unit}</strong><time dateTime={new Date(selected.at).toISOString()} title={fullDate.format(selected.at)}>{expanded ? shortDate.format(selected.at) : fullDate.format(selected.at)}</time></> : <span>Touche la courbe pour lire la valeur et l’heure d’un relevé.</span>}</output>

@@ -2,7 +2,17 @@
 
 `ferme_chauffage.yaml` mémorise les réglages depuis Ferme, calcule la consigne et peut la transmettre directement au module B. Le calcul et la reprise après une coupure fonctionnent dans Home Assistant, sans ordinateur ni navigateur ouvert. La liaison Ferme → Home Assistant sert uniquement à mémoriser la configuration.
 
-Le propriétaire a confirmé les positions physiques **50, 60 et 70 °C** du potentiomètre. La plage autorisée est **50–70 °C** ; aucune extrapolation vers 90 °C n'est utilisée. Le service unique est `esphome.batiment_b_control_servo`, avec `level = 4 × température − 250` : −50, −10 et30 pour les trois positions vérifiées. Le firmware divise ce niveau par100. Le capteur de position historique n'est pas une mesure mécanique fiable.
+La calibration utilise les graduations du potentiomètre lues sur place par le propriétaire le 22 octobre 2026. Le test a montré que l'ancienne formule `level = 4 × température − 250` plaçait une demande de 60 °C vers 62,5 °C : elle est retirée.
+
+| Graduation confirmée | Niveau ESPHome confirmé |
+|---|---:|
+| 50 °C | −56 |
+| 60 °C | −18 |
+| 70 °C | 24 |
+
+Le premier niveau −50 avait été lu à 50 °C, mais le retour depuis 80 °C a ensuite montré 52 °C après stabilisation. Le niveau bas a donc été corrigé à −56 : 50 °C a été confirmé, puis retrouvé exactement après un aller-retour à 60 °C. Le point 60 → −18 a aussi été revérifié lors de cet aller-retour. Les essais ont ensuite confirmé de nouveau 60 et 70 °C lors de la montée. Au niveau 56, une montée par paliers a donné 79 °C, puis le saut direct 50 → 80 a donné 80 °C. Les deux retours directs depuis ce niveau haut ont retrouvé 50 °C au niveau −56. Ces observations ne démontrent pas une précision mécanique parfaite. Le point 80 reste hors de la plage du contrôleur et ne relève pas son plafond de 70 °C.
+
+La plage autorisée reste **50–70 °C**. Les valeurs intermédiaires sont estimées par interpolation entre ces points, sans extrapolation. Une calibration incomplète ou invalide bloque l'appel matériel. Le service unique est `esphome.batiment_b_control_servo`, dont le firmware divise le niveau par 100. Ces lectures calibrent les graduations, pas une mesure de température de chaudière. Le capteur de position historique n'est pas une mesure mécanique fiable.
 
 **« Transmis » signifie uniquement que l'appel de service Home Assistant s'est terminé sans erreur.** Le firmware ne fournit pas d'accusé d'application ni de retour mécanique ; `position_feedback` vaut toujours `unmeasured`. Un état de ballon disponible indique une connexion native utilisable, sans prouver un nouvel échantillon à chaque consultation ni le mouvement du servo.
 
@@ -80,7 +90,7 @@ Les constantes numériques et booléennes utilisent des expressions Jinja (`{{ 2
 | Attribut | Sens |
 |---|---|
 | `phase` | `active` ou `suspended` |
-| `actuation_enabled`, `calibration_valid` | Booléens ; calibration des trois positions confirmée |
+| `actuation_enabled`, `calibration_valid` | Booléens ; `calibration_valid` reflète la validation des trois points utilisés et bloque la commande si elle est fausse |
 | `fuel_minimum`, `fuel_maximum`, `release_temperature_d` |50,70,60 |
 | `module_online`, `module_last_seen_at` | Disponibilité native B et date ISO de sa dernière observation locale valide ; ce n'est pas la date d'une conversion matérielle |
 | `delivery_state` | `disabled`, `blocked`, `waiting_module`, `waiting_sensor`, `pending`, `uncertain`, `transmitted` |
@@ -92,7 +102,7 @@ Les constantes numériques et booléennes utilisent des expressions Jinja (`{{ 2
 
 `sensor.ferme_chauffage_consigne_envoyee` est indisponible avant le premier succès API. Ensuite sa valeur est la dernière température transmise, en°C. Son attribut `transmitted_at` garde **l'instant réel de ce succès**, même si le template se réévalue. Le relais de télémétrie ne doit pas remplacer cette date par la date d'actualisation du sensor.
 
-Codes `reason` : `control_disabled`, `legacy_conflict`, `configuration_invalid`, `sensor_d_unavailable`, `sensor_b_unavailable`, `sensor_d_stale`, `sensor_b_stale`, `warming_up`, `manual_ready`, `rest_hot`, `rest_in_band`, `support_start`, `support_increase`, `support_stable`, `recent_recovery`, `release_support`, `increase_cooldown`, `decrease_cooldown`, `at_maximum`, `response_not_observed`, `awaiting_transmission`, `transmission_uncertain`, `observer_stale`.
+Codes `reason` : `control_disabled`, `calibration_required`, `legacy_conflict`, `configuration_invalid`, `sensor_d_unavailable`, `sensor_b_unavailable`, `sensor_d_stale`, `sensor_b_stale`, `warming_up`, `manual_ready`, `rest_hot`, `rest_in_band`, `support_start`, `support_increase`, `support_stable`, `recent_recovery`, `release_support`, `increase_cooldown`, `decrease_cooldown`, `at_maximum`, `response_not_observed`, `awaiting_transmission`, `transmission_uncertain`, `observer_stale`.
 
 ## Application et droits existants
 

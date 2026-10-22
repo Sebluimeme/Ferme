@@ -27,6 +27,13 @@ ACTIVE = "input_boolean.ferme_chauffage_commande_active"
 LEGACY = "automation.nouvelle_automatisation_2"
 D = "sensor.esphome_web_61063e_tampon_haut"
 B = "sensor.batiment_b_ballon_b"
+# Synthetic calibration for control-flow regression tests, NOT real hardware values.
+SYNTHETIC_CALIBRATION = [
+    {"temperature": 50, "level": -50, "verified": True},
+    {"temperature": 60, "level": -10, "verified": True},
+    {"temperature": 70, "level": 30, "verified": True},
+]
+
 
 
 class ResultDict(dict):
@@ -70,7 +77,8 @@ class States:
 
 
 class Harness:
-    def __init__(self):
+    def __init__(self, calibration_override=SYNTHETIC_CALIBRATION):
+        self.calibration_override = copy.deepcopy(calibration_override)
         self.time = 1792663200
         self.entities = {}
         self.calls = []
@@ -122,7 +130,7 @@ class Harness:
         for action in actions:
             if "variables" in action:
                 for key, template in action["variables"].items():
-                    context[key] = self.render(template, context)
+                    context[key] = self.calibration_override if key == "calibration_points" and self.calibration_override is not None else self.render(template, context)
             elif "if" in action:
                 if self.render(action["if"], context):
                     self.execute(action["then"], context)
@@ -140,7 +148,7 @@ class Harness:
                 service = action["action"]
                 if service == "esphome.batiment_b_control_servo":
                     level = self.render(action["data"]["level"], context)
-                    assert -50 <= level <= 30 and (level + 250) % 4 == 0, level
+                    assert -100 <= level <= 100 and context["calibration_ready"], level
                     self.servo_calls.append(level)
                     if self.fail_servo:
                         raise ScriptStop("simulated_api_failure", True)
@@ -186,7 +194,7 @@ class Harness:
         template = PACKAGE["template"][0]
         context = {}
         for key, value in template["variables"].items():
-            context[key] = self.render(value, context)
+            context[key] = self.calibration_override if key == "calibration_points" and self.calibration_override is not None else self.render(value, context)
         sensor = template["sensor"][0]
         return {"state": self.render(sensor["state"], context), **{key: self.render(value, context) for key, value in sensor["attributes"].items()}}
 
@@ -246,6 +254,76 @@ class HeatingPackageTests(unittest.TestCase):
         for key in ['calibration_valid','schema_version','fuel_minimum','fuel_maximum','release_temperature_d']:
             self.assertIn('{{',PACKAGE['template'][0]['sensor'][0]['attributes'][key])
 
+    def test_production_calibration_and_status_share_the_same_verified_data(self):
+        production=PACKAGE['automation'][0]['actions'][0]['variables']['calibration_points']
+        self.assertEqual(production,PACKAGE['template'][0]['variables']['calibration_points'])
+        points=self.h.render(production,{})
+        self.assertEqual(points[0],{'temperature':50,'level':-56,'verified':True})
+        self.assertEqual(points[1],{'temperature':60,'level':-18,'verified':True})
+        self.assertEqual(points[2],{'temperature':70,'level':24,'verified':True})
+
+    def test_preliminary_observations_remain_interpolation_fixtures_only(self):
+        # Historical preliminary readings exercise arithmetic only. Production
+        # uses its independently confirmed final table, including 50 -> -56.
+        fixture=[{'temperature':50,'level':-50,'verified':True},{'temperature':60,'level':-18,'verified':True},{'temperature':70,'level':24,'verified':True}]
+        for temperature,expected in [(50,-50),(51,-46.8),(55,-34),(60,-18),(61,-13.8),(62,-9.6),(65,3),(69,19.8),(70,24)]:
+            with self.subTest(temperature=temperature):
+                h=Harness(calibration_override=fixture)
+                self.assertEqual(h.configure(mode='manual',manual_temperature=temperature),'applied')
+                h.set(ACTIVE,'on');h.observe()
+                self.assertEqual(h.servo_calls,[expected])
+                self.assertIs(h.status()['calibration_valid'],True)
+                self.assertEqual(h.status()['last_transmitted_temperature'],temperature)
+
+    def test_real_production_calibration_never_extrapolates_80(self):
+        h=Harness(calibration_override=None)
+        self.assertEqual(h.configure(mode='manual',manual_temperature=80),'invalid_request')
+        h.set(ACTIVE,'on');h.observe()
+        self.assertEqual(h.servo_calls,[])
+        h.configure();h.set(D,0);h.set(B,100);h.observe()
+        self.assertEqual(h.read(OBS)['q'],70)
+        self.assertEqual(h.servo_calls,[24])
+
+    def test_final_production_calibration_points_and_intermediates_without_override(self):
+        for temperature,expected in [(50,-56),(51,-52.2),(55,-37),(59,-21.8),(60,-18),(61,-13.8),(62,-9.6),(65,3),(69,19.8),(70,24)]:
+            with self.subTest(temperature=temperature):
+                h=Harness(calibration_override=None)
+                self.assertEqual(h.configure(mode='manual',manual_temperature=temperature),'applied')
+                h.set(ACTIVE,'on');h.observe()
+                self.assertEqual(h.servo_calls,[expected])
+                self.assertIs(h.status()['calibration_valid'],True)
+                self.assertIs(h.status()['actuation_enabled'],True)
+                self.assertEqual(h.status()['last_transmitted_temperature'],temperature)
+
+    def test_incomplete_calibration_blocks_even_a_known_manual_point(self):
+        points=[{'temperature':50,'level':-50,'verified':True},{'temperature':60,'level':-18,'verified':True},{'temperature':70,'level':None,'verified':False}]
+        for temperature in [50,60,70]:
+            h=Harness(calibration_override=points);h.configure(mode='manual',manual_temperature=temperature);h.set(ACTIVE,'on');h.observe()
+            self.assertEqual(h.servo_calls,[])
+            self.assertEqual(h.status()['delivery_state'],'blocked')
+            self.assertEqual(h.status()['reason'],'calibration_required')
+            self.assertIs(h.status()['calibration_valid'],False)
+            self.assertIs(h.status()['actuation_enabled'],False)
+
+    def test_piecewise_interpolation_uses_both_segments_without_legacy_fallback(self):
+        # Deliberately different slopes and fictitious positions for interpolation.
+        points=[{'temperature':50,'level':0,'verified':True},{'temperature':60,'level':20,'verified':True},{'temperature':70,'level':60,'verified':True}]
+        for temperature,expected in [(50,0),(51,2),(55,10),(59,18),(60,20),(61,24),(65,40),(69,56),(70,60)]:
+            h=Harness(calibration_override=points);h.configure(mode='manual',manual_temperature=temperature);h.set(ACTIVE,'on');h.observe()
+            self.assertEqual(h.servo_calls,[expected])
+
+    def test_invalid_calibrations_never_call_the_service(self):
+        invalids=[[],{},'invalid',SYNTHETIC_CALIBRATION[:2],list(reversed(SYNTHETIC_CALIBRATION))]
+        for value in [None,True,'20',float('nan'),float('inf'),-101,101,-50,30]:
+            points=copy.deepcopy(SYNTHETIC_CALIBRATION);points[1]['level']=value;invalids.append(points)
+        for flag in [False,1,'true',None]:
+            points=copy.deepcopy(SYNTHETIC_CALIBRATION);points[1]['verified']=flag;invalids.append(points)
+        for points in invalids:
+            with self.subTest(points=points):
+                h=Harness(calibration_override=points);h.configure(mode='manual');h.set(ACTIVE,'on');h.observe()
+                self.assertEqual(h.servo_calls,[])
+                self.assertIs(h.status()['calibration_valid'],False)
+
     def test_atomic_config_and_bounds(self):
         self.assertEqual(self.h.configure(mode='manual',manual_temperature=70,minimum_d=59), 'applied')
         self.assertEqual(self.h.read(CFG),dict(v=1,r=1,m='manual',t=70,d=59,id='test_1'))
@@ -265,7 +343,7 @@ class HeatingPackageTests(unittest.TestCase):
         self.assertEqual(self.h.configure(request_id='second'),'revision_conflict')
         self.assertEqual(self.h.configure(request_id='second',expected_revision=1),'applied')
 
-    def test_manual_mapping_all_verified_points(self):
+    def test_manual_mapping_synthetic_points_for_control_flow(self):
         for temperature,level in [(50,-50),(60,-10),(70,30)]:
             with self.subTest(temperature=temperature):
                 h=Harness(); h.configure(mode='manual',manual_temperature=temperature); h.set(ACTIVE,'on'); h.set(D,'unavailable')
