@@ -1,6 +1,7 @@
 "use client";
 
 interface KpiCardProps {
+  tone?: "expense" | "income";
   label: string;
   value: string | number;
   subtitle?: string;
@@ -11,7 +12,7 @@ interface KpiCardProps {
   onClick?: () => void;
 }
 
-export default function KpiCard({ label, value, subtitle, icon, trend, onClick }: KpiCardProps) {
+export default function KpiCard({ label, value, subtitle, icon, trend, onClick, tone }: KpiCardProps) {
   return (
     <div
       className={`bg-white border border-stone-200 rounded-xl p-5 hover:border-stone-300 hover:shadow-sm transition-all ${onClick ? "cursor-pointer" : ""}`}
@@ -26,7 +27,7 @@ export default function KpiCard({ label, value, subtitle, icon, trend, onClick }
         )}
       </div>
 
-      <p className="text-[20px] sm:text-[26px] font-semibold text-stone-900 tracking-[-0.5px] leading-tight break-words">
+      <p style={tone ? { color: tone === "expense" ? "var(--farm-danger)" : "var(--farm-accent)" } : undefined} className="text-[20px] sm:text-[26px] font-semibold text-stone-900 tracking-[-0.5px] leading-tight break-words">
         {value}
       </p>
 

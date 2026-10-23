@@ -218,10 +218,11 @@ export default function RapportsPageContent() {
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KpiCard label="Achats enregistrés" value={`${fmt(stats.totalDepenses, 2)} €`} icon={<TrendingDown className="w-3.5 h-3.5 text-red-500" />} />
-            <KpiCard label="Recettes enregistrées" value={`${fmt(stats.totalRevenus, 2)} €`} icon={<TrendingUp className="w-3.5 h-3.5 text-green-600" />} />
+            <KpiCard tone="expense" label="Achats enregistrés" value={`${fmt(stats.totalDepenses, 2)} €`} icon={<TrendingDown className="w-3.5 h-3.5 text-red-500" />} />
+            <KpiCard tone="income" label="Recettes enregistrées" value={`${fmt(stats.totalRevenus, 2)} €`} icon={<TrendingUp className="w-3.5 h-3.5 text-green-600" />} />
             <KpiCard
               label="Recettes − achats"
+              tone={stats.balance < 0 ? "expense" : stats.balance > 0 ? "income" : undefined}
               value={`${stats.balance >= 0 ? "+" : ""}${fmt(stats.balance, 2)} €`}
               icon={<Scale className="w-3.5 h-3.5" />}
             />

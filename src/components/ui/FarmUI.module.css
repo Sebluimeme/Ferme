@@ -58,3 +58,7 @@
 @keyframes appear { from { opacity: .5; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .button { transition: none; } .sheet, .spinner { animation: none; } }
 @media (min-width: 700px) { .overlay { padding: 24px; align-items: center; } .sheet { border-radius: 28px; } }
+
+/* Financial meaning remains visible in both system themes. */
+.theme .expense { color: var(--farm-danger); }
+.theme .income { color: var(--farm-accent); }

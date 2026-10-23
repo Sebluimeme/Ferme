@@ -54,7 +54,7 @@
 .groupTitle h2 { font-size: 20px; font-weight: 600; margin: 0; overflow-wrap: anywhere; }
 .groupTitle strong { font-size: 19px; font-variant-numeric: tabular-nums; flex: none; }
 .bar { height: 7px; border-radius: 7px; background: var(--farm-input); margin: 18px 0; overflow: hidden; }
-.bar span { display: block; height: 100%; border-radius: inherit; background: var(--farm-accent); }
+.bar span { display: block; height: 100%; border-radius: inherit; background: var(--farm-danger); }
 .groupDetails { display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: space-between; font-size: 15px; color: var(--farm-muted); }
 @media(min-width:768px) { .page { padding-bottom: 88px; } }
 @media(min-width:1024px) { .page { padding-bottom: 100px; } .purchaseAction { left: 220px; bottom: 0; padding: 16px 32px; } }

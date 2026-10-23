@@ -134,9 +134,9 @@ export default function CoutsPageContent() {
     {loadError && <Notice tone="error">{loadError}</Notice>}
     <Card className={styles.summary}>
       <div className={styles.summaryHeading}><span>Dépenses</span><Button variant="ghost" onClick={() => setPanel("filters")}>{filters.annee || "Toutes les années"}<SlidersHorizontal aria-hidden="true" /></Button></div>
-      <p className={styles.bigAmount}>{loading ? "…" : money(stats.totalDepenses)}</p>
+      <p className={`${styles.bigAmount} ${farmStyles.expense}`}>{loading ? "…" : money(stats.totalDepenses)}</p>
       <p className={styles.secondary}>{hasFilters ? "Sélection affichée · hors avances et remboursements personnels" : "Hors avances et remboursements personnels"}</p>
-      <div className={styles.summaryDetails}><div><span>Recettes</span><strong>{money(stats.totalRevenus)}</strong></div><div><span>Recettes − achats</span><strong>{money(stats.balance)}</strong></div></div>
+      <div className={styles.summaryDetails}><div><span>Recettes</span><strong className={farmStyles.income}>{money(stats.totalRevenus)}</strong></div><div><span>Recettes − achats</span><strong className={stats.balance < 0 ? farmStyles.expense : stats.balance > 0 ? farmStyles.income : undefined}>{money(stats.balance)}</strong></div></div>
       {aidReceipts > 0 && <p className={styles.summaryExplanation}>Dont {money(aidReceipts)} d’aides reçues, déjà comprises dans les recettes.</p>}
       <p className={styles.summaryExplanation}>Cet écart n’est pas la somme à rembourser.</p>
     </Card>
@@ -153,18 +153,18 @@ export default function CoutsPageContent() {
         const partial = invoice && Math.round(selectedAmount * 100) !== Math.round(t.montant * 100);
         const destinations = unique(lines.flatMap(row => [row.production, row.vehicleLabel || ""]));
         return <button className={styles.entry} key={t.id} type="button" onClick={() => setSelected(t)}>
-          <span className={styles.entryTop}><span className={styles.entryTitle}>{invoice ? purchaseInvoiceTitle(t) : t.produit || "Écriture"}</span><strong className={styles.entryAmount}>{t.operation === "Revenus" ? "+" : "−"}{money(t.montant)}</strong></span>
+          <span className={styles.entryTop}><span className={styles.entryTitle}>{invoice ? purchaseInvoiceTitle(t) : t.produit || "Écriture"}</span><strong className={`${styles.entryAmount} ${t.operation === "Revenus" ? farmStyles.income : farmStyles.expense}`}>{t.operation === "Revenus" ? "+" : "−"}{money(t.montant)}</strong></span>
           {invoice && t.fournisseur && <span className={styles.entryDescription}>Fournisseur : {t.fournisseur}</span>}
           <span className={styles.entryDescription}>{invoice ? `${t.allocations.length} affectation${t.allocations.length > 1 ? "s" : ""} · ${destinations.join(", ")}` : t.production + " · " + t.sousCategorie}</span>
           {nature !== "exploitation" && <span className={styles.selectionAmount}>{nature === "avance" ? "Avance à la ferme" : "Remboursement personnel"} · hors total des achats</span>}
-          {partial && <span className={styles.selectionAmount}>Dont {money(selectedAmount)} pour ces filtres</span>}
+          {partial && <span className={`${styles.selectionAmount} ${t.operation === "Revenus" ? farmStyles.income : farmStyles.expense}`}>Dont {money(selectedAmount)} pour ces filtres</span>}
           <span className={styles.entryBottom}><span>{formatDate(t.date)} · {payerName(t.payeur)}</span><span className={styles.entryIcons}>{t.pieceJointe && <Paperclip aria-label="Avec justificatif" />}<ChevronRight aria-hidden="true" /></span></span>
         </button>;
       })}
     </div> : <div className={styles.entries}>
       {view === "materiel" && <Notice>Cette vue utilise les liens explicites avec le matériel. Les anciennes écritures ne sont pas attribuées automatiquement.</Notice>}
       {!groups.length && <Card className={styles.empty}><Tractor aria-hidden="true" /><h2>Aucune affectation {view === "materiel" ? "à un matériel" : "pour cette sélection"}</h2><p>Les nouvelles factures alimenteront cette analyse.</p></Card>}
-      {groups.map(group => <Card key={group.id}><div className={styles.groupTitle}><h2>{group.label}</h2><strong>{money(group.expense)}</strong></div><div className={styles.bar} aria-hidden="true"><span style={{ width: `${group.expense / maximum * 100}%` }} /></div><div className={styles.groupDetails}><span>Recettes {money(group.revenue)}</span><span>Solde {money(group.revenue - group.expense)}</span></div></Card>)}
+      {groups.map(group => <Card key={group.id}><div className={styles.groupTitle}><h2>{group.label}</h2><strong className={farmStyles.expense}>{money(group.expense)}</strong></div><div className={styles.bar} aria-hidden="true"><span style={{ width: `${group.expense / maximum * 100}%` }} /></div><div className={styles.groupDetails}><span className={farmStyles.income}>Recettes {money(group.revenue)}</span><span className={group.revenue < group.expense ? farmStyles.expense : group.revenue > group.expense ? farmStyles.income : undefined}>Solde {money(group.revenue - group.expense)}</span></div></Card>)}
     </div>}
     <div className={styles.purchaseAction}><Button variant="primary" fullWidth onClick={() => view === "aides" ? setSubsidyEditor("new") : setInvoiceEditor("new")}><Plus aria-hidden="true" />{view === "aides" ? "Enregistrer une aide reçue" : "Enregistrer un achat"}</Button></div>
 
@@ -187,12 +187,12 @@ export default function CoutsPageContent() {
       onShowEntries={payeur => { setPanel(null); setFilters({ ...emptyFilters, payeur }); setSearch(""); setView("ecritures"); }}
     /></Sheet>}
     {selected && <Sheet title={isPurchaseInvoice(selected) ? "Facture d’achat" : isSubsidyPayment(selected) ? "Aide reçue" : "Détail de l’écriture"} onClose={() => setSelected(null)} footer={<Button variant="primary" fullWidth onClick={() => edit(selected)}>Modifier {isPurchaseInvoice(selected) ? "la facture" : isSubsidyPayment(selected) ? "l’aide" : "l’écriture"}</Button>}>
-      <p className={styles.detailAmount}>{money(selected.montant)}</p><p>{isPurchaseInvoice(selected) ? purchaseInvoiceTitle(selected) : selected.produit || "Écriture"}</p>
+      <p className={`${styles.detailAmount} ${selected.operation === "Revenus" ? farmStyles.income : farmStyles.expense}`}>{money(selected.montant)}</p><p>{isPurchaseInvoice(selected) ? purchaseInvoiceTitle(selected) : selected.produit || "Écriture"}</p>
       {selected.fournisseur && <p className={styles.secondary}>Fournisseur : {selected.fournisseur}</p>}
       <p className={styles.secondary}>{formatDate(selected.date)} · {payerName(selected.payeur)}</p>
       {isSubsidyPayment(selected) && <p className={styles.secondary}>Campagne {selected.subvention.campagne} · Versement inclus dans les recettes</p>}
       {selected.reference && <p className={styles.secondary}>Référence : {selected.reference}</p>}
-      {isPurchaseInvoice(selected) ? <div className={styles.actions}>{expandPurchaseAllocations([selected]).map(line => <Card key={line.id}><strong>{line.production} · {money(line.montant)}</strong><p className={styles.secondary}>{line.produit}</p>{line.vehicleLabel && <p className={styles.secondary}>{line.vehicleLabel}</p>}</Card>)}</div> : <p className={styles.secondary}>{selected.production} · {selected.categorie} · {selected.sousCategorie}</p>}
+      {isPurchaseInvoice(selected) ? <div className={styles.actions}>{expandPurchaseAllocations([selected]).map(line => <Card key={line.id}><strong>{line.production} · <span className={farmStyles.expense}>{money(line.montant)}</span></strong><p className={styles.secondary}>{line.produit}</p>{line.vehicleLabel && <p className={styles.secondary}>{line.vehicleLabel}</p>}</Card>)}</div> : <p className={styles.secondary}>{selected.production} · {selected.categorie} · {selected.sousCategorie}</p>}
       {selected.remarque && <p className={styles.detailNote}>{selected.remarque}</p>}
       {selected.pieceJointe && <a className={styles.actionLink} href={selected.pieceJointe.url} target="_blank" rel="noopener noreferrer"><Paperclip aria-hidden="true" />Ouvrir le justificatif</a>}
       <Button variant="danger" fullWidth onClick={() => { setDeleteTarget(selected); setSelected(null); setDeleteError(""); }}><Trash2 aria-hidden="true" />Supprimer {isPurchaseInvoice(selected) ? "la facture" : "l’écriture"}</Button>
