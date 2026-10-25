@@ -33,6 +33,7 @@ SYNTHETIC_CALIBRATION = [
     {"temperature": 50, "level": -50, "verified": True},
     {"temperature": 60, "level": -10, "verified": True},
     {"temperature": 70, "level": 30, "verified": True},
+    {"temperature": 80, "level": 70, "verified": True},
 ]
 
 
@@ -266,8 +267,8 @@ class HeatingPackageTests(unittest.TestCase):
     def test_preliminary_observations_remain_interpolation_fixtures_only(self):
         # Historical preliminary readings exercise arithmetic only. Production
         # uses its independently confirmed final table, including 50 -> -56.
-        fixture=[{'temperature':50,'level':-50,'verified':True},{'temperature':60,'level':-18,'verified':True},{'temperature':70,'level':24,'verified':True}]
-        for temperature,expected in [(50,-50),(51,-46.8),(55,-34),(60,-18),(61,-13.8),(62,-9.6),(65,3),(69,19.8),(70,24)]:
+        fixture=[{'temperature':50,'level':-50,'verified':True},{'temperature':60,'level':-18,'verified':True},{'temperature':70,'level':24,'verified':True},{'temperature':80,'level':56,'verified':True}]
+        for temperature,expected in [(50,-50),(51,-46.8),(55,-34),(60,-18),(61,-13.8),(62,-9.6),(65,3),(69,19.8),(70,24),(75,40),(80,56)]:
             with self.subTest(temperature=temperature):
                 h=Harness(calibration_override=fixture)
                 self.assertEqual(h.configure(mode='manual',manual_temperature=temperature),'applied')
@@ -278,7 +279,7 @@ class HeatingPackageTests(unittest.TestCase):
 
     def test_real_production_calibration_never_extrapolates_80(self):
         h=Harness(calibration_override=None)
-        self.assertEqual(h.configure(mode='manual',manual_temperature=80),'invalid_request')
+        self.assertEqual(h.configure(mode='manual',manual_temperature=81),'invalid_request')
         h.set(ACTIVE,'on');h.observe()
         self.assertEqual(h.servo_calls,[])
         h.configure();h.set(D,0);h.set(B,100);h.transmitted(70,online=0);h.observe()
@@ -286,7 +287,7 @@ class HeatingPackageTests(unittest.TestCase):
         self.assertEqual(h.servo_calls,[24])
 
     def test_final_production_calibration_points_and_intermediates_without_override(self):
-        for temperature,expected in [(50,-56),(51,-52.2),(55,-37),(59,-21.8),(60,-18),(61,-13.8),(62,-9.6),(65,3),(69,19.8),(70,24)]:
+        for temperature,expected in [(50,-56),(51,-52.2),(55,-37),(59,-21.8),(60,-18),(61,-13.8),(62,-9.6),(65,3),(69,19.8),(70,24),(75,40),(80,56)]:
             with self.subTest(temperature=temperature):
                 h=Harness(calibration_override=None)
                 self.assertEqual(h.configure(mode='manual',manual_temperature=temperature),'applied')
@@ -308,7 +309,7 @@ class HeatingPackageTests(unittest.TestCase):
 
     def test_piecewise_interpolation_uses_both_segments_without_legacy_fallback(self):
         # Deliberately different slopes and fictitious positions for interpolation.
-        points=[{'temperature':50,'level':0,'verified':True},{'temperature':60,'level':20,'verified':True},{'temperature':70,'level':60,'verified':True}]
+        points=[{'temperature':50,'level':0,'verified':True},{'temperature':60,'level':20,'verified':True},{'temperature':70,'level':60,'verified':True},{'temperature':80,'level':80,'verified':True}]
         for temperature,expected in [(50,0),(51,2),(55,10),(59,18),(60,20),(61,24),(65,40),(69,56),(70,60)]:
             h=Harness(calibration_override=points);h.configure(mode='manual',manual_temperature=temperature);h.set(ACTIVE,'on');h.observe()
             self.assertEqual(h.servo_calls,[expected])
@@ -329,7 +330,7 @@ class HeatingPackageTests(unittest.TestCase):
         self.assertEqual(self.h.configure(mode='manual',manual_temperature=70,minimum_d=59), 'applied')
         self.assertEqual(self.h.read(CFG),dict(v=1,r=1,m='manual',t=70,d=59,id='test_1'))
         self.assertEqual(len(self.h.calls),1)
-        for patch in [dict(manual_temperature=49),dict(manual_temperature=71),dict(manual_temperature=60.5),dict(manual_temperature='60'),dict(manual_temperature=True),dict(minimum_d=54),dict(minimum_d=60),dict(minimum_d=57.5),dict(minimum_d=False),dict(mode='auto'),dict(expires_at='tomorrow'),dict(expected_revision=True),dict(expected_revision=-1),dict(request_id='x'*49)]:
+        for patch in [dict(manual_temperature=49),dict(manual_temperature=81),dict(manual_temperature=60.5),dict(manual_temperature='60'),dict(manual_temperature=True),dict(minimum_d=54),dict(minimum_d=60),dict(minimum_d=57.5),dict(minimum_d=False),dict(mode='auto'),dict(expires_at='tomorrow'),dict(expected_revision=True),dict(expected_revision=-1),dict(request_id='x'*49)]:
             with self.subTest(patch=patch):
                 h=Harness()
                 self.assertEqual(h.configure(**patch),'invalid_request')
@@ -723,6 +724,28 @@ class HeatingPackageTests(unittest.TestCase):
         self.h.set(B,'unavailable');self.h.observe()
         self.assertEqual(self.h.tick(d=56.5,b=64)['q'],62)
         self.assertEqual(self.h.read(TX)['at']-changed,1800)
+
+    def test_manual_eighty_waits_for_module_and_uses_verified_point(self):
+        self.h=Harness(calibration_override=None)
+        self.h.configure(mode='manual',manual_temperature=80);self.h.set(ACTIVE,'on')
+        self.h.set(D,'unavailable');self.h.set(B,'unavailable');self.h.observe()
+        self.assertEqual(self.h.status()['desired_temperature'],80)
+        self.assertEqual(self.h.servo_calls,[])
+        self.h.set(B,60);self.h.observe()
+        self.assertEqual(self.h.servo_calls,[56])
+        self.assertEqual(self.h.status()['last_transmitted_temperature'],80)
+
+    def test_manual_eighty_to_automatic_ignores_cooldown_and_caps_at_seventy(self):
+        for d,expected in [(56,70),(62,50)]:
+            h=Harness(calibration_override=None);h.configure(mode='manual',manual_temperature=80)
+            h.set(ACTIVE,'on');h.set(D,d);h.observe()
+            self.assertEqual(h.servo_calls,[56])
+            h.configure(mode='automatic',manual_temperature=80,expected_revision=1,request_id='auto')
+            h.observe()
+            self.assertEqual(h.read(OBS)['q'],expected)
+            self.assertEqual(h.read(TX)['t'],expected)
+            self.assertEqual(h.status()['fuel_maximum'],70)
+            self.assertEqual(h.status()['commissioned_maximum'],80)
 
     def test_malformed_configuration_never_transmits(self):
         for value in ['not-json','[]','null','{"v":2}',json.dumps(dict(v=1,r=True,m='manual',t=60,d=57)),json.dumps(dict(v=1,r=1,m='manual',t=90,d=57))]:

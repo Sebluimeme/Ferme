@@ -113,7 +113,7 @@ test("an absent controller cannot be mistaken for an available manual mode", () 
 });
 test("request validation rejects expiry, replay keys, out-of-range and hidden payloads", () => {
   assert.deepEqual(validateHeatingControlRequest(request(), id, now), request());
-  for (const change of [{ version: 1 }, { version: "2" }, { expiresAt: now }, { createdAt: now + 31_000 }, { expiresAt: now + 91_000 }, { manualTemperature: 71 }, { manualTemperature: 49 }, { manualTemperature: "60" }, { manualTemperature: true }, { manualTemperature: Number.NaN }, { minimumD: 54 }, { minimumD: 60 }, { minimumD: "57" }, { minimumD: true }, { minimumD: Number.NaN }, { expectedRevision: -1 }, { expectedRevision: 0.5 }, { expectedRevision: 999999999 }, { status: "accepted" }, { actuator: true }, { entity_id: "switch.any" }, { mode: "off" }, { mode: ["manual"] }]) {
+  for (const change of [{ version: 1 }, { version: "2" }, { expiresAt: now }, { createdAt: now + 31_000 }, { expiresAt: now + 91_000 }, { manualTemperature: 81 }, { manualTemperature: 49 }, { manualTemperature: "60" }, { manualTemperature: true }, { manualTemperature: Number.NaN }, { minimumD: 54 }, { minimumD: 60 }, { minimumD: "57" }, { minimumD: true }, { minimumD: Number.NaN }, { expectedRevision: -1 }, { expectedRevision: 0.5 }, { expectedRevision: 999999999 }, { status: "accepted" }, { actuator: true }, { entity_id: "switch.any" }, { mode: "off" }, { mode: ["manual"] }]) {
     assert.throws(() => validateHeatingControlRequest({ ...request(), ...change }, id, now));
   }
   assert.throws(() => validateHeatingControlRequest(request(), "different-key", now));
@@ -122,7 +122,7 @@ test("request validation rejects expiry, replay keys, out-of-range and hidden pa
   assert.throws(() => validateHeatingControlRequest({ ...request(), createdAt: now - 1000, expiresAt: now + 1000 }, id, now));
 });
 test("manual and automatic settings enforce commissioned bounds and preserve internal helper v1", () => {
-  for (const manualTemperature of [50, 70]) for (const minimumD of [55, 59]) {
+  for (const manualTemperature of [50, 70, 75, 80]) for (const minimumD of [55, 59]) {
     assert.equal(validHeatingSettings({ mode: "manual", manualTemperature, minimumD }), true);
   }
   assert.deepEqual(parseHaHeatingConfiguration(states(5, id)), { revision: 5, requestId: id });
@@ -141,8 +141,8 @@ test("configuration receipts validate identity and v2 without claiming physical 
 });
 test("switching mode can save its valid field without silently submitting an invalid hidden draft", () => {
   const confirmed = { mode: "manual", manualTemperature: 60, minimumD: 57 };
-  assert.equal(heatingSettingsFromDraft("manual", 71, 57, confirmed), null);
-  assert.deepEqual(heatingSettingsFromDraft("automatic", 71, 57, confirmed), { mode: "automatic", manualTemperature: 60, minimumD: 57 });
+  assert.equal(heatingSettingsFromDraft("manual", 81, 57, confirmed), null);
+  assert.deepEqual(heatingSettingsFromDraft("automatic", 81, 57, confirmed), { mode: "automatic", manualTemperature: 60, minimumD: 57 });
   assert.equal(heatingSettingsFromDraft("automatic", 60, 60, confirmed), null);
   assert.deepEqual(heatingSettingsFromDraft("manual", 62, 60, confirmed), { mode: "manual", manualTemperature: 62, minimumD: 57 });
   assert.deepEqual(heatingSettingsFromDraft("automatic", Number.NaN, 56, confirmed), { mode: "automatic", manualTemperature: 60, minimumD: 56 });
@@ -239,4 +239,26 @@ test("an old displayed calculation is labelled as old even if it has a numeric v
   for (const [value, offline] of [[status, true], [{ ...status, fresh: false }, false]]) {
     assert.deepEqual(heatingDisplayedTarget(value, offline), { value: 63, label: "Dernière consigne calculée", detail: "Calcul ancien" });
   }
+});
+
+
+test("manual 80 is accepted through the bridge and remains distinct from the automatic ceiling", async () => {
+  const value = { ...request(), mode: "manual", manualTemperature: 80 };
+  assert.equal(validateHeatingControlRequest(value, id, now).manualTemperature, 80);
+  let sent;
+  const client = createHeatingConfigurationHaClient({ url: "http://ha.test", token: "test", fetchImpl: async (url, init) => {
+    sent = JSON.parse(init.body); return new Response("[]", { status: 200 });
+  } });
+  await client.configure(value);
+  assert.equal(sent.manual_temperature, 80);
+  const rows = states();
+  Object.assign(rows[0].attributes, { mode: "manual", manual_temperature: 80, desired_temperature: 80, last_transmitted_temperature: 80, last_transmitted_at: new Date(now).toISOString() });
+  assert.equal(controlStatusFromHa(rows, now).available, true);
+  rows[0].attributes.mode = "automatic";
+  assert.equal(controlStatusFromHa(rows, now).available, false);
+  rows[0].attributes.desired_temperature = 70;
+  const automatic = controlStatusFromHa(rows, now);
+  assert.equal(automatic.available, true);
+  assert.equal(automatic.lastTransmittedTemperature, 80);
+  assert.equal(automatic.fuelMaximum, 70);
 });

@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { ChevronDown, CircleAlert, Clock3, Minus, Plus, Send, SlidersHorizontal, Thermometer, Wifi, WifiOff } from "lucide-react";
 import { Button, Field, Notice, Sheet, farmStyles } from "@/components/ui/FarmUI";
-import { HEATING_DEFAULT_MINIMUM_D, HEATING_FUEL_MINIMUM, HEATING_FUEL_MAXIMUM, HEATING_RELEASE_D, heatingControlReason, heatingDisplayedTarget, heatingSettingsFromDraft, type HeatingControlSettings, type HeatingControlStatus } from "@/lib/heating-control";
+import { HEATING_DEFAULT_MINIMUM_D, HEATING_FUEL_MINIMUM, HEATING_MANUAL_MAXIMUM, HEATING_RELEASE_D, heatingControlReason, heatingDisplayedTarget, heatingSettingsFromDraft, type HeatingControlSettings, type HeatingControlStatus } from "@/lib/heating-control";
 import styles from "./HeatingControlPanel.module.css";
 
 export interface HeatingControlPanelProps {
@@ -154,7 +154,7 @@ function ControlSheet({ status, loading, offline, busy, error, onSave, onClose }
         <button type="button" aria-pressed={mode === "manual"} className={mode === "manual" ? styles.selectedMode : ""} disabled={waiting || saved} onClick={() => setMode("manual")}>Manuel</button>
         <button type="button" aria-pressed={mode === "automatic"} className={mode === "automatic" ? styles.selectedMode : ""} disabled={waiting || saved} onClick={() => setMode("automatic")}>Automatique</button>
       </div></div>
-      {mode === "manual" ? <TemperatureInput id={`${id}-manual`} value={manual} onChange={setManual} min={HEATING_FUEL_MINIMUM} max={HEATING_FUEL_MAXIMUM} disabled={waiting || saved} label="Consigne de la chaudière fioul" hint="De 50 à 70 °C. Home Assistant conserve cette consigne si le module B est temporairement hors ligne." /> : <>
+      {mode === "manual" ? <TemperatureInput id={`${id}-manual`} value={manual} onChange={setManual} min={HEATING_FUEL_MINIMUM} max={HEATING_MANUAL_MAXIMUM} disabled={waiting || saved} label="Consigne de la chaudière fioul" hint="De 50 à 80 °C. Home Assistant conserve cette consigne si le module B est temporairement hors ligne." /> : <>
         <TemperatureInput id={`${id}-minimum`} value={minimumD} onChange={setMinimumD} min={55} max={59} disabled={waiting || saved} label="Limite basse de la sonde du ballon D" hint="De 55 à 59 °C, sur la sonde affichée dans Ferme. À adapter à la différence avec la sonde de la chaudière." />
         <details className={styles.details}><summary>Fonctionnement automatique<ChevronDown aria-hidden="true" /></summary><div className={styles.automaticExplanation}><Thermometer aria-hidden="true" /><div>
           <strong>Deux repères pour le ballon D</strong>

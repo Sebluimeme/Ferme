@@ -1,7 +1,8 @@
 export const HEATING_CONTROL_PATH = "chauffage-ha/control";
 export const HEATING_CONTROL_VERSION = 2;
 export const HEATING_FUEL_MINIMUM = 50;
-export const HEATING_FUEL_MAXIMUM = 70;
+export const HEATING_FUEL_MAXIMUM = 70; // Automatic regulation only.
+export const HEATING_MANUAL_MAXIMUM = 80;
 export const HEATING_RELEASE_D = 60;
 export const HEATING_DEFAULT_MINIMUM_D = 57;
 export type HeatingControlMode = "manual" | "automatic";
@@ -73,7 +74,7 @@ const finite = (value: unknown): value is number => typeof value === "number" &&
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const iso = (value: unknown): string | null => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value)) ? value : null;
 const nullableObservedIso = (value: unknown, now: number) => value == null || (iso(value) !== null && Date.parse(value as string) >= 0 && Date.parse(value as string) <= now + 30_000);
-const fuelTemperature = (value: unknown): value is number => finite(value) && value >= HEATING_FUEL_MINIMUM && value <= HEATING_FUEL_MAXIMUM;
+const fuelTemperature = (value: unknown): value is number => finite(value) && value >= HEATING_FUEL_MINIMUM && value <= HEATING_MANUAL_MAXIMUM;
 const nullableFuelTemperature = (value: unknown) => value == null || fuelTemperature(value);
 const observedTemperature = (value: unknown) => finite(value) && value >= 0 && value <= 110 ? value : null;
 export function validHeatingSettings(value: unknown): value is HeatingControlSettings {
@@ -100,7 +101,7 @@ export function heatingSettingsFromDraft(mode: HeatingControlMode, manualTempera
 export function heatingControlReason(reason: string): string {
   return ({
     control_disabled: "Le pilotage du servomoteur est désactivé.",
-    calibration_required: "Les trois points de calibration du servomoteur ne sont pas encore validés. Les réglages peuvent être mémorisés, mais aucune consigne n’est transmise.",
+    calibration_required: "Les quatre points de calibration du servomoteur ne sont pas encore validés. Les réglages peuvent être mémorisés, mais aucune consigne n’est transmise.",
     legacy_conflict: "Pilotage suspendu : une autre automatisation commande encore le servomoteur.",
     warming_up: "Premières mesures en cours pour calculer la tendance.",
     manual_ready: "La consigne manuelle est mémorisée. Son état de transmission apparaît ci-dessous.",
@@ -115,6 +116,7 @@ export function heatingControlReason(reason: string): string {
     release_support: "L’approche de 60 °C permet de réduire progressivement le fioul.",
     increase_cooldown: "Le délai entre deux hausses de consigne est respecté.",
     decrease_cooldown: "Le délai entre deux baisses de consigne est respecté.",
+    automatic_limit: "Retour en automatique : la consigne est ramenée au plafond de 70 °C, ou à 50 °C si le ballon D est chaud.",
     at_maximum: "La consigne fioul a atteint sa limite de 70 °C.",
     response_not_observed: "Aucune remontée détectée malgré l’appoint : hausse suspendue, installation à vérifier.",
     awaiting_transmission: "La consigne attend sa transmission au module B.",
@@ -144,6 +146,7 @@ export function normalizeHeatingControl(value: unknown, now = Date.now()): Heati
     && HEATING_DELIVERY_STATES.includes(v.deliveryState as HeatingDeliveryState)
     && v.positionFeedback === "unmeasured" && typeof v.reason === "string"
     && nullableFuelTemperature(v.desiredTemperature) && nullableFuelTemperature(v.lastTransmittedTemperature)
+    && (v.mode === "manual" || v.desiredTemperature == null || (finite(v.desiredTemperature) && v.desiredTemperature <= HEATING_FUEL_MAXIMUM))
     && nullableObservedIso(v.lastTransmittedAt, now)
     && (v.deliveryState !== "transmitted" || (fuelTemperature(v.lastTransmittedTemperature) && iso(v.lastTransmittedAt) !== null));
   return {
