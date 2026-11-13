@@ -25,6 +25,8 @@ export interface HeatingDashboardProps {
   onSelectMetric?: (key: HeatingHistoryKey) => void;
   topology?: HeatingTopology;
   controlPanel?: ReactNode;
+  /** Bloc supplémentaire sous l'installation (ex. nettoyage de la chaudière). */
+  extraPanel?: ReactNode;
 }
 
 const numberFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
@@ -146,7 +148,7 @@ function Installation({ status, topology, sourceInterrupted, onSelectMetric, con
   </Card>;
 }
 
-export default function HeatingDashboard({ status, loading, error, refreshing, offline, onRefresh, onSelectMetric, topology = provisionalTopology, controlPanel }: HeatingDashboardProps) {
+export default function HeatingDashboard({ status, loading, error, refreshing, offline, onRefresh, onSelectMetric, topology = provisionalTopology, controlPanel, extraPanel }: HeatingDashboardProps) {
   const checked = displayDate(status.checkedAt);
   const connected = status.connected && status.relayFreshness === "fresh" && !offline;
   const sourceInterrupted = !connected;
@@ -162,6 +164,7 @@ export default function HeatingDashboard({ status, loading, error, refreshing, o
     {error && !offline && <Notice tone="error" className={styles.notice}>L’actualisation a échoué. Les dernières valeurs connues restent affichées.</Notice>}
     {!loading && !status.hasData && !error && !offline && <Notice className={styles.notice}>Les températures apparaîtront dès les premiers relevés disponibles.</Notice>}
     <Installation status={status} topology={topology} sourceInterrupted={sourceInterrupted} onSelectMetric={onSelectMetric} controlPanel={controlPanel} />
+    {extraPanel && <div className={styles.extraPanel}>{extraPanel}</div>}
     <p className={styles.help}><CircleAlert aria-hidden="true" /><span>En orange : aucun nouveau relevé du capteur depuis plus de 30 minutes. Une coupure plus courte conserve la couleur habituelle.</span></p>
     <footer className={styles.actions}><Button variant="primary" fullWidth busy={refreshing} disabled={loading} onClick={() => { void onRefresh(); }}>{!refreshing && <RefreshCw aria-hidden="true" />}{refreshing ? "Actualisation…" : "Actualiser"}</Button></footer>
   </div>;

@@ -1,0 +1,21 @@
+.card { box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; width: 100%; min-width: 0; padding: 16px; border: 1px solid var(--farm-divider); border-radius: 18px; background: var(--farm-input); }
+.header h3 { margin: 0; font-size: 17px; line-height: 1.3; font-weight: 700; letter-spacing: -.25px; }
+.muted { margin: 0; color: var(--farm-muted); font-size: 14px; line-height: 1.5; }
+.block { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid var(--farm-divider); min-width: 0; }
+.label { color: var(--farm-muted); font-size: 13px; line-height: 1.4; }
+.big { font-size: 20px; line-height: 1.25; font-weight: 700; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }
+.state { margin: 0; font-size: 14px; line-height: 1.45; color: var(--farm-muted); }
+.stateWarn { color: var(--farm-warning); }
+.stateError { color: var(--farm-danger); }
+.actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.history li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; border-bottom: 1px solid var(--farm-divider); font-size: 15px; font-variant-numeric: tabular-nums; }
+.history li:last-child { border-bottom: 0; }
+.history time { min-width: 0; }
+.details summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: 15px; font-weight: 600; }
+.sheetContent { display: flex; flex-direction: column; gap: 18px; padding-top: 3px; }
+.choice { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border: 1px solid var(--farm-border); border-radius: 15px; background: var(--farm-input); }
+.choice button { min-width: 0; min-height: 48px; padding: 10px 6px; border: 1px solid transparent; border-radius: 11px; background: transparent; color: var(--farm-muted); font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; }
+.choice .selected { background: var(--farm-surface); color: var(--farm-text); border-color: var(--farm-divider); }
+.delayRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.footerNote { margin: 8px 0 0; color: var(--farm-muted); font-size: 13px; line-height: 1.45; }

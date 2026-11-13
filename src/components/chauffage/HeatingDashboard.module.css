@@ -84,3 +84,5 @@
   .connection { flex-direction: row; gap: 16px; align-items: center; }
 }
 @media (prefers-reduced-motion: reduce) { .equipment { transition: none; } }
+
+.extraPanel { margin-top: 16px; min-width: 0; }
