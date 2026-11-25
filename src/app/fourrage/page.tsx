@@ -10,6 +10,7 @@ import type {
   ActiviteFourrage,
   CheptelDistribution,
   DistributionFourrage,
+  FormatBotte,
   Partiel,
   UniteDistribution,
 } from "@/types/fourrage";
@@ -24,6 +25,7 @@ import {
   rendementMoyen,
   rendementParParcelle,
   donneesMensuellesRecoltes,
+  stockFoinRestant,
   derniereUniteCheptel,
   distributionDuJour,
   type OrigineFourrage,
@@ -44,7 +46,7 @@ import {
 
 // ==================== Types internes ====================
 
-type TypeActivite = "foin" | "ensilage" | "fauche" | "paturage" | "regain";
+type TypeActivite = "foin" | "paille" | "ensilage" | "fauche" | "paturage" | "regain";
 
 interface ActiviteFormData {
   typeActivite: TypeActivite;
@@ -52,6 +54,7 @@ interface ActiviteFormData {
   dateActivite: string;
   parcelIds: string[];
   nombreBottes: string;
+  formatBotte: FormatBotte | "";
   poidsBotteKg: string;
   fournisseur: string;
   prixTotal: string;
@@ -65,6 +68,7 @@ interface BottesFormData {
 
 const TYPE_LABELS: Record<TypeActivite, string> = {
   foin: "Foin",
+  paille: "Paille",
   ensilage: "Ensilage",
   fauche: "Fauche",
   paturage: "Pâturage",
@@ -73,6 +77,7 @@ const TYPE_LABELS: Record<TypeActivite, string> = {
 
 const TYPE_COLORS: Record<TypeActivite, string> = {
   foin: "bg-yellow-100 text-yellow-800",
+  paille: "bg-orange-100 text-orange-800",
   ensilage: "bg-green-100 text-green-800",
   fauche: "bg-blue-100 text-blue-800",
   paturage: "bg-emerald-100 text-emerald-800",
@@ -114,6 +119,7 @@ function ActiviteForm({
     dateActivite: initial?.dateActivite ?? today,
     parcelIds: initial?.parcelIds ?? [],
     nombreBottes: initial?.nombreBottes ?? "",
+    formatBotte: initial?.formatBotte ?? (initial?.origine === "achat" ? "petite" : ""),
     poidsBotteKg: initial?.poidsBotteKg ?? "16.5",
     fournisseur: initial?.fournisseur ?? "",
     prixTotal: initial?.prixTotal ?? "",
@@ -128,7 +134,15 @@ function ActiviteForm({
 
   /** Passer en achat vide les parcelles : un achat n'est rattaché à aucune parcelle. */
   const setOrigine = (origine: OrigineFourrage) =>
-    setForm((p) => (origine === "achat" ? { ...p, origine, parcelIds: [] } : { ...p, origine }));
+    setForm((p) => {
+      if (origine === "achat") return { ...p, origine, parcelIds: [] };
+      return {
+        ...p,
+        origine,
+        typeActivite: p.typeActivite === "paille" ? "foin" : p.typeActivite,
+        formatBotte: "",
+      };
+    });
 
   const togglePartiel = (id: string) => {
     setForm((prev) => ({
@@ -155,7 +169,7 @@ function ActiviteForm({
               type="button"
               onClick={() => setOrigine(o)}
               aria-pressed={form.origine === o}
-              className={`px-3 py-2.5 text-sm font-semibold rounded-lg border transition-colors cursor-pointer ${
+              className={`min-h-11 px-3 py-2.5 text-sm font-semibold rounded-lg border transition-colors cursor-pointer ${
                 form.origine === o
                   ? "bg-brand-50 border-brand-500 text-brand-700"
                   : "bg-white border-stone-300 text-stone-600 hover:bg-stone-50"
@@ -167,21 +181,24 @@ function ActiviteForm({
         </div>
         <p className="text-xs text-stone-400 mt-1">
           {achat
-            ? "Les bottes achetées comptent dans le stock et l'objectif foin, mais jamais dans les rendements."
+            ? "Les achats restent séparés des rendements. Seul le foin acheté compte dans l’objectif foin."
             : "Les récoltes alimentent les rendements et les analytics par parcelle."}
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-stone-700 mb-1">Type d&apos;activité *</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">
+            {achat ? "Produit acheté *" : "Type d’activité *"}
+          </label>
           <select
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="min-h-11 w-full border border-stone-300 rounded-lg px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.typeActivite}
             onChange={(e) => setForm((p) => ({ ...p, typeActivite: e.target.value as TypeActivite }))}
             required
           >
             <option value="foin">Foin</option>
+            {achat && <option value="paille">Paille</option>}
             <option value="regain">Regain</option>
             <option value="ensilage">Ensilage</option>
             {!achat && <option value="fauche">Fauche</option>}
@@ -192,13 +209,39 @@ function ActiviteForm({
           <label className="block text-sm font-medium text-stone-700 mb-1">Date *</label>
           <input
             type="date"
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="min-h-11 w-full border border-stone-300 rounded-lg px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.dateActivite}
             onChange={(e) => setForm((p) => ({ ...p, dateActivite: e.target.value }))}
             required
           />
         </div>
       </div>
+
+      {achat && (
+        <fieldset>
+          <legend className="block text-sm font-medium text-stone-700 mb-2">Format des bottes *</legend>
+          <div className="grid grid-cols-2 gap-2">
+            {(["petite", "grande"] as FormatBotte[]).map((format) => (
+              <button
+                key={format}
+                type="button"
+                onClick={() => setForm((p) => ({ ...p, formatBotte: format }))}
+                aria-pressed={form.formatBotte === format}
+                className={`min-h-11 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${
+                  form.formatBotte === format
+                    ? "border-brand-500 bg-brand-50 text-brand-700"
+                    : "border-stone-300 bg-white text-stone-600 hover:bg-stone-50"
+                }`}
+              >
+                {format === "petite" ? "Petites bottes" : "Grandes bottes"}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-stone-500">
+            Le poids unitaire reste indiqué séparément. La forme ronde ou carrée n’est pas demandée.
+          </p>
+        </fieldset>
+      )}
 
       {!achat && (
         <div>
@@ -217,13 +260,13 @@ function ActiviteForm({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className="block text-sm font-medium text-stone-700 mb-1">Nombre de bottes</label>
           <input
             type="number"
             min="0"
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="min-h-11 w-full border border-stone-300 rounded-lg px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.nombreBottes}
             onChange={(e) => setForm((p) => ({ ...p, nombreBottes: e.target.value }))}
             placeholder="Ex : 120"
@@ -235,7 +278,7 @@ function ActiviteForm({
             type="number"
             min="0"
             step="0.01"
-            className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="min-h-11 w-full border border-stone-300 rounded-lg px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             value={form.poidsBotteKg}
             onChange={(e) => setForm((p) => ({ ...p, poidsBotteKg: e.target.value }))}
             placeholder="Ex : 16.05"
@@ -250,12 +293,12 @@ function ActiviteForm({
       )}
 
       {achat && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium text-stone-700 mb-1">Fournisseur</label>
             <input
               type="text"
-              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="min-h-11 w-full border border-stone-300 rounded-lg px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               value={form.fournisseur}
               onChange={(e) => setForm((p) => ({ ...p, fournisseur: e.target.value }))}
               placeholder="Ex : GAEC des Prés"
@@ -267,7 +310,7 @@ function ActiviteForm({
               type="number"
               min="0"
               step="0.01"
-              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="min-h-11 w-full border border-stone-300 rounded-lg px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               value={form.prixTotal}
               onChange={(e) => setForm((p) => ({ ...p, prixTotal: e.target.value }))}
               placeholder="Ex : 450"
@@ -280,7 +323,7 @@ function ActiviteForm({
         <label className="block text-sm font-medium text-stone-700 mb-1">Notes</label>
         <textarea
           rows={3}
-          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
           value={form.notes}
           onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
           placeholder={achat ? "Qualité, transport, conditions..." : "Observations, conditions météo..."}
@@ -291,14 +334,14 @@ function ActiviteForm({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
+          className="min-h-11 px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
         >
           Annuler
         </button>
         <button
           type="submit"
-          disabled={loading}
-          className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50"
+          disabled={loading || (achat && !form.formatBotte)}
+          className="min-h-11 px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50"
         >
           {loading ? "Enregistrement..." : "Enregistrer"}
         </button>
@@ -501,6 +544,7 @@ export default function FourragePage() {
 
   // Stock foin = récoltes + achats (les achats comptent pour l'objectif, pas pour les rendements)
   const stock = stockFoin(activitesFourrage);
+  const stockRestant = stockFoinRestant(activitesFourrage, distributionsFourrage);
 
   const progressPct = objectifFoinT > 0 ? Math.min(100, (stock.totalT / objectifFoinT) * 100) : 0;
   const manquantT = Math.max(0, objectifFoinT - stock.totalT);
@@ -558,6 +602,8 @@ export default function FourragePage() {
   const formatQuantiteDistribution = (quantite: number, unite: UniteDistribution) =>
     `${quantite} ${unite}${quantite > 1 ? "s" : ""}`;
 
+  const formatUnites = (quantite: number) => new Intl.NumberFormat("fr-FR").format(quantite);
+
   // Handlers
   /** Champs communs création/édition — un achat n'a jamais de parcelle. */
   const buildPayload = (data: ActiviteFormData) => {
@@ -572,6 +618,7 @@ export default function FourragePage() {
       dateActivite: data.dateActivite,
       parcelIds: achat ? [] : data.parcelIds,
       nombreBottes: nbBottes,
+      formatBotte: achat && data.formatBotte ? data.formatBotte : undefined,
       poidsBotteKg,
       poidsTonne,
       fournisseur: achat ? data.fournisseur || undefined : undefined,
@@ -607,6 +654,7 @@ export default function FourragePage() {
         parcelIds: payload.parcelIds.length ? payload.parcelIds : null,
         fournisseur: payload.fournisseur ?? null,
         prixTotal: payload.prixTotal ?? null,
+        formatBotte: payload.formatBotte ?? null,
       });
       if (result.success) {
         showToast({ type: "success", title: "Activité mise à jour" });
@@ -707,18 +755,18 @@ export default function FourragePage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-stone-900">Fourrage</h1>
-          <p className="text-stone-500 mt-1">Gestion des activités de coupe, de récolte et des achats de bottes</p>
+          <p className="text-stone-500 mt-1">Gestion des activités de coupe, de récolte et des achats de foin ou de paille</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:shrink-0">
           <button
             onClick={() => setModalOpen("achat")}
-            className="w-full sm:w-auto whitespace-nowrap px-4 py-2 text-sm font-semibold text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 rounded-lg transition-colors cursor-pointer"
+            className="min-h-11 w-full sm:w-auto whitespace-nowrap px-4 py-2 text-sm font-semibold text-sky-700 bg-sky-50 border border-sky-200 hover:bg-sky-100 rounded-lg transition-colors cursor-pointer"
           >
-            🛒 Achat de bottes
+            🛒 Achat foin ou paille
           </button>
           <button
             onClick={() => setModalOpen("recolte")}
-            className="w-full sm:w-auto whitespace-nowrap px-4 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors cursor-pointer"
+            className="min-h-11 w-full sm:w-auto whitespace-nowrap px-4 py-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors cursor-pointer"
           >
             + Nouvelle activité
           </button>
@@ -764,6 +812,31 @@ export default function FourragePage() {
           </div>
           <span className="text-xs text-stone-400">{formatDate(dateDuJour)}</span>
         </div>
+
+        <div className="mb-5 rounded-lg border border-brand-200 bg-brand-50 p-4" aria-label="Stock de foin restant">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-brand-800">Stock de foin disponible</p>
+              <p className="mt-1 text-2xl font-bold text-stone-900">
+                {formatUnites(stockRestant.unitesRestantes)} unité{stockRestant.unitesRestantes > 1 ? "s" : ""} restante{stockRestant.unitesRestantes > 1 ? "s" : ""}
+              </p>
+            </div>
+            <p className="text-sm text-stone-600">
+              {formatUnites(stockRestant.unitesEnregistrees)} enregistrée{stockRestant.unitesEnregistrees > 1 ? "s" : ""}
+              {" − "}
+              {formatUnites(stockRestant.unitesDistribuees)} distribuée{stockRestant.unitesDistribuees > 1 ? "s" : ""}
+            </p>
+          </div>
+          <p className="mt-2 text-xs text-stone-600">
+            Une botte ou une balle distribuée retire une unité. La paille n’est pas concernée.
+          </p>
+          {stockRestant.unitesSansStock > 0 && (
+            <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900" role="status">
+              {formatUnites(stockRestant.unitesSansStock)} unité{stockRestant.unitesSansStock > 1 ? "s" : ""} distribuée{stockRestant.unitesSansStock > 1 ? "s" : ""} sans stock de foin enregistré.
+            </p>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {(["ovin", "bovin"] as CheptelDistribution[]).map((cheptel) => {
             const distribution = distributionAujourdhui(cheptel);
@@ -814,7 +887,7 @@ export default function FourragePage() {
                         disabled={estEnregistrement}
                         onClick={() => handleUniteChange(cheptel, option)}
                         aria-pressed={unite === option}
-                        className={`rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-wait ${unite === option ? "border-brand-600 bg-brand-50 text-brand-700" : "border-stone-300 bg-white text-stone-600 hover:bg-stone-100"}`}
+                        className={`min-h-11 rounded-md border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-wait ${unite === option ? "border-brand-600 bg-brand-50 text-brand-700" : "border-stone-300 bg-white text-stone-600 hover:bg-stone-100"}`}
                       >
                         {option === "botte" ? "Botte" : "Balle"}
                       </button>
@@ -824,7 +897,7 @@ export default function FourragePage() {
                 <button
                   type="submit"
                   disabled={estEnregistrement}
-                  className="mt-4 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-wait disabled:opacity-60"
+                  className="mt-4 min-h-11 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-wait disabled:opacity-60"
                 >
                   {estEnregistrement
                     ? "Enregistrement..."
@@ -882,7 +955,7 @@ export default function FourragePage() {
                         type="button"
                         onClick={() => setDistributionDeleteTarget(distribution)}
                         disabled={distributionDeleting === distribution.id}
-                        className="shrink-0 rounded-lg p-2 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-wait disabled:opacity-50"
+                        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg p-2 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-wait disabled:opacity-50"
                         aria-label={`Supprimer la distribution de ${formatQuantiteDistribution(distribution.quantite, distribution.unite)} pour ${label.toLowerCase()}`}
                         title="Supprimer cette distribution"
                       >
@@ -902,7 +975,7 @@ export default function FourragePage() {
         <div className="bg-white rounded-xl shadow-sm border border-stone-100 p-5 mb-8">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-base font-semibold text-stone-800">🎯 Objectif foin — saison</h2>
+              <h2 className="text-base font-semibold text-stone-800">🎯 Objectif d’approvisionnement — saison</h2>
               <p className="text-xs text-stone-400 mt-0.5">{DUREE_STABULATION} jours de stabulation · {animauxActifs.length} animaux actifs</p>
             </div>
             <div className="text-right">
@@ -923,14 +996,14 @@ export default function FourragePage() {
           {/* Chiffres */}
           <div className="flex items-center justify-between text-sm mb-4">
             <span className="text-stone-600">
-              <span className="font-semibold text-stone-800">{stock.totalT.toFixed(1)} t</span> en stock
+              <span className="font-semibold text-stone-800">{stock.totalT.toFixed(1)} t</span> de foin enregistré
             </span>
             <span className="text-stone-400">sur</span>
             <span className="text-stone-600">
               objectif <span className="font-semibold text-stone-800">{objectifFoinT.toFixed(1)} t</span>
             </span>
             {manquantT > 0 && (
-              <span className="text-red-500 font-medium">−{manquantT.toFixed(1)} t restantes</span>
+              <span className="text-red-500 font-medium">−{manquantT.toFixed(1)} t à prévoir</span>
             )}
             {manquantT === 0 && (
               <span className="text-green-600 font-medium">✓ Objectif atteint</span>
@@ -940,7 +1013,7 @@ export default function FourragePage() {
           {/* Répartition stock : récolté vs acheté */}
           <div className="grid grid-cols-3 gap-2 mb-4">
             <div className="bg-stone-50 rounded-lg px-3 py-2">
-              <p className="text-xs text-stone-400">Stock total</p>
+              <p className="text-xs text-stone-400">Tonnage enregistré</p>
               <p className="text-sm font-bold text-stone-800">{stock.totalT.toFixed(1)} t</p>
             </div>
             <div className="bg-yellow-50 rounded-lg px-3 py-2">
@@ -1114,7 +1187,9 @@ export default function FourragePage() {
               <div className="mt-0.5 text-sm text-stone-600">
                 {activite.nombreBottes != null ? (
                   <>
-                    <span className="font-medium">{activite.nombreBottes} bottes</span>
+                    <span className="font-medium">
+                      {activite.nombreBottes} {activite.formatBotte ? `${activite.formatBotte}${activite.nombreBottes > 1 ? "s" : ""} ` : ""}botte{activite.nombreBottes > 1 ? "s" : ""}
+                    </span>
                     {activite.poidsTonne != null && ` — ${activite.poidsTonne} t`}
                   </>
                 ) : (
@@ -1157,7 +1232,7 @@ export default function FourragePage() {
       <Modal
         isOpen={!!modalOpen}
         onClose={() => setModalOpen(null)}
-        title={modalOpen === "achat" ? "Achat de bottes" : "Nouvelle activité fourrage"}
+        title={modalOpen === "achat" ? "Achat de foin ou de paille" : "Nouvelle activité fourrage"}
       >
         {modalOpen && (
           <ActiviteForm
@@ -1186,6 +1261,7 @@ export default function FourragePage() {
               dateActivite: editActivite.dateActivite,
               parcelIds: editActivite.parcelIds ?? [],
               nombreBottes: editActivite.nombreBottes?.toString() ?? "",
+              formatBotte: editActivite.formatBotte ?? "",
               poidsBotteKg: editActivite.poidsBotteKg?.toString() ?? "16.5",
               fournisseur: editActivite.fournisseur ?? "",
               prixTotal: editActivite.prixTotal?.toString() ?? "",

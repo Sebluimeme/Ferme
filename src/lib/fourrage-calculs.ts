@@ -200,6 +200,41 @@ export interface DistributionCalc {
   quantite: number;
 }
 
+export interface StockFoinRestant {
+  unitesEnregistrees: number;
+  unitesDistribuees: number;
+  unitesRestantes: number;
+  unitesSansStock: number;
+}
+
+/**
+ * Stock de foin restant en unités physiques.
+ * Une botte ou une balle distribuée retire une unité : les distributions ne
+ * portent pas encore de poids, donc aucun tonnage restant n'est inventé.
+ */
+export function stockFoinRestant(
+  activites: ActiviteCalc[],
+  distributions: DistributionCalc[],
+  annee?: number
+): StockFoinRestant {
+  const stock = stockFoin(activites, annee);
+  const unitesEnregistrees = stock.bottesRecoltees + stock.bottesAchetees;
+  const distributionsRetenues = annee === undefined
+    ? distributions
+    : distributions.filter((distribution) => Number.parseInt(distribution.dateDistribution.slice(0, 4), 10) === annee);
+  const unitesDistribuees = distributionsRetenues.reduce((total, distribution) => {
+    const quantite = Number(distribution.quantite);
+    return total + (Number.isFinite(quantite) && quantite > 0 ? quantite : 0);
+  }, 0);
+
+  return {
+    unitesEnregistrees,
+    unitesDistribuees,
+    unitesRestantes: Math.max(0, unitesEnregistrees - unitesDistribuees),
+    unitesSansStock: Math.max(0, unitesDistribuees - unitesEnregistrees),
+  };
+}
+
 export function distributionsDuCheptel<T extends DistributionCalc>(distributions: T[], cheptel: string): T[] {
   return distributions.filter((d) => d.cheptel === cheptel);
 }

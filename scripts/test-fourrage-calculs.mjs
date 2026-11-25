@@ -31,6 +31,7 @@ const {
   rendementMoyen,
   rendementParParcelle,
   donneesMensuellesRecoltes,
+  stockFoinRestant,
   distributionDuJour,
   derniereUniteCheptel,
   totalDistribueCheptel,
@@ -119,6 +120,15 @@ const ACHAT_AVEC_PARCELLE = {
   poidsTonne: 0.165,
 };
 
+const ACHAT_PAILLE = {
+  typeActivite: "paille",
+  dateActivite: "2026-08-12",
+  origine: "achat",
+  nombreBottes: 4,
+  formatBotte: "grande",
+  poidsTonne: 1.2,
+};
+
 const TOUTES = [RECOLTE_LEGACY, RECOLTE_EXPLICITE, REGAIN, ACHAT, ACHAT_AVEC_PARCELLE];
 
 const MOIS = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
@@ -167,6 +177,13 @@ test("le stock foin additionne récoltes et achats", () => {
 test("le regain n'entre pas dans le stock foin", () => {
   const s = stockFoin([REGAIN]);
   assertClose(s.totalT, 0, "total");
+});
+
+test("un achat de paille reste séparé du stock foin", () => {
+  const s = stockFoin([ACHAT, ACHAT_PAILLE]);
+  assertClose(s.acheteT, ACHAT.poidsTonne, "foin acheté");
+  assert(s.bottesAchetees === ACHAT.nombreBottes, "seules les bottes de foin sont comptées");
+  assert(estAchat(ACHAT_PAILLE), "la paille reste bien reconnue comme achat");
 });
 
 test("le stock foin peut être filtré par année", () => {
@@ -278,6 +295,46 @@ test("la dernière unité est conservée indépendamment par cheptel", () => {
 test("les totaux de distribution filtrent le cheptel et la période", () => {
   assert(totalDistribueCheptel(DISTRIBUTIONS, "ovin") === 5);
   assert(totalDistribuePeriode(DISTRIBUTIONS, "ovin", "2026-08-16", "2026-08-16") === 2);
+});
+
+test("le stock restant déduit toutes les bottes et balles distribuées", () => {
+  const restant = stockFoinRestant(TOUTES, DISTRIBUTIONS);
+  assert(restant.unitesEnregistrees === 316, "300 récoltées + 16 achetées");
+  assert(restant.unitesDistribuees === 9, "3 + 2 + 4 distribuées");
+  assert(restant.unitesRestantes === 307, "316 - 9 restantes");
+  assert(restant.unitesSansStock === 0);
+});
+
+test("la paille ne gonfle pas le stock restant de foin", () => {
+  const restant = stockFoinRestant([ACHAT, ACHAT_PAILLE], [{
+    dateDistribution: "2026-08-15",
+    cheptel: "ovin",
+    unite: "botte",
+    quantite: 2,
+  }]);
+  assert(restant.unitesEnregistrees === 6, "seules les 6 bottes de foin sont disponibles");
+  assert(restant.unitesRestantes === 4);
+});
+
+test("le stock restant ne devient jamais négatif et signale le dépassement", () => {
+  const restant = stockFoinRestant([ACHAT], [{
+    dateDistribution: "2026-08-15",
+    cheptel: "bovin",
+    unite: "balle",
+    quantite: 8,
+  }]);
+  assert(restant.unitesRestantes === 0);
+  assert(restant.unitesSansStock === 2);
+});
+
+test("le stock restant annuel ne déduit que les distributions de la même année", () => {
+  const restant = stockFoinRestant([ACHAT], [
+    { dateDistribution: "2025-12-31", cheptel: "bovin", unite: "botte", quantite: 5 },
+    { dateDistribution: "2026-01-01", cheptel: "bovin", unite: "botte", quantite: 2 },
+  ], 2026);
+  assert(restant.unitesEnregistrees === 6);
+  assert(restant.unitesDistribuees === 2);
+  assert(restant.unitesRestantes === 4);
 });
 
 // ─── Résultat ────────────────────────────────────────────────────────────────
