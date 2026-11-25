@@ -14,7 +14,7 @@ export interface CendresPanelProps {
   busy: boolean;
   /** Vrai uniquement si l'envoi d'e-mail a été validé et activé côté serveur. Faux par défaut. */
   emailEnabled: boolean;
-  onClean: (at?: string) => Promise<void>;
+  onClean: (at?: string) => Promise<string | null | void>;
   onRemove: (id: string) => Promise<void>;
   onSaveReminder: (input: { dueAt?: string; delayMinutes?: number }) => Promise<void>;
   onCancelReminder: () => Promise<void>;
@@ -51,12 +51,12 @@ function ReminderSheet({ busy, offline, initial, onSave, onClose }: { busy: bool
         <button type="button" aria-pressed={mode === "delay"} className={mode === "delay" ? styles.selected : ""} onClick={() => setMode("delay")}>Dans un délai</button>
         <button type="button" aria-pressed={mode === "date"} className={mode === "date" ? styles.selected : ""} onClick={() => setMode("date")}>À une date</button>
       </div>
-      {mode === "delay" ? <Field label="Dans combien de temps ?" htmlFor={`${id}-amount`} hint="Aucune fréquence n'est imposée : le rappel ne se répète pas.">
+      {mode === "delay" ? <Field label="Dans combien de temps ?" htmlFor={`${id}-amount`} hint="Après chaque « Cendres vidées », le rappel est reporté avec ce même délai. Tu peux le modifier ou l'annuler.">
         <div className={styles.delayRow}>
           <input id={`${id}-amount`} type="number" inputMode="numeric" min="1" step="1" placeholder="ex. 7" value={amount} onChange={e => setAmount(e.target.value)} />
           <select aria-label="Unité de temps" value={unit} onChange={e => setUnit(Number(e.target.value))}>{UNITS.map(u => <option key={u.minutes} value={u.minutes}>{u.label}</option>)}</select>
         </div>
-      </Field> : <Field label="Date et heure" htmlFor={`${id}-when`} hint="Heure de l'appareil. Le rappel ne se répète pas."><input id={`${id}-when`} type="datetime-local" value={when} onChange={e => setWhen(e.target.value)} /></Field>}
+      </Field> : <Field label="Date et heure" htmlFor={`${id}-when`} hint="Heure de l'appareil. Date fixe : pas de report automatique."><input id={`${id}-when`} type="datetime-local" value={when} onChange={e => setWhen(e.target.value)} /></Field>}
       {error && <Notice tone="error">{error}</Notice>}
     </div>
   </Sheet>;
@@ -75,9 +75,9 @@ export default function CendresPanel({ state, loading, loadError, offline, busy,
   const sending = reminder?.status === "sending";
   const shown = all ? state.cleanings : state.cleanings.slice(0, 5);
 
-  async function act(action: () => Promise<void>, message: string) {
+  async function act(action: () => Promise<string | null | void>, message: string) {
     setError(null); setDone(null);
-    try { await action(); setDone(message); } catch (failure) { setError(messageOf(failure)); }
+    try { const note = await action(); setDone(typeof note === "string" && note ? `${message} ${note}` : message); } catch (failure) { setError(messageOf(failure)); }
   }
   const problem = reminder && ["failed", "unconfirmed", "failed_retry"].includes(reminder.status);
 

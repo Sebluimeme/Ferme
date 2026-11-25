@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { onValue, ref, remove, set } from "firebase/database";
+import { onValue, ref, remove, set, update } from "firebase/database";
 import { database } from "@/lib/firebase";
 import { useAppStore } from "@/store/store";
-import { CENDRES_PATH, buildCleaning, buildReminder, cancelReminder, normalizeCendres, type CendresState } from "@/lib/cendres";
+import { CENDRES_PATH, buildCleaning, buildReminder, cancelReminder, normalizeCendres, rescheduleAfterCleaning, type CendresState } from "@/lib/cendres";
 
 const WRITE_TIMEOUT_MS = 10_000;
 const notConfirmed = "L'enregistrement n'a pas été confirmé. Vérifie la connexion puis l'état affiché avant de réessayer.";
@@ -52,11 +52,21 @@ export function useCendres() {
 
   return {
     state, loading, loadError, offline: !online, busy,
-    recordCleaning: (at?: string) => run(() => {
-      const now = Date.now();
-      const cleaning = buildCleaning(`${now}-${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`, now, at);
-      return set(ref(database, `${CENDRES_PATH}/cleanings/${cleaning.id}`), cleaning);
-    }),
+    /** Enregistre le nettoyage ET reporte le rappel (même délai) en une seule écriture : tout ou rien. Retourne un message si le rappel n'a pas pu être reporté. */
+    recordCleaning: async (at?: string): Promise<string | null> => {
+      let note: string | null = null;
+      await run(() => {
+        const now = Date.now();
+        const cleaning = buildCleaning(`${now}-${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`, now, at);
+        const { cleanings, reminder } = stateRef.current;
+        const cycle = rescheduleAfterCleaning(reminder, cleaning, cleanings[0]?.at ?? null, crypto.randomUUID(), now);
+        note = cycle.message;
+        const updates: Record<string, unknown> = { [`cleanings/${cleaning.id}`]: cleaning };
+        if (cycle.outcome === "rescheduled") updates.reminder = cycle.reminder;
+        return update(ref(database, CENDRES_PATH), updates);
+      });
+      return note;
+    },
     removeCleaning: (id: string) => run(() => remove(ref(database, `${CENDRES_PATH}/cleanings/${id}`))),
     /** Programmer ou modifier : remplace le rappel par un nouveau (nouvelle clé d'envoi). */
     saveReminder: (input: { dueAt?: string; delayMinutes?: number }) => run(() => {

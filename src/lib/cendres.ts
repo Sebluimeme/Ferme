@@ -20,6 +20,8 @@ export interface CendresReminder {
   sentAt: string | null;
   /** Heure de la prise en charge par le serveur (sert à repérer un envoi interrompu). */
   claimedAt: string | null;
+  /** Délai choisi (minutes) quand le rappel a été programmé « dans un délai ». Null = inconnu (date fixe ou rappel antérieur) : jamais deviné. */
+  intervalMinutes: number | null;
 }
 export interface CendresState { cleanings: CendresCleaning[]; reminder: CendresReminder | null }
 
@@ -42,6 +44,7 @@ export function normalizeCendres(raw: unknown): CendresState {
       id: r.id, dueAt: r.dueAt, createdAt: isIso(r.createdAt) ? r.createdAt : r.dueAt, status: r.status as CendresReminderStatus,
       attempts: Number.isInteger(r.attempts) ? (r.attempts as number) : 0, nextAttemptAt: isIso(r.nextAttemptAt) ? r.nextAttemptAt : r.dueAt,
       lastError: typeof r.lastError === "string" ? r.lastError : null, sentAt: isIso(r.sentAt) ? r.sentAt : null, claimedAt: isIso(r.claimedAt) ? r.claimedAt : null,
+      intervalMinutes: typeof r.intervalMinutes === "number" && Number.isInteger(r.intervalMinutes) && r.intervalMinutes > 0 && r.intervalMinutes * 60_000 <= CENDRES_MAX_DELAY_MS ? r.intervalMinutes : null,
     };
   }
   return { cleanings, reminder };
@@ -64,7 +67,48 @@ export function buildReminder(id: string, now: number, input: { dueAt?: string; 
   if (ms <= now) throw new Error("L'échéance doit être dans le futur.");
   if (ms - now > CENDRES_MAX_DELAY_MS) throw new Error("Échéance trop lointaine (5 ans au maximum).");
   const due = new Date(ms).toISOString();
-  return { id, dueAt: due, createdAt: new Date(now).toISOString(), status: "scheduled", attempts: 0, nextAttemptAt: due, lastError: null, sentAt: null, claimedAt: null };
+  const intervalMinutes = input.dueAt === undefined && Number.isInteger(input.delayMinutes) ? (input.delayMinutes as number) : null;
+  return { id, dueAt: due, createdAt: new Date(now).toISOString(), status: "scheduled", attempts: 0, nextAttemptAt: due, lastError: null, sentAt: null, claimedAt: null, intervalMinutes };
+}
+
+const CENDRES_TZ = "Europe/Paris";
+const parisParts = (ms: number) => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: CENDRES_TZ, hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric" }).formatToParts(new Date(ms)).map(x => [x.type, Number(x.value)]));
+  return { y: p.year, mo: p.month, d: p.day, h: p.hour, mi: p.minute, s: p.second };
+};
+/** Instant UTC correspondant à une heure murale de Paris (l'heure absente au passage à l'heure d'été est décalée vers l'avant). */
+function parisWallToMs(y: number, mo: number, d: number, h: number, mi: number, s: number, msPart: number): number {
+  const wall = Date.UTC(y, mo - 1, d, h, mi, s);
+  const offsetAt = (ms: number) => { const q = parisParts(ms); return Date.UTC(q.y, q.mo - 1, q.d, q.h, q.mi, q.s) - ms; };
+  const candidates = [wall - offsetAt(wall - 86_400_000), wall - offsetAt(wall + 86_400_000)];
+  const exact = candidates.filter(c => offsetAt(c) === wall - c).sort((x, z) => x - z);
+  return (exact.length ? exact[0] : Math.max(...candidates)) + msPart;
+}
+/** Ajoute le délai à une date. Un délai en jours entiers garde la même heure locale (Europe/Paris) malgré le changement d'heure ; sinon durée exacte. */
+export function addCendresInterval(fromMs: number, intervalMinutes: number): number {
+  if (intervalMinutes % 1440 !== 0) return fromMs + intervalMinutes * 60_000;
+  const p = parisParts(fromMs);
+  return parisWallToMs(p.y, p.mo, p.d + intervalMinutes / 1440, p.h, p.mi, p.s, ((fromMs % 1000) + 1000) % 1000);
+}
+
+export type CendresCycleResult = { reminder: CendresReminder | null; outcome: "rescheduled" | "no_reminder" | "cancelled" | "unknown_interval" | "sending" | "not_latest" | "in_past" | "not_applicable"; message: string | null };
+/**
+ * Après un « Cendres vidées » : nouvelle échéance = date du nettoyage + MÊME délai que le rappel précédent.
+ * Rien n'est inventé : sans délai connu, rappel annulé, envoi en cours ou nettoyage qui n'est pas le plus récent, le rappel reste tel quel.
+ */
+export function rescheduleAfterCleaning(current: CendresReminder | null, cleaning: CendresCleaning, latestCleaningAt: string | null, newId: string, now: number): CendresCycleResult {
+  const keep = (outcome: CendresCycleResult["outcome"], message: string | null): CendresCycleResult => ({ reminder: current, outcome, message });
+  if (!current) return keep("no_reminder", null);
+  if (current.status === "cancelled") return keep("cancelled", null);
+  if (current.status === "sending") return keep("sending", "Un envoi est en cours : le rappel n'a pas été reporté.");
+  if (current.status === "failed" || current.status === "unconfirmed") return keep("not_applicable", "Le rappel précédent est à vérifier : il n'a pas été reporté.");
+  if (latestCleaningAt && Date.parse(cleaning.at) < Date.parse(latestCleaningAt)) return keep("not_latest", "Ce nettoyage n'est pas le plus récent : le rappel n'a pas été changé.");
+  if (current.intervalMinutes === null) return keep("unknown_interval", "Délai du rappel inconnu : le rappel n'a pas été reporté. Reprogramme-le « dans un délai » pour activer le report automatique.");
+  const due = addCendresInterval(Date.parse(cleaning.at), current.intervalMinutes);
+  if (due <= now) return keep("in_past", "Le nouveau rappel serait déjà passé : le rappel n'a pas été changé.");
+  if (due - now > CENDRES_MAX_DELAY_MS) return keep("in_past", "Échéance trop lointaine : le rappel n'a pas été changé.");
+  const iso = new Date(due).toISOString();
+  return { outcome: "rescheduled", message: null, reminder: { id: newId, dueAt: iso, createdAt: new Date(now).toISOString(), status: "scheduled", attempts: 0, nextAttemptAt: iso, lastError: null, sentAt: null, claimedAt: null, intervalMinutes: current.intervalMinutes } };
 }
 
 export const isReminderActive = (r: CendresReminder | null): r is CendresReminder => !!r && (r.status === "scheduled" || r.status === "failed_retry");
