@@ -9,6 +9,7 @@ import { getVehicleStats } from "@/services/vehicle-service";
 import { getUrgentTasks, getTaskStats, getDaysUntilDue } from "@/services/task-service";
 import { getGestationAlert, getHeatAlert, formatGestationDate } from "@/lib/reproduction";
 import { groupChaleursByAnimal } from "@/components/HeatAlerts";
+import { stockFoinRestant } from "@/lib/fourrage-calculs";
 import KpiCard from "@/components/KpiCard";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Animal } from "@/store/store";
@@ -41,7 +42,7 @@ type CiterneSummaryResponse =
 export default function DashboardPage() {
   const router = useRouter();
   const { state } = useAppStore();
-  const { stats, alertes, vehicles, maintenanceAlerts, taches, animaux, activitesFourrage, weatherReadings, chaleurs } = state;
+  const { stats, alertes, vehicles, maintenanceAlerts, taches, animaux, activitesFourrage, distributionsFourrage, weatherReadings, chaleurs } = state;
 
   const vehicleStats = useMemo(() => getVehicleStats(vehicles), [vehicles]);
   const urgentTasks  = useMemo(() => getUrgentTasks(taches, 5), [taches]);
@@ -124,66 +125,14 @@ export default function DashboardPage() {
     router.push(`/vehicules/${alert.vehicleId}?tab=entretien&maintenanceAction=complete${maintenanceParam}`);
   };
 
-  const DUREE_STABULATION = 120;
-
-  // Même logique que fourrage/page.tsx : conso selon espèce + âge à la prochaine stabulation
-  function getConsoKgJour(type: string, ageMois: number | null): number {
-    switch (type) {
-      case "bovin":
-        if (ageMois === null) return 9;
-        if (ageMois < 3)  return 1;
-        if (ageMois < 9)  return 3;
-        if (ageMois < 18) return 5;
-        return 9;
-      case "ovin":
-        if (ageMois === null) return 2;
-        if (ageMois < 3)  return 0.4;
-        if (ageMois < 9)  return 1;
-        return 2;
-      case "caprin":
-        if (ageMois === null) return 1.8;
-        if (ageMois < 3)  return 0.4;
-        if (ageMois < 9)  return 0.9;
-        return 1.8;
-      case "equin":
-        if (ageMois === null) return 10;
-        if (ageMois < 6)  return 2;
-        if (ageMois < 18) return 5;
-        return 10;
-      default: return 0;
-    }
-  }
-
-  function ageMoisAStabulation(dateNaissance: string | undefined): number | null {
-    if (!dateNaissance) return null;
-    const naissance = new Date(dateNaissance);
-    if (isNaN(naissance.getTime())) return null;
-    const now = new Date();
-    const debutStab = new Date(now.getMonth() < 10 ? now.getFullYear() : now.getFullYear() + 1, 10, 15);
-    const diffMs = debutStab.getTime() - naissance.getTime();
-    if (diffMs < 0) return 0;
-    return Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
-  }
-
-  const objectifFoinTonnes = useMemo(() => {
-    const actifs = animaux.filter((a) => a.statut === "actif");
-    const kg = actifs.reduce((sum, a) => {
-      const age = ageMoisAStabulation(a.dateNaissance);
-      return sum + getConsoKgJour(a.type, age) * DUREE_STABULATION;
-    }, 0);
-    return Math.round(kg / 100) / 10;
-  }, [animaux]);
-
-  const foinsRecoltesTonnes = useMemo(() => {
-    const annee = new Date().getFullYear().toString();
-    return activitesFourrage
-      .filter((a) => a.typeActivite === "foin" && a.dateActivite?.startsWith(annee) && (a.poidsTonne ?? 0) > 0)
-      .reduce((sum, a) => sum + (a.poidsTonne ?? 0), 0);
-  }, [activitesFourrage]);
-
-  const foinPct = objectifFoinTonnes > 0
-    ? Math.min(100, Math.round((foinsRecoltesTonnes / objectifFoinTonnes) * 100))
+  const stockRestant = useMemo(
+    () => stockFoinRestant(activitesFourrage, distributionsFourrage),
+    [activitesFourrage, distributionsFourrage]
+  );
+  const stockRestantPct = stockRestant.unitesEnregistrees > 0
+    ? Math.min(100, Math.round((stockRestant.unitesRestantes / stockRestant.unitesEnregistrees) * 100))
     : 0;
+  const formatUnites = (quantite: number) => new Intl.NumberFormat("fr-FR").format(quantite);
 
   return (
     <div className="space-y-6 fade-in">
@@ -464,46 +413,62 @@ export default function DashboardPage() {
         {/* Colonne droite */}
         <div className="space-y-4">
 
-          {/* Objectif foin */}
-          {objectifFoinTonnes > 0 && (
-            <div className="bg-white border border-stone-200 rounded-xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Wheat className="w-4 h-4 text-stone-400" />
-                  <span className="text-[13px] font-semibold text-stone-800">Objectif foin {new Date().getFullYear()}</span>
-                </div>
-                <button
-                  onClick={() => router.push("/fourrage")}
-                  className="text-[12px] text-brand-600 hover:underline cursor-pointer"
-                >
-                  Voir →
-                </button>
+          {/* Stock de foin réellement disponible après les distributions */}
+          <div className="bg-white border border-stone-200 rounded-xl p-5">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Wheat className="w-4 h-4 shrink-0 text-stone-400" aria-hidden="true" />
+                <span className="text-[13px] font-semibold text-stone-800">Stock de foin restant</span>
               </div>
+              <button
+                type="button"
+                onClick={() => router.push("/fourrage")}
+                className="min-h-11 shrink-0 px-2 -mr-2 text-[12px] font-medium text-brand-600 hover:underline cursor-pointer"
+              >
+                Voir le détail
+              </button>
+            </div>
 
-              <div className="flex items-baseline gap-2 mb-3">
-                <span className="text-[24px] font-semibold text-stone-900 tracking-tight font-mono">
-                  {foinsRecoltesTonnes.toFixed(1)}
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-3">
+              <span className="text-[28px] font-semibold text-stone-900 tracking-tight font-mono">
+                {formatUnites(stockRestant.unitesRestantes)}
+              </span>
+              <span className="text-[13px] text-stone-500">
+                unité{stockRestant.unitesRestantes !== 1 ? "s" : ""} disponible{stockRestant.unitesRestantes !== 1 ? "s" : ""}
+              </span>
+              {stockRestant.unitesEnregistrees > 0 && (
+                <span className="ml-auto text-[13px] font-semibold text-stone-600">
+                  {stockRestantPct} % restant
                 </span>
-                <span className="text-[13px] text-stone-400">/ {objectifFoinTonnes.toFixed(1)} t</span>
-                <span className={`ml-auto text-[13px] font-semibold ${foinPct >= 100 ? "text-brand-600" : foinPct >= 50 ? "text-amber-600" : "text-stone-500"}`}>
-                  {foinPct}%
-                </span>
-              </div>
-
-              <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-500 ${foinPct >= 100 ? "bg-brand-500" : foinPct >= 50 ? "bg-amber-400" : "bg-red-400"}`}
-                  style={{ width: `${foinPct}%` }}
-                />
-              </div>
-
-              {foinPct < 100 && (
-                <p className="text-[11px] text-stone-400 mt-2">
-                  Il manque <span className="text-stone-600 font-medium">{(objectifFoinTonnes - foinsRecoltesTonnes).toFixed(1)} t</span> pour atteindre l'objectif
-                </p>
               )}
             </div>
-          )}
+
+            <div
+              className="h-1.5 bg-stone-100 rounded-full overflow-hidden"
+              role="progressbar"
+              aria-label="Part du stock de foin restant"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={stockRestantPct}
+            >
+              <div
+                className={`h-full rounded-full ${stockRestantPct > 50 ? "bg-brand-500" : stockRestantPct > 20 ? "bg-amber-400" : "bg-red-400"}`}
+                style={{ width: `${stockRestantPct}%` }}
+              />
+            </div>
+
+            <p className="mt-2 text-xs text-stone-500">
+              {formatUnites(stockRestant.unitesEnregistrees)} unité{stockRestant.unitesEnregistrees !== 1 ? "s" : ""} enregistrée{stockRestant.unitesEnregistrees !== 1 ? "s" : ""}
+              {" − "}
+              {formatUnites(stockRestant.unitesDistribuees)} distribuée{stockRestant.unitesDistribuees !== 1 ? "s" : ""}
+            </p>
+
+            {stockRestant.unitesSansStock > 0 && (
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-medium text-amber-800" role="status">
+                {formatUnites(stockRestant.unitesSansStock)} unité{stockRestant.unitesSansStock !== 1 ? "s" : ""} distribuée{stockRestant.unitesSansStock !== 1 ? "s" : ""} sans stock enregistré.
+              </p>
+            )}
+          </div>
 
           {/* Entretiens */}
           {sortedMaintenanceAlerts.length > 0 && (

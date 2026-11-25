@@ -381,6 +381,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       defer(listenEntretiens);
       defer(listenRelevesVehicule);
       defer(listenActivitesFourrage);
+      defer(listenDistributionsFourrage);
       defer(listenMeteoRecent);
     } else if (pathname === "/animaux" || pathname.startsWith("/animaux/")) {
       listenAnimaux();
