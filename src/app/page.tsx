@@ -2,49 +2,33 @@
 
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/store";
-import { formatCurrency } from "@/lib/utils";
 import { formatAlertMessage } from "@/lib/vehicle-utils";
 import { computeWeatherStats, formatWeatherValue, getWindDirectionLabel } from "@/types/weather";
-import { getVehicleStats } from "@/services/vehicle-service";
 import { getUrgentTasks, getTaskStats, getDaysUntilDue } from "@/services/task-service";
 import { getGestationAlert, getHeatAlert, formatGestationDate } from "@/lib/reproduction";
 import { groupChaleursByAnimal } from "@/components/HeatAlerts";
-import { stockFoinRestant } from "@/lib/fourrage-calculs";
-import KpiCard from "@/components/KpiCard";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import QuickDistributionCard from "@/components/QuickDistributionCard";
+import { useMemo } from "react";
 import type { Animal } from "@/store/store";
-import type { CiterneStatus } from "@/lib/citerneEau";
-import { formatFreshnessLabel, formatMetricValue, formatRelativeAge } from "@/lib/citerneEau";
-import { loadCiterneStatus } from "@/lib/citerneClient";
 import {
   PawPrint,
   CalendarDays,
   HeartPulse,
-  Truck,
-  Wallet,
   ClipboardList,
-  Wheat,
   Wrench,
   ChevronRight,
   AlertCircle,
   CloudSun,
   Droplets,
-  Waves,
   Wind,
   Thermometer,
-  RefreshCw,
 } from "lucide-react";
-
-type CiterneSummaryResponse =
-  | { ok: true; status: CiterneStatus; updatedAt: string }
-  | { ok: false; error: string };
 
 export default function DashboardPage() {
   const router = useRouter();
   const { state } = useAppStore();
-  const { stats, alertes, vehicles, maintenanceAlerts, taches, animaux, activitesFourrage, distributionsFourrage, weatherReadings, chaleurs } = state;
+  const { alertes, maintenanceAlerts, taches, animaux, weatherReadings, chaleurs } = state;
 
-  const vehicleStats = useMemo(() => getVehicleStats(vehicles), [vehicles]);
   const urgentTasks  = useMemo(() => getUrgentTasks(taches, 5), [taches]);
   const taskStats    = useMemo(() => getTaskStats(taches), [taches]);
   const allActiveTasks = useMemo(() => taches.filter((t) => t.statut !== "terminee"), [taches]);
@@ -80,33 +64,6 @@ export default function DashboardPage() {
   const weatherStats = useMemo(() => computeWeatherStats(weatherReadings), [weatherReadings]);
   const latestWeather = weatherStats.latest;
 
-  const [citerne, setCiterne] = useState<CiterneSummaryResponse | null>(null);
-  const loadCiterne = useCallback(async (force = false) => {
-    try {
-      const status = await loadCiterneStatus(1, { force });
-      setCiterne({ ok: true, status, updatedAt: new Date().toISOString() });
-    } catch (error) {
-      setCiterne({ ok: false, error: error instanceof Error ? error.message : "Erreur réseau" });
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadCiterne();
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") void loadCiterne();
-    };
-    const refreshWhenOnline = () => void loadCiterne();
-    const timer = window.setInterval(() => void loadCiterne(), 5 * 60 * 1000);
-    document.addEventListener("visibilitychange", refreshWhenVisible);
-    window.addEventListener("online", refreshWhenOnline);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
-      window.removeEventListener("online", refreshWhenOnline);
-    };
-  }, [loadCiterne]);
-  const citerneStatus = citerne?.ok ? citerne.status : null;
-
   const openMaintenanceAlert = (alert: (typeof sortedMaintenanceAlerts)[number]) => {
     const title = (alert.titre || "").toLowerCase();
     const isMeterReadingReminder = !alert.maintenanceId && (title.includes("relevé") || title.includes("releve"));
@@ -125,55 +82,12 @@ export default function DashboardPage() {
     router.push(`/vehicules/${alert.vehicleId}?tab=entretien&maintenanceAction=complete${maintenanceParam}`);
   };
 
-  const stockRestant = useMemo(
-    () => stockFoinRestant(activitesFourrage, distributionsFourrage),
-    [activitesFourrage, distributionsFourrage]
-  );
-  const stockRestantPct = stockRestant.tonnesEnregistrees > 0
-    ? Math.min(100, Math.round((stockRestant.tonnesRestantesEstimees / stockRestant.tonnesEnregistrees) * 100))
-    : 0;
-  const formatUnites = (quantite: number) => new Intl.NumberFormat("fr-FR").format(quantite);
-  const formatTonnes = (tonnes: number) => new Intl.NumberFormat("fr-FR", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 2,
-  }).format(tonnes);
-  const formatKg = (kg: number) => new Intl.NumberFormat("fr-FR", {
-    maximumFractionDigits: 1,
-  }).format(kg);
-
   return (
     <div className="space-y-6 fade-in">
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
-          label="Animaux"
-          value={stats.totalAnimaux || 0}
-          subtitle="actifs"
-          icon={<PawPrint className="w-3.5 h-3.5" />}
-          onClick={() => router.push("/animaux")}
-        />
-        <KpiCard
-          label="Véhicules"
-          value={vehicleStats.totalVehicules || 0}
-          subtitle="dans le parc"
-          icon={<Truck className="w-3.5 h-3.5" />}
-          onClick={() => router.push("/vehicules")}
-        />
-        <KpiCard
-          label="Tâches actives"
-          value={taskStats.aFaire + taskStats.enCours}
-          subtitle={taskStats.enRetard > 0 ? `${taskStats.enRetard} en retard` : "à jour"}
-          icon={<ClipboardList className="w-3.5 h-3.5" />}
-          onClick={() => router.push("/taches")}
-        />
-        <KpiCard
-          label="Profit global"
-          value={formatCurrency(stats.profitGlobal || 0)}
-          subtitle="Année en cours"
-          icon={<Wallet className="w-3.5 h-3.5" />}
-        />
-      </div>
+      <h1 className="text-2xl font-bold text-stone-900">Tableau de bord</h1>
+
+      <QuickDistributionCard historyLimit={4} />
 
       {/* Rappels reproduction */}
       {(upcomingHeats.length > 0 || upcomingBirths.length > 0) && (
@@ -282,66 +196,6 @@ export default function DashboardPage() {
         </button>
       )}
 
-      {!citerne && (
-        <div className="w-full h-28 rounded-xl border border-stone-200 bg-stone-50 animate-pulse" aria-label="Chargement de la citerne" />
-      )}
-
-      {citerne && !citerneStatus?.hasData && (
-        <button
-          onClick={() => void loadCiterne(true)}
-          className="w-full rounded-xl border border-amber-200 bg-amber-50 p-4 text-left hover:bg-amber-100 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
-              <RefreshCw className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-[13px] font-semibold text-stone-800">Citerne temporairement indisponible</p>
-              <p className="text-[11px] text-stone-600 mt-0.5">Appuyer ici pour réessayer via Firebase</p>
-            </div>
-          </div>
-        </button>
-      )}
-
-      {citerneStatus?.hasData && (
-        <button
-          onClick={() => router.push("/eau")}
-          className="w-full bg-white border border-stone-200 rounded-xl p-4 text-left hover:border-stone-300 hover:shadow-sm transition-all"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
-                <Waves className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[13px] font-semibold text-stone-800">Citerne 1 — eau potable</p>
-                <p className="text-[11px] text-stone-400 truncate">
-                  {formatFreshnessLabel(citerneStatus.freshness)} · {formatRelativeAge(citerneStatus.lastUpdated, Date.now())}
-                </p>
-              </div>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="text-2xl font-semibold text-stone-900 tracking-tight">
-                {citerneStatus.niveau.value !== null ? `${citerneStatus.niveau.value.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}%` : "—"}
-              </p>
-              <p className="text-[11px] text-brand-600 font-medium">Voir →</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 mt-3">
-            <div className="rounded-lg bg-stone-50 border border-stone-100 px-3 py-2">
-              <div className="flex items-center gap-1.5 text-[11px] text-stone-400"><Droplets className="w-3 h-3" /> Volume dispo.</div>
-              <p className="text-sm font-semibold text-stone-800 mt-0.5">{formatMetricValue(citerneStatus.volumeDisponible, 0)}</p>
-            </div>
-            <div className="rounded-lg bg-stone-50 border border-stone-100 px-3 py-2">
-              <div className="flex items-center gap-1.5 text-[11px] text-stone-400"><Droplets className="w-3 h-3" /> Débit</div>
-              <p className="text-sm font-semibold text-stone-800 mt-0.5">
-                {citerneStatus.debit.value !== null ? formatMetricValue(citerneStatus.debit, 2) : "Non mesuré"}
-              </p>
-            </div>
-          </div>
-        </button>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
         {/* Tâches */}
@@ -411,7 +265,7 @@ export default function DashboardPage() {
             ) : (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <ClipboardList className="w-8 h-8 text-stone-200 mb-2" />
-                <p className="text-[13px] text-stone-400">Aucune tâche en cours</p>
+                <p className="text-[13px] text-stone-600">Aucune tâche en cours</p>
               </div>
             )}
           </div>
@@ -419,66 +273,6 @@ export default function DashboardPage() {
 
         {/* Colonne droite */}
         <div className="space-y-4">
-
-          {/* Stock de foin réellement disponible après les distributions */}
-          <div className="bg-white border border-stone-200 rounded-xl p-5">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <Wheat className="w-4 h-4 shrink-0 text-stone-400" aria-hidden="true" />
-                <span className="text-[13px] font-semibold text-stone-800">Stock de foin restant</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => router.push("/fourrage")}
-                className="min-h-11 shrink-0 px-2 -mr-2 text-[12px] font-medium text-brand-600 hover:underline cursor-pointer"
-              >
-                Voir le détail
-              </button>
-            </div>
-
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-3">
-              <span className="text-[28px] font-semibold text-stone-900 tracking-tight font-mono">
-                {formatTonnes(stockRestant.tonnesRestantesEstimees)} t
-              </span>
-              <span className="text-[13px] text-stone-500">
-                restantes estimées
-              </span>
-              {stockRestant.tonnesEnregistrees > 0 && (
-                <span className="ml-auto text-[13px] font-semibold text-stone-600">
-                  {stockRestantPct} % restant
-                </span>
-              )}
-            </div>
-
-            <div
-              className="h-1.5 bg-stone-100 rounded-full overflow-hidden"
-              role="progressbar"
-              aria-label="Part du stock de foin restant"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={stockRestantPct}
-            >
-              <div
-                className={`h-full rounded-full ${stockRestantPct > 50 ? "bg-brand-500" : stockRestantPct > 20 ? "bg-amber-400" : "bg-red-400"}`}
-                style={{ width: `${stockRestantPct}%` }}
-              />
-            </div>
-
-            <p className="mt-2 text-xs text-stone-500">
-              {formatTonnes(stockRestant.tonnesEnregistrees)} t enregistrées
-              {" − "}
-              {formatTonnes(stockRestant.tonnesDistribueesEstimees)} t distribuées estimées
-            </p>
-            <p className="mt-1 text-xs text-stone-500">
-              {formatUnites(stockRestant.unitesRestantes)} unité{stockRestant.unitesRestantes !== 1 ? "s" : ""} restante{stockRestant.unitesRestantes !== 1 ? "s" : ""} · botte {formatKg(stockRestant.poidsBotteMoyenKg)} kg{stockRestant.poidsBotteDeRepli ? " par défaut" : ""} · balle {formatKg(stockRestant.poidsBalleMoyenKg)} kg{stockRestant.poidsBalleDeRepli ? " par défaut" : ""}
-            </p>
-
-            {stockRestant.tonnesSansStockEstimees > 0 && (
-              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-medium text-amber-800" role="status">
-                {formatTonnes(stockRestant.tonnesSansStockEstimees)} t distribuées au-delà du stock enregistré.
-              </p>
-            )}
-          </div>
 
           {/* Entretiens */}
           {sortedMaintenanceAlerts.length > 0 && (

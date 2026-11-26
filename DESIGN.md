@@ -17,6 +17,8 @@ Permettre des saisies rapides sur le terrain et rendre immédiatement lisibles l
 - Cible tactile d’au moins 44 px ; taille de saisie de 16 px minimum sur mobile.
 - Utiliser le système de formulaire déjà défini dans `src/app/globals.css`; ne pas introduire de grilles à deux colonnes non adaptatives dans les modales.
 - Les chiffres, unités, dates et états de synchronisation doivent être explicites.
+- L’accueil privilégie la distribution rapide du fourrage ; les compteurs généraux et le niveau de citerne restent dans leurs écrans métier.
+- Chaque distribution enregistrée ajoute une ligne indépendante et supprimable dans l’historique, y compris plusieurs fois le même jour.
 
 ## Vérifications minimales
 

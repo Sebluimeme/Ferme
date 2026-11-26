@@ -1,18 +1,16 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useAppStore } from "@/store/store";
 import KpiCard from "@/components/KpiCard";
+import QuickDistributionCard from "@/components/QuickDistributionCard";
 import Modal, { ConfirmModal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import type {
   ActiviteFourrage,
-  CheptelDistribution,
-  DistributionFourrage,
   FormatBotte,
   Partiel,
-  UniteDistribution,
 } from "@/types/fourrage";
 import {
   origineActivite,
@@ -25,11 +23,8 @@ import {
   rendementMoyen,
   rendementParParcelle,
   donneesMensuellesRecoltes,
-  stockFoinRestant,
   POIDS_BOTTE_FOIN_REPLI_KG,
   POIDS_BALLE_FOIN_REPLI_KG,
-  derniereUniteCheptel,
-  distributionDuJour,
   type OrigineFourrage,
 } from "@/lib/fourrage-calculs";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -42,13 +37,11 @@ import {
   updateActivite,
   deleteActivite,
   addBottesActivite,
-  definirDistributionJour,
-  deleteDistribution,
 } from "@/services/fourrage-service";
 
 // ==================== Types internes ====================
 
-type TypeActivite = "foin" | "paille" | "ensilage" | "fauche" | "paturage" | "regain";
+type TypeActivite = "foin" | "paille" | "fauche" | "paturage" | "regain";
 
 interface ActiviteFormData {
   typeActivite: TypeActivite;
@@ -71,7 +64,6 @@ interface BottesFormData {
 const TYPE_LABELS: Record<TypeActivite, string> = {
   foin: "Foin",
   paille: "Paille",
-  ensilage: "Ensilage",
   fauche: "Fauche",
   paturage: "Pâturage",
   regain: "Regain",
@@ -80,7 +72,6 @@ const TYPE_LABELS: Record<TypeActivite, string> = {
 const TYPE_COLORS: Record<TypeActivite, string> = {
   foin: "bg-yellow-100 text-yellow-800",
   paille: "bg-orange-100 text-orange-800",
-  ensilage: "bg-green-100 text-green-800",
   fauche: "bg-blue-100 text-blue-800",
   paturage: "bg-emerald-100 text-emerald-800",
   regain: "bg-amber-100 text-amber-800",
@@ -95,9 +86,6 @@ const ORIGINE_COLORS: Record<OrigineFourrage, string> = {
   recolte: "bg-stone-100 text-stone-600",
   achat: "bg-sky-100 text-sky-800",
 };
-
-const dateLocaleISO = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
 // ==================== Formulaire activité ====================
 
@@ -505,35 +493,6 @@ export default function FourragePage() {
   const [bottesModal, setBottesModal] = useState<ActiviteFourrage | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ActiviteFourrage | null>(null);
   const [saving, setSaving] = useState(false);
-  const [distributionSaving, setDistributionSaving] = useState<CheptelDistribution | null>(null);
-  const [distributionDeleteTarget, setDistributionDeleteTarget] = useState<DistributionFourrage | null>(null);
-  const [distributionDeleting, setDistributionDeleting] = useState<string | null>(null);
-  const [quantitesDistribution, setQuantitesDistribution] = useState<Record<CheptelDistribution, string>>({
-    ovin: "1",
-    bovin: "1",
-  });
-  const [unitesSelectionnees, setUnitesSelectionnees] = useState<Record<CheptelDistribution, UniteDistribution>>({
-    ovin: "botte",
-    bovin: "botte",
-  });
-  const { distributionsFourrage } = state;
-
-  const dateDuJour = dateLocaleISO(new Date());
-
-  useEffect(() => {
-    setUnitesSelectionnees({
-      ovin: distributionDuJour(distributionsFourrage, "ovin", dateDuJour)?.unite
-        ?? (derniereUniteCheptel(distributionsFourrage, "ovin") as UniteDistribution | null)
-        ?? "botte",
-      bovin: distributionDuJour(distributionsFourrage, "bovin", dateDuJour)?.unite
-        ?? (derniereUniteCheptel(distributionsFourrage, "bovin") as UniteDistribution | null)
-        ?? "botte",
-    });
-    setQuantitesDistribution({
-      ovin: distributionDuJour(distributionsFourrage, "ovin", dateDuJour)?.quantite.toString() ?? "1",
-      bovin: distributionDuJour(distributionsFourrage, "bovin", dateDuJour)?.quantite.toString() ?? "1",
-    });
-  }, [dateDuJour, distributionsFourrage]);
 
   // KPIs
   const now = new Date();
@@ -560,8 +519,6 @@ export default function FourragePage() {
 
   // Stock foin = récoltes + achats (les achats comptent pour l'objectif, pas pour les rendements)
   const stock = stockFoin(activitesFourrage);
-  const stockRestant = stockFoinRestant(activitesFourrage, distributionsFourrage);
-
   const progressPct = objectifFoinT > 0 ? Math.min(100, (stock.totalT / objectifFoinT) * 100) : 0;
   const manquantT = Math.max(0, objectifFoinT - stock.totalT);
 
@@ -576,15 +533,6 @@ export default function FourragePage() {
 
   const activitesTri = [...activitesFourrage].sort(
     (a, b) => new Date(b.dateActivite).getTime() - new Date(a.dateActivite).getTime()
-  );
-
-  const distributionsTriees = useMemo(
-    () => [...distributionsFourrage].sort((a, b) => {
-      const parDate = b.dateDistribution.localeCompare(a.dateDistribution);
-      if (parDate !== 0) return parDate;
-      return (b.derniereMAJ ?? b.dateCreation ?? "").localeCompare(a.derniereMAJ ?? a.dateCreation ?? "");
-    }),
-    [distributionsFourrage]
   );
 
   // Analytics foin / regain — récoltes uniquement, les achats en sont exclus
@@ -614,18 +562,6 @@ export default function FourragePage() {
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
-
-  const formatQuantiteDistribution = (quantite: number, unite: UniteDistribution) =>
-    `${quantite} ${unite}${quantite > 1 ? "s" : ""}`;
-
-  const formatUnites = (quantite: number) => new Intl.NumberFormat("fr-FR").format(quantite);
-  const formatTonnes = (tonnes: number) => new Intl.NumberFormat("fr-FR", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 2,
-  }).format(tonnes);
-  const formatKg = (kg: number) => new Intl.NumberFormat("fr-FR", {
-    maximumFractionDigits: 1,
-  }).format(kg);
 
   // Handlers
   /** Champs communs création/édition — un achat n'a jamais de parcelle. */
@@ -719,59 +655,6 @@ export default function FourragePage() {
     }
   };
 
-  const distributionAujourdhui = (cheptel: CheptelDistribution) =>
-    distributionDuJour(distributionsFourrage, cheptel, dateDuJour);
-
-  const handleSaveDistribution = async (cheptel: CheptelDistribution) => {
-    const quantite = Number(quantitesDistribution[cheptel]);
-    if (!Number.isInteger(quantite) || quantite < 1) {
-      showToast({ type: "error", title: "Quantité invalide", message: "Indiquez un nombre entier d'au moins 1." });
-      return;
-    }
-    setDistributionSaving(cheptel);
-    try {
-      const result = await definirDistributionJour(
-        cheptel,
-        quantite,
-        unitesSelectionnees[cheptel],
-        distributionsFourrage,
-        dateDuJour
-      );
-      if (result.success) {
-        const label = cheptel === "ovin" ? "les moutons" : "les bovins";
-        showToast({
-          type: "success",
-          title: "Distribution enregistrée",
-          message: `${formatQuantiteDistribution(quantite, unitesSelectionnees[cheptel])} pour ${label}.`,
-        });
-      } else {
-        showToast({ type: "error", title: "Distribution non enregistrée", message: result.error });
-      }
-    } finally {
-      setDistributionSaving(null);
-    }
-  };
-
-  const handleUniteChange = (cheptel: CheptelDistribution, unite: UniteDistribution) => {
-    setUnitesSelectionnees((current) => ({ ...current, [cheptel]: unite }));
-  };
-
-  const handleDeleteDistribution = async () => {
-    if (!distributionDeleteTarget) return;
-    setDistributionDeleting(distributionDeleteTarget.id);
-    try {
-      const result = await deleteDistribution(distributionDeleteTarget.id);
-      if (result.success) {
-        showToast({ type: "success", title: "Distribution supprimée" });
-      } else {
-        showToast({ type: "error", title: "Suppression impossible", message: result.error });
-      }
-    } finally {
-      setDistributionDeleting(null);
-      setDistributionDeleteTarget(null);
-    }
-  };
-
   return (
     <div>
       {/* En-tête */}
@@ -826,175 +709,9 @@ export default function FourragePage() {
         />
       </div>
 
-      {/* Distribution quotidienne */}
-      <section className="bg-white rounded-xl shadow-sm border border-stone-100 p-5 mb-8" aria-labelledby="distribution-quotidienne-title">
-        <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 mb-4">
-          <div>
-            <h2 id="distribution-quotidienne-title" className="text-base font-semibold text-stone-800">Distribution du jour</h2>
-            <p className="text-xs text-stone-500 mt-0.5">Indiquez la quantité, choisissez l&apos;unité, puis confirmez avec le bouton Enregistrer.</p>
-          </div>
-          <span className="text-xs text-stone-400">{formatDate(dateDuJour)}</span>
-        </div>
-
-        <div className="mb-5 rounded-lg border border-brand-200 bg-brand-50 p-4" aria-label="Stock de foin restant">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-            <div>
-              <p className="text-sm font-medium text-brand-800">Stock de foin disponible</p>
-              <p className="mt-1 text-2xl font-bold text-stone-900">
-                {formatTonnes(stockRestant.tonnesRestantesEstimees)} t restantes estimées
-              </p>
-            </div>
-            <p className="text-sm text-stone-600">
-              {formatTonnes(stockRestant.tonnesEnregistrees)} t enregistrées
-              {" − "}
-              {formatTonnes(stockRestant.tonnesDistribueesEstimees)} t distribuées estimées
-            </p>
-          </div>
-          <p className="mt-2 text-xs text-stone-600">
-            {formatUnites(stockRestant.unitesRestantes)} unité{stockRestant.unitesRestantes !== 1 ? "s" : ""} restante{stockRestant.unitesRestantes !== 1 ? "s" : ""} · moyenne appliquée : botte {formatKg(stockRestant.poidsBotteMoyenKg)} kg{stockRestant.poidsBotteDeRepli ? " (par défaut)" : ""}, balle {formatKg(stockRestant.poidsBalleMoyenKg)} kg{stockRestant.poidsBalleDeRepli ? " (par défaut)" : ""}.
-          </p>
-          <p className="mt-1 text-xs text-stone-600">
-            Le tonnage distribué est estimé à partir des poids moyens enregistrés. La paille n’est pas concernée.
-          </p>
-          {stockRestant.tonnesSansStockEstimees > 0 && (
-            <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900" role="status">
-              {formatTonnes(stockRestant.tonnesSansStockEstimees)} t distribuées au-delà du stock de foin enregistré.
-            </p>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {(["ovin", "bovin"] as CheptelDistribution[]).map((cheptel) => {
-            const distribution = distributionAujourdhui(cheptel);
-            const estEnregistrement = distributionSaving === cheptel;
-            const label = cheptel === "ovin" ? "Moutons" : "Bovins";
-            const unite = unitesSelectionnees[cheptel];
-            return (
-              <form
-                key={cheptel}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  handleSaveDistribution(cheptel);
-                }}
-                className="rounded-lg border border-stone-200 bg-stone-50 p-4"
-              >
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <h3 className="font-semibold text-stone-800">{label}</h3>
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${distribution ? "bg-green-100 text-green-700" : "bg-stone-200 text-stone-600"}`}>
-                    {distribution
-                      ? `${formatQuantiteDistribution(distribution.quantite, distribution.unite)} enregistrée${distribution.quantite > 1 ? "s" : ""}`
-                      : "Rien d'enregistré"}
-                  </span>
-                </div>
-                <label className="block text-xs font-medium text-stone-600">
-                  Nombre de bottes ou de balles distribuées
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    inputMode="numeric"
-                    required
-                    value={quantitesDistribution[cheptel]}
-                    onChange={(event) => setQuantitesDistribution((current) => ({
-                      ...current,
-                      [cheptel]: event.target.value,
-                    }))}
-                    disabled={estEnregistrement}
-                    className="mt-1 block w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-base font-semibold text-stone-900 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:cursor-wait"
-                  />
-                </label>
-                <fieldset className="mt-3">
-                  <legend className="text-xs font-medium text-stone-600 mb-1">Unité</legend>
-                  <div className="flex gap-2">
-                    {(["botte", "balle"] as UniteDistribution[]).map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        disabled={estEnregistrement}
-                        onClick={() => handleUniteChange(cheptel, option)}
-                        aria-pressed={unite === option}
-                        className={`min-h-11 rounded-md border px-3 py-2 text-xs font-semibold transition-colors disabled:cursor-wait ${unite === option ? "border-brand-600 bg-brand-50 text-brand-700" : "border-stone-300 bg-white text-stone-600 hover:bg-stone-100"}`}
-                      >
-                        {option === "botte" ? "Botte" : "Balle"}
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
-                <button
-                  type="submit"
-                  disabled={estEnregistrement}
-                  className="mt-4 min-h-11 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-wait disabled:opacity-60"
-                >
-                  {estEnregistrement
-                    ? "Enregistrement..."
-                    : distribution
-                      ? "Mettre à jour la distribution"
-                      : "Enregistrer la distribution"}
-                </button>
-                <p className="mt-2 text-center text-xs text-stone-500">
-                  Les changements ne sont enregistrés qu&apos;après ce clic.
-                </p>
-              </form>
-            );
-          })}
-        </div>
-
-        <div className="mt-6 border-t border-stone-200 pt-5" aria-labelledby="historique-distributions-title">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h3 id="historique-distributions-title" className="font-semibold text-stone-800">Historique des distributions</h3>
-              <p className="mt-0.5 text-xs text-stone-500">Les distributions enregistrées apparaissent ici immédiatement.</p>
-            </div>
-            {distributionsTriees.length > 0 && (
-              <span className="shrink-0 text-xs text-stone-400">
-                {distributionsTriees.length} saisie{distributionsTriees.length > 1 ? "s" : ""}
-              </span>
-            )}
-          </div>
-
-          {distributionsTriees.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-4 py-6 text-center">
-              <p className="text-sm font-medium text-stone-600">Aucune distribution enregistrée</p>
-              <p className="mt-1 text-xs text-stone-400">La première distribution apparaîtra ici après son enregistrement.</p>
-            </div>
-          ) : (
-            <div className="max-h-80 overflow-y-auto rounded-lg border border-stone-200 bg-white">
-              <ul className="divide-y divide-stone-100">
-                {distributionsTriees.map((distribution) => {
-                  const label = distribution.cheptel === "ovin" ? "Moutons" : "Bovins";
-                  return (
-                    <li key={distribution.id} className="flex items-center gap-3 px-3 py-3 sm:px-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold text-stone-900">
-                            {formatQuantiteDistribution(distribution.quantite, distribution.unite)}
-                          </span>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${distribution.cheptel === "ovin" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"}`}>
-                            {label}
-                          </span>
-                        </div>
-                        <p className="mt-0.5 text-xs text-stone-500">
-                          {distribution.dateDistribution === dateDuJour ? "Aujourd'hui" : formatDate(distribution.dateDistribution)}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setDistributionDeleteTarget(distribution)}
-                        disabled={distributionDeleting === distribution.id}
-                        className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg p-2 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-wait disabled:opacity-50"
-                        aria-label={`Supprimer la distribution de ${formatQuantiteDistribution(distribution.quantite, distribution.unite)} pour ${label.toLowerCase()}`}
-                        title="Supprimer cette distribution"
-                      >
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-        </div>
-      </section>
+      <div className="mb-8">
+        <QuickDistributionCard historyInitiallyOpen />
+      </div>
 
       {/* Objectif foin */}
       {objectifFoinT > 0 && (
@@ -1328,18 +1045,6 @@ export default function FourragePage() {
         danger
       />
 
-      {/* Modal suppression d'une distribution */}
-      <ConfirmModal
-        isOpen={!!distributionDeleteTarget}
-        onClose={() => setDistributionDeleteTarget(null)}
-        onConfirm={handleDeleteDistribution}
-        title="Supprimer la distribution"
-        message={distributionDeleteTarget
-          ? `Supprimer la distribution de <strong>${formatQuantiteDistribution(distributionDeleteTarget.quantite, distributionDeleteTarget.unite)}</strong> pour ${distributionDeleteTarget.cheptel === "ovin" ? "les moutons" : "les bovins"} du ${formatDate(distributionDeleteTarget.dateDistribution)} ?`
-          : ""}
-        confirmText="Supprimer"
-        danger
-      />
     </div>
   );
 }

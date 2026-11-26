@@ -21,7 +21,7 @@ export type FormatBotte = "petite" | "grande";
 
 export interface ActiviteFourrage {
   id: string;
-  typeActivite: "foin" | "paille" | "ensilage" | "fauche" | "paturage" | "regain";
+  typeActivite: "foin" | "paille" | "fauche" | "paturage" | "regain";
   dateActivite: string; // ISO date string
   /** Absent sur les anciennes données = récolte (voir origineActivite()). */
   origine?: OrigineFourrage;
@@ -44,16 +44,20 @@ export type CheptelDistribution = "ovin" | "bovin";
 /** Unité choisie par l'éleveur pour compter ce qui est distribué. */
 export type UniteDistribution = "balle" | "botte";
 
+/** Fourrage réellement donné lors d'une distribution. */
+export type TypeFourrageDistribution = "foin" | "paille";
+
 /**
- * Une entrée par cheptel et par jour : quantité de balles/bottes distribuées.
- * Sert à calculer ensuite la consommation réelle par production (vs l'estimation
- * théorique de getConsoKgJour), une fois croisée avec les effectifs actifs.
+ * Une action de distribution indépendante. Plusieurs entrées peuvent concerner
+ * le même cheptel le même jour afin de conserver chaque passage dans l'historique.
  */
 export interface DistributionFourrage {
   id: string;
   dateDistribution: string; // ISO date (YYYY-MM-DD)
   cheptel: CheptelDistribution;
   unite: UniteDistribution;
+  /** Absent sur les anciennes données = foin. */
+  typeFourrage?: TypeFourrageDistribution;
   quantite: number;
   notes?: string;
   dateCreation?: string;

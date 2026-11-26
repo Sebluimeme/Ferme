@@ -33,7 +33,6 @@ const {
   donneesMensuellesRecoltes,
   poidsMoyensFoin,
   stockFoinRestant,
-  distributionDuJour,
   derniereUniteCheptel,
   totalDistribueCheptel,
   totalDistribuePeriode,
@@ -278,14 +277,9 @@ console.log("\n── Distribution quotidienne ──");
 const DISTRIBUTIONS = [
   { id: "d1", dateDistribution: "2026-08-15", cheptel: "ovin", unite: "botte", quantite: 3 },
   { id: "d2", dateDistribution: "2026-08-16", cheptel: "ovin", unite: "balle", quantite: 2 },
+  { id: "d4", dateDistribution: "2026-08-16", cheptel: "ovin", unite: "botte", quantite: 1 },
   { id: "d3", dateDistribution: "2026-08-16", cheptel: "bovin", unite: "botte", quantite: 4 },
 ];
-
-test("la distribution du jour reste séparée par cheptel", () => {
-  assert(distributionDuJour(DISTRIBUTIONS, "ovin", "2026-08-16")?.id === "d2");
-  assert(distributionDuJour(DISTRIBUTIONS, "bovin", "2026-08-16")?.id === "d3");
-  assert(distributionDuJour(DISTRIBUTIONS, "ovin", "2026-08-17") === undefined);
-});
 
 test("la dernière unité est conservée indépendamment par cheptel", () => {
   assert(derniereUniteCheptel(DISTRIBUTIONS, "ovin") === "balle");
@@ -294,22 +288,22 @@ test("la dernière unité est conservée indépendamment par cheptel", () => {
 });
 
 test("les totaux de distribution filtrent le cheptel et la période", () => {
-  assert(totalDistribueCheptel(DISTRIBUTIONS, "ovin") === 5);
-  assert(totalDistribuePeriode(DISTRIBUTIONS, "ovin", "2026-08-16", "2026-08-16") === 2);
+  assert(totalDistribueCheptel(DISTRIBUTIONS, "ovin") === 6);
+  assert(totalDistribuePeriode(DISTRIBUTIONS, "ovin", "2026-08-16", "2026-08-16") === 3);
 });
 
 test("le stock restant déduit toutes les bottes et balles distribuées", () => {
   const restant = stockFoinRestant(TOUTES, DISTRIBUTIONS);
   assert(restant.unitesEnregistrees === 316, "300 récoltées + 16 achetées");
-  assert(restant.unitesDistribuees === 9, "3 + 2 + 4 distribuées");
-  assert(restant.unitesRestantes === 307, "316 - 9 restantes");
+  assert(restant.unitesDistribuees === 10, "3 + 2 + 1 + 4 distribuées");
+  assert(restant.unitesRestantes === 306, "316 - 10 restantes");
   assert(restant.unitesSansStock === 0);
   assertClose(restant.tonnesEnregistrees, 5.214, "tonnage enregistré");
   assertClose(restant.poidsBotteMoyenKg, 16.5, "moyenne des bottes");
   assertClose(restant.poidsBalleMoyenKg, 300, "repli des balles");
   assert(restant.poidsBalleDeRepli, "aucune grande balle enregistrée dans ce jeu");
-  assertClose(restant.tonnesDistribueesEstimees, 0.7155, "7 bottes + 2 balles");
-  assertClose(restant.tonnesRestantesEstimees, 4.4985, "tonnage restant");
+  assertClose(restant.tonnesDistribueesEstimees, 0.732, "8 bottes + 2 balles");
+  assertClose(restant.tonnesRestantesEstimees, 4.482, "tonnage restant");
 });
 
 test("les tonnes restantes utilisent les moyennes pondérées par format", () => {
@@ -353,6 +347,24 @@ test("la paille ne gonfle pas le stock restant de foin", () => {
   assert(restant.unitesEnregistrees === 6, "seules les 6 bottes de foin sont disponibles");
   assert(restant.unitesRestantes === 4);
   assertClose(restant.tonnesRestantesEstimees, 0.066, "la paille ne modifie pas le tonnage de foin");
+});
+
+test("une distribution de paille ne diminue pas le stock de foin", () => {
+  const restant = stockFoinRestant([ACHAT], [
+    { dateDistribution: "2026-08-15", cheptel: "ovin", unite: "botte", typeFourrage: "paille", quantite: 4 },
+    { dateDistribution: "2026-08-15", cheptel: "bovin", unite: "botte", typeFourrage: "foin", quantite: 2 },
+  ]);
+  assert(restant.unitesDistribuees === 2, "seule la distribution de foin est déduite");
+  assert(restant.unitesRestantes === 4);
+  assertClose(restant.tonnesRestantesEstimees, 0.066);
+});
+
+test("une ancienne distribution sans type reste considérée comme du foin", () => {
+  const restant = stockFoinRestant([ACHAT], [
+    { dateDistribution: "2026-08-15", cheptel: "ovin", unite: "botte", quantite: 1 },
+  ]);
+  assert(restant.unitesDistribuees === 1);
+  assert(restant.unitesRestantes === 5);
 });
 
 test("le stock restant ne devient jamais négatif et signale le dépassement", () => {

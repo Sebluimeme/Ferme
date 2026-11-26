@@ -199,6 +199,7 @@ export interface DistributionCalc {
   dateDistribution: string; // ISO date (YYYY-MM-DD)
   cheptel: string;
   unite: string;
+  typeFourrage?: string | null;
   quantite: number;
 }
 
@@ -283,9 +284,10 @@ export function stockFoinRestant(
 ): StockFoinRestant {
   const stock = stockFoin(activites, annee);
   const unitesEnregistrees = stock.bottesRecoltees + stock.bottesAchetees;
+  const distributionsFoin = distributions.filter((distribution) => (distribution.typeFourrage ?? "foin") === "foin");
   const distributionsRetenues = annee === undefined
-    ? distributions
-    : distributions.filter((distribution) => Number.parseInt(distribution.dateDistribution.slice(0, 4), 10) === annee);
+    ? distributionsFoin
+    : distributionsFoin.filter((distribution) => Number.parseInt(distribution.dateDistribution.slice(0, 4), 10) === annee);
   const poidsMoyens = poidsMoyensFoin(activites, annee);
   const unitesDistribuees = distributionsRetenues.reduce((total, distribution) => {
     const quantite = Number(distribution.quantite);
@@ -317,15 +319,6 @@ export function stockFoinRestant(
 
 export function distributionsDuCheptel<T extends DistributionCalc>(distributions: T[], cheptel: string): T[] {
   return distributions.filter((d) => d.cheptel === cheptel);
-}
-
-/** Entrée existante pour un cheptel à une date donnée (une seule par jour). */
-export function distributionDuJour<T extends DistributionCalc>(
-  distributions: T[],
-  cheptel: string,
-  date: string
-): T | undefined {
-  return distributions.find((d) => d.cheptel === cheptel && d.dateDistribution === date);
 }
 
 /**
