@@ -31,6 +31,7 @@ const {
   rendementMoyen,
   rendementParParcelle,
   donneesMensuellesRecoltes,
+  poidsMoyensFoin,
   stockFoinRestant,
   distributionDuJour,
   derniereUniteCheptel,
@@ -303,6 +304,43 @@ test("le stock restant déduit toutes les bottes et balles distribuées", () => 
   assert(restant.unitesDistribuees === 9, "3 + 2 + 4 distribuées");
   assert(restant.unitesRestantes === 307, "316 - 9 restantes");
   assert(restant.unitesSansStock === 0);
+  assertClose(restant.tonnesEnregistrees, 5.214, "tonnage enregistré");
+  assertClose(restant.poidsBotteMoyenKg, 16.5, "moyenne des bottes");
+  assertClose(restant.poidsBalleMoyenKg, 300, "repli des balles");
+  assert(restant.poidsBalleDeRepli, "aucune grande balle enregistrée dans ce jeu");
+  assertClose(restant.tonnesDistribueesEstimees, 0.7155, "7 bottes + 2 balles");
+  assertClose(restant.tonnesRestantesEstimees, 4.4985, "tonnage restant");
+});
+
+test("les tonnes restantes utilisent les moyennes pondérées par format", () => {
+  const activites = [
+    { typeActivite: "foin", dateActivite: "2026-06-01", nombreBottes: 10, formatBotte: "petite", poidsBotteKg: 20, poidsTonne: 0.2 },
+    { typeActivite: "foin", dateActivite: "2026-06-02", nombreBottes: 30, formatBotte: "petite", poidsBotteKg: 10, poidsTonne: 0.3 },
+    { typeActivite: "foin", dateActivite: "2026-06-03", nombreBottes: 2, formatBotte: "grande", poidsBotteKg: 350, poidsTonne: 0.7 },
+    { typeActivite: "foin", dateActivite: "2026-06-04", nombreBottes: 2, formatBotte: "grande", poidsBotteKg: 250, poidsTonne: 0.5 },
+  ];
+  const restant = stockFoinRestant(activites, [
+    { dateDistribution: "2026-08-15", cheptel: "ovin", unite: "botte", quantite: 4 },
+    { dateDistribution: "2026-08-15", cheptel: "bovin", unite: "balle", quantite: 1 },
+  ]);
+  assertClose(restant.poidsBotteMoyenKg, 12.5, "(10 × 20 + 30 × 10) / 40");
+  assertClose(restant.poidsBalleMoyenKg, 300, "(2 × 350 + 2 × 250) / 4");
+  assert(!restant.poidsBotteDeRepli && !restant.poidsBalleDeRepli);
+  assertClose(restant.tonnesEnregistrees, 1.7);
+  assertClose(restant.tonnesDistribueesEstimees, 0.35, "4 × 12,5 kg + 1 × 300 kg");
+  assertClose(restant.tonnesRestantesEstimees, 1.35);
+});
+
+test("une ancienne activité lourde sans format alimente la moyenne des balles", () => {
+  const moyennes = poidsMoyensFoin([{
+    typeActivite: "foin",
+    dateActivite: "2026-06-01",
+    nombreBottes: 2,
+    poidsTonne: 0.64,
+  }]);
+  assertClose(moyennes.poidsBalleMoyenKg, 320);
+  assert(!moyennes.poidsBalleDeRepli);
+  assert(moyennes.poidsBotteDeRepli);
 });
 
 test("la paille ne gonfle pas le stock restant de foin", () => {
@@ -314,6 +352,7 @@ test("la paille ne gonfle pas le stock restant de foin", () => {
   }]);
   assert(restant.unitesEnregistrees === 6, "seules les 6 bottes de foin sont disponibles");
   assert(restant.unitesRestantes === 4);
+  assertClose(restant.tonnesRestantesEstimees, 0.066, "la paille ne modifie pas le tonnage de foin");
 });
 
 test("le stock restant ne devient jamais négatif et signale le dépassement", () => {
@@ -325,6 +364,8 @@ test("le stock restant ne devient jamais négatif et signale le dépassement", (
   }]);
   assert(restant.unitesRestantes === 0);
   assert(restant.unitesSansStock === 2);
+  assertClose(restant.tonnesRestantesEstimees, 0);
+  assertClose(restant.tonnesSansStockEstimees, 2.301);
 });
 
 test("le stock restant annuel ne déduit que les distributions de la même année", () => {
@@ -335,6 +376,7 @@ test("le stock restant annuel ne déduit que les distributions de la même anné
   assert(restant.unitesEnregistrees === 6);
   assert(restant.unitesDistribuees === 2);
   assert(restant.unitesRestantes === 4);
+  assertClose(restant.tonnesRestantesEstimees, 0.066);
 });
 
 // ─── Résultat ────────────────────────────────────────────────────────────────

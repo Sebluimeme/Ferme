@@ -26,6 +26,8 @@ import {
   rendementParParcelle,
   donneesMensuellesRecoltes,
   stockFoinRestant,
+  POIDS_BOTTE_FOIN_REPLI_KG,
+  POIDS_BALLE_FOIN_REPLI_KG,
   derniereUniteCheptel,
   distributionDuJour,
   type OrigineFourrage,
@@ -120,7 +122,8 @@ function ActiviteForm({
     parcelIds: initial?.parcelIds ?? [],
     nombreBottes: initial?.nombreBottes ?? "",
     formatBotte: initial?.formatBotte ?? (initial?.origine === "achat" ? "petite" : ""),
-    poidsBotteKg: initial?.poidsBotteKg ?? "16.5",
+    poidsBotteKg: initial?.poidsBotteKg
+      ?? String(initial?.formatBotte === "grande" ? POIDS_BALLE_FOIN_REPLI_KG : POIDS_BOTTE_FOIN_REPLI_KG),
     fournisseur: initial?.fournisseur ?? "",
     prixTotal: initial?.prixTotal ?? "",
     notes: initial?.notes ?? "",
@@ -151,6 +154,20 @@ function ActiviteForm({
         ? prev.parcelIds.filter((p) => p !== id)
         : [...prev.parcelIds, id],
     }));
+  };
+
+  const setFormatBotte = (formatBotte: FormatBotte) => {
+    setForm((current) => {
+      const poidsEstUneValeurParDefaut = current.poidsBotteKg === String(POIDS_BOTTE_FOIN_REPLI_KG)
+        || current.poidsBotteKg === String(POIDS_BALLE_FOIN_REPLI_KG);
+      return {
+        ...current,
+        formatBotte,
+        poidsBotteKg: poidsEstUneValeurParDefaut
+          ? String(formatBotte === "grande" ? POIDS_BALLE_FOIN_REPLI_KG : POIDS_BOTTE_FOIN_REPLI_KG)
+          : current.poidsBotteKg,
+      };
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -200,7 +217,6 @@ function ActiviteForm({
             <option value="foin">Foin</option>
             {achat && <option value="paille">Paille</option>}
             <option value="regain">Regain</option>
-            <option value="ensilage">Ensilage</option>
             {!achat && <option value="fauche">Fauche</option>}
             {!achat && <option value="paturage">Pâturage</option>}
           </select>
@@ -225,7 +241,7 @@ function ActiviteForm({
               <button
                 key={format}
                 type="button"
-                onClick={() => setForm((p) => ({ ...p, formatBotte: format }))}
+                onClick={() => setFormatBotte(format)}
                 aria-pressed={form.formatBotte === format}
                 className={`min-h-11 rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${
                   form.formatBotte === format
@@ -233,7 +249,7 @@ function ActiviteForm({
                     : "border-stone-300 bg-white text-stone-600 hover:bg-stone-50"
                 }`}
               >
-                {format === "petite" ? "Petites bottes" : "Grandes bottes"}
+                {format === "petite" ? "Petites bottes" : "Grandes bottes / balles"}
               </button>
             ))}
           </div>
@@ -262,7 +278,7 @@ function ActiviteForm({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="block text-sm font-medium text-stone-700 mb-1">Nombre de bottes</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Nombre de bottes ou balles</label>
           <input
             type="number"
             min="0"
@@ -273,7 +289,7 @@ function ActiviteForm({
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-stone-700 mb-1">Poids par botte (kg)</label>
+          <label className="block text-sm font-medium text-stone-700 mb-1">Poids unitaire (kg)</label>
           <input
             type="number"
             min="0"
@@ -361,7 +377,7 @@ function BottesForm({
   onCancel: () => void;
   loading: boolean;
 }) {
-  const [form, setForm] = useState<BottesFormData>({ nombreBottes: "", poidsBotteKg: "16.5" });
+  const [form, setForm] = useState<BottesFormData>({ nombreBottes: "", poidsBotteKg: String(POIDS_BOTTE_FOIN_REPLI_KG) });
 
   const poidsTotalT = form.nombreBottes && form.poidsBotteKg
     ? (parseInt(form.nombreBottes) * parseFloat(form.poidsBotteKg)) / 1000
@@ -375,11 +391,11 @@ function BottesForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="block text-sm font-medium text-stone-700 mb-1">Nombre de bottes *</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Nombre de bottes ou balles *</label>
         <input
           type="number"
           min="0"
-          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="min-h-11 w-full border border-stone-300 rounded-lg px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           value={form.nombreBottes}
           onChange={(e) => setForm((p) => ({ ...p, nombreBottes: e.target.value }))}
           placeholder="Ex : 120"
@@ -387,12 +403,12 @@ function BottesForm({
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-stone-700 mb-1">Poids par botte (kg)</label>
+        <label className="block text-sm font-medium text-stone-700 mb-1">Poids unitaire (kg)</label>
         <input
           type="number"
           min="0"
           step="0.01"
-          className="w-full border border-stone-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="min-h-11 w-full border border-stone-300 rounded-lg px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           value={form.poidsBotteKg}
           onChange={(e) => setForm((p) => ({ ...p, poidsBotteKg: e.target.value }))}
           placeholder="Ex : 16.05"
@@ -408,14 +424,14 @@ function BottesForm({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
+          className="min-h-11 px-4 py-2 text-sm font-medium bg-stone-100 text-stone-700 border border-stone-300 rounded-lg hover:bg-stone-200 cursor-pointer"
         >
           Annuler
         </button>
         <button
           type="submit"
           disabled={loading}
-          className="px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50"
+          className="min-h-11 px-5 py-2 text-sm font-semibold text-white rounded-lg bg-brand-600 hover:bg-brand-700 transition-colors cursor-pointer disabled:opacity-50"
         >
           {loading ? "Enregistrement..." : "Confirmer"}
         </button>
@@ -603,6 +619,13 @@ export default function FourragePage() {
     `${quantite} ${unite}${quantite > 1 ? "s" : ""}`;
 
   const formatUnites = (quantite: number) => new Intl.NumberFormat("fr-FR").format(quantite);
+  const formatTonnes = (tonnes: number) => new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 2,
+  }).format(tonnes);
+  const formatKg = (kg: number) => new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 1,
+  }).format(kg);
 
   // Handlers
   /** Champs communs création/édition — un achat n'a jamais de parcelle. */
@@ -818,21 +841,24 @@ export default function FourragePage() {
             <div>
               <p className="text-sm font-medium text-brand-800">Stock de foin disponible</p>
               <p className="mt-1 text-2xl font-bold text-stone-900">
-                {formatUnites(stockRestant.unitesRestantes)} unité{stockRestant.unitesRestantes > 1 ? "s" : ""} restante{stockRestant.unitesRestantes > 1 ? "s" : ""}
+                {formatTonnes(stockRestant.tonnesRestantesEstimees)} t restantes estimées
               </p>
             </div>
             <p className="text-sm text-stone-600">
-              {formatUnites(stockRestant.unitesEnregistrees)} enregistrée{stockRestant.unitesEnregistrees > 1 ? "s" : ""}
+              {formatTonnes(stockRestant.tonnesEnregistrees)} t enregistrées
               {" − "}
-              {formatUnites(stockRestant.unitesDistribuees)} distribuée{stockRestant.unitesDistribuees > 1 ? "s" : ""}
+              {formatTonnes(stockRestant.tonnesDistribueesEstimees)} t distribuées estimées
             </p>
           </div>
           <p className="mt-2 text-xs text-stone-600">
-            Une botte ou une balle distribuée retire une unité. La paille n’est pas concernée.
+            {formatUnites(stockRestant.unitesRestantes)} unité{stockRestant.unitesRestantes !== 1 ? "s" : ""} restante{stockRestant.unitesRestantes !== 1 ? "s" : ""} · moyenne appliquée : botte {formatKg(stockRestant.poidsBotteMoyenKg)} kg{stockRestant.poidsBotteDeRepli ? " (par défaut)" : ""}, balle {formatKg(stockRestant.poidsBalleMoyenKg)} kg{stockRestant.poidsBalleDeRepli ? " (par défaut)" : ""}.
           </p>
-          {stockRestant.unitesSansStock > 0 && (
+          <p className="mt-1 text-xs text-stone-600">
+            Le tonnage distribué est estimé à partir des poids moyens enregistrés. La paille n’est pas concernée.
+          </p>
+          {stockRestant.tonnesSansStockEstimees > 0 && (
             <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900" role="status">
-              {formatUnites(stockRestant.unitesSansStock)} unité{stockRestant.unitesSansStock > 1 ? "s" : ""} distribuée{stockRestant.unitesSansStock > 1 ? "s" : ""} sans stock de foin enregistré.
+              {formatTonnes(stockRestant.tonnesSansStockEstimees)} t distribuées au-delà du stock de foin enregistré.
             </p>
           )}
         </div>
@@ -1262,7 +1288,8 @@ export default function FourragePage() {
               parcelIds: editActivite.parcelIds ?? [],
               nombreBottes: editActivite.nombreBottes?.toString() ?? "",
               formatBotte: editActivite.formatBotte ?? "",
-              poidsBotteKg: editActivite.poidsBotteKg?.toString() ?? "16.5",
+              poidsBotteKg: editActivite.poidsBotteKg?.toString()
+                ?? String(editActivite.formatBotte === "grande" ? POIDS_BALLE_FOIN_REPLI_KG : POIDS_BOTTE_FOIN_REPLI_KG),
               fournisseur: editActivite.fournisseur ?? "",
               prixTotal: editActivite.prixTotal?.toString() ?? "",
               notes: editActivite.notes ?? "",

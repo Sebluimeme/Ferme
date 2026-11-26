@@ -19,7 +19,9 @@ export interface ActiviteCalc {
   dateActivite: string;
   parcelIds?: string[] | null;
   nombreBottes?: number | null;
+  poidsBotteKg?: number | null;
   poidsTonne?: number | null;
+  formatBotte?: string | null;
   origine?: string | null;
 }
 
@@ -205,12 +207,74 @@ export interface StockFoinRestant {
   unitesDistribuees: number;
   unitesRestantes: number;
   unitesSansStock: number;
+  tonnesEnregistrees: number;
+  tonnesDistribueesEstimees: number;
+  tonnesRestantesEstimees: number;
+  tonnesSansStockEstimees: number;
+  poidsBotteMoyenKg: number;
+  poidsBalleMoyenKg: number;
+  poidsBotteDeRepli: boolean;
+  poidsBalleDeRepli: boolean;
+}
+
+export const POIDS_BOTTE_FOIN_REPLI_KG = 16.5;
+export const POIDS_BALLE_FOIN_REPLI_KG = 300;
+const SEUIL_BALLE_LEGACY_KG = 100;
+
+function poidsUnitaireKg(activite: ActiviteCalc): number | null {
+  const poidsSaisi = Number(activite.poidsBotteKg);
+  if (Number.isFinite(poidsSaisi) && poidsSaisi > 0) return poidsSaisi;
+  const quantite = Number(activite.nombreBottes);
+  const tonnes = Number(activite.poidsTonne);
+  if (!Number.isFinite(quantite) || quantite <= 0 || !Number.isFinite(tonnes) || tonnes <= 0) return null;
+  return (tonnes * 1000) / quantite;
 }
 
 /**
- * Stock de foin restant en unités physiques.
- * Une botte ou une balle distribuée retire une unité : les distributions ne
- * portent pas encore de poids, donc aucun tonnage restant n'est inventé.
+ * Poids moyens pondérés par le nombre d'unités réellement enregistré.
+ * Les anciennes activités sans format sont classées par leur poids unitaire :
+ * à partir de 100 kg, elles sont traitées comme des grandes balles.
+ */
+export function poidsMoyensFoin(activites: ActiviteCalc[], annee?: number) {
+  const groupes = {
+    botte: { poidsKg: 0, quantite: 0 },
+    balle: { poidsKg: 0, quantite: 0 },
+  };
+
+  activites
+    .filter((activite) => activite.typeActivite === "foin" && (annee === undefined || anneeActivite(activite) === annee))
+    .forEach((activite) => {
+      const quantite = Number(activite.nombreBottes);
+      const poidsKg = poidsUnitaireKg(activite);
+      if (!Number.isFinite(quantite) || quantite <= 0 || poidsKg === null) return;
+      const unite = activite.formatBotte === "grande"
+        ? "balle"
+        : activite.formatBotte === "petite"
+          ? "botte"
+          : poidsKg >= SEUIL_BALLE_LEGACY_KG
+            ? "balle"
+            : "botte";
+      groupes[unite].poidsKg += poidsKg * quantite;
+      groupes[unite].quantite += quantite;
+    });
+
+  return {
+    poidsBotteMoyenKg: groupes.botte.quantite > 0
+      ? groupes.botte.poidsKg / groupes.botte.quantite
+      : POIDS_BOTTE_FOIN_REPLI_KG,
+    poidsBalleMoyenKg: groupes.balle.quantite > 0
+      ? groupes.balle.poidsKg / groupes.balle.quantite
+      : POIDS_BALLE_FOIN_REPLI_KG,
+    poidsBotteDeRepli: groupes.botte.quantite === 0,
+    poidsBalleDeRepli: groupes.balle.quantite === 0,
+  };
+}
+
+/**
+ * Stock de foin restant en unités et tonnage estimé.
+ * Le tonnage distribué applique à chaque botte/balle le poids moyen pondéré
+ * enregistré pour ce format. Les valeurs de repli restent explicites dans le
+ * résultat afin que l'interface puisse signaler qu'il s'agit d'une estimation.
  */
 export function stockFoinRestant(
   activites: ActiviteCalc[],
@@ -222,16 +286,32 @@ export function stockFoinRestant(
   const distributionsRetenues = annee === undefined
     ? distributions
     : distributions.filter((distribution) => Number.parseInt(distribution.dateDistribution.slice(0, 4), 10) === annee);
+  const poidsMoyens = poidsMoyensFoin(activites, annee);
   const unitesDistribuees = distributionsRetenues.reduce((total, distribution) => {
     const quantite = Number(distribution.quantite);
     return total + (Number.isFinite(quantite) && quantite > 0 ? quantite : 0);
   }, 0);
+  const kgDistribuesEstimes = distributionsRetenues.reduce((total, distribution) => {
+    const quantite = Number(distribution.quantite);
+    if (!Number.isFinite(quantite) || quantite <= 0) return total;
+    const poidsMoyen = distribution.unite === "balle"
+      ? poidsMoyens.poidsBalleMoyenKg
+      : poidsMoyens.poidsBotteMoyenKg;
+    return total + quantite * poidsMoyen;
+  }, 0);
+  const tonnesDistribueesEstimees = kgDistribuesEstimes / 1000;
+  const tonnesRestantesBrutes = stock.totalT - tonnesDistribueesEstimees;
 
   return {
     unitesEnregistrees,
     unitesDistribuees,
     unitesRestantes: Math.max(0, unitesEnregistrees - unitesDistribuees),
     unitesSansStock: Math.max(0, unitesDistribuees - unitesEnregistrees),
+    tonnesEnregistrees: stock.totalT,
+    tonnesDistribueesEstimees,
+    tonnesRestantesEstimees: Math.max(0, tonnesRestantesBrutes),
+    tonnesSansStockEstimees: Math.max(0, -tonnesRestantesBrutes),
+    ...poidsMoyens,
   };
 }
 

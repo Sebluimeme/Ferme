@@ -129,10 +129,17 @@ export default function DashboardPage() {
     () => stockFoinRestant(activitesFourrage, distributionsFourrage),
     [activitesFourrage, distributionsFourrage]
   );
-  const stockRestantPct = stockRestant.unitesEnregistrees > 0
-    ? Math.min(100, Math.round((stockRestant.unitesRestantes / stockRestant.unitesEnregistrees) * 100))
+  const stockRestantPct = stockRestant.tonnesEnregistrees > 0
+    ? Math.min(100, Math.round((stockRestant.tonnesRestantesEstimees / stockRestant.tonnesEnregistrees) * 100))
     : 0;
   const formatUnites = (quantite: number) => new Intl.NumberFormat("fr-FR").format(quantite);
+  const formatTonnes = (tonnes: number) => new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 2,
+  }).format(tonnes);
+  const formatKg = (kg: number) => new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 1,
+  }).format(kg);
 
   return (
     <div className="space-y-6 fade-in">
@@ -431,12 +438,12 @@ export default function DashboardPage() {
 
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-3">
               <span className="text-[28px] font-semibold text-stone-900 tracking-tight font-mono">
-                {formatUnites(stockRestant.unitesRestantes)}
+                {formatTonnes(stockRestant.tonnesRestantesEstimees)} t
               </span>
               <span className="text-[13px] text-stone-500">
-                unité{stockRestant.unitesRestantes !== 1 ? "s" : ""} disponible{stockRestant.unitesRestantes !== 1 ? "s" : ""}
+                restantes estimées
               </span>
-              {stockRestant.unitesEnregistrees > 0 && (
+              {stockRestant.tonnesEnregistrees > 0 && (
                 <span className="ml-auto text-[13px] font-semibold text-stone-600">
                   {stockRestantPct} % restant
                 </span>
@@ -458,14 +465,17 @@ export default function DashboardPage() {
             </div>
 
             <p className="mt-2 text-xs text-stone-500">
-              {formatUnites(stockRestant.unitesEnregistrees)} unité{stockRestant.unitesEnregistrees !== 1 ? "s" : ""} enregistrée{stockRestant.unitesEnregistrees !== 1 ? "s" : ""}
+              {formatTonnes(stockRestant.tonnesEnregistrees)} t enregistrées
               {" − "}
-              {formatUnites(stockRestant.unitesDistribuees)} distribuée{stockRestant.unitesDistribuees !== 1 ? "s" : ""}
+              {formatTonnes(stockRestant.tonnesDistribueesEstimees)} t distribuées estimées
+            </p>
+            <p className="mt-1 text-xs text-stone-500">
+              {formatUnites(stockRestant.unitesRestantes)} unité{stockRestant.unitesRestantes !== 1 ? "s" : ""} restante{stockRestant.unitesRestantes !== 1 ? "s" : ""} · botte {formatKg(stockRestant.poidsBotteMoyenKg)} kg{stockRestant.poidsBotteDeRepli ? " par défaut" : ""} · balle {formatKg(stockRestant.poidsBalleMoyenKg)} kg{stockRestant.poidsBalleDeRepli ? " par défaut" : ""}
             </p>
 
-            {stockRestant.unitesSansStock > 0 && (
+            {stockRestant.tonnesSansStockEstimees > 0 && (
               <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] font-medium text-amber-800" role="status">
-                {formatUnites(stockRestant.unitesSansStock)} unité{stockRestant.unitesSansStock !== 1 ? "s" : ""} distribuée{stockRestant.unitesSansStock !== 1 ? "s" : ""} sans stock enregistré.
+                {formatTonnes(stockRestant.tonnesSansStockEstimees)} t distribuées au-delà du stock enregistré.
               </p>
             )}
           </div>
