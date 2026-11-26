@@ -41,32 +41,22 @@ const formatDistribution = (distribution: DistributionFourrage) => {
 };
 
 function ChoiceGroup<T extends string>({
-  step,
   legend,
-  hint,
   value,
   options,
   onChange,
   disabled,
 }: {
-  step: number;
   legend: string;
-  hint: string;
   value: T;
   options: Array<{ value: T; label: string }>;
   onChange: (value: T) => void;
   disabled: boolean;
 }) {
   return (
-    <fieldset className="min-w-0 px-4 py-4 sm:px-5">
-      <legend className="flex items-center gap-2 text-base font-semibold text-stone-900">
-        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-brand-300 bg-brand-50 text-sm font-bold text-brand-800" aria-hidden="true">
-          {step}
-        </span>
-        {legend}
-      </legend>
-      <p className="mt-1 text-sm text-stone-600">{hint}</p>
-      <div className={`mt-3 grid gap-2 ${options.length === 3 ? "grid-cols-3" : "grid-cols-2"}`} role="group">
+    <fieldset className="min-w-0">
+      <legend className="mb-2 text-sm font-semibold text-stone-800">{legend}</legend>
+      <div className={`grid gap-2 ${options.length === 3 ? "grid-cols-3" : "grid-cols-2"}`} role="group">
         {options.map((option) => (
           <button
             key={option.value}
@@ -170,29 +160,19 @@ export default function QuickDistributionCard({
 
   return (
     <section className="rounded-xl border border-stone-200 bg-white p-4 sm:p-5" aria-labelledby="distribution-rapide-title">
-      <div className="mb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Wheat className="h-5 w-5 text-brand-700" aria-hidden="true" />
-            <h2 id="distribution-rapide-title" className="text-lg font-semibold text-stone-900">Distribution rapide</h2>
-          </div>
-          <p className="mt-1 text-sm text-stone-600">Chaque enregistrement ajoute une nouvelle ligne à l’historique.</p>
-        </div>
+      <div className="mb-3 flex items-center gap-2">
+        <Wheat className="h-5 w-5 text-brand-700" aria-hidden="true" />
+        <h2 id="distribution-rapide-title" className="text-lg font-semibold text-stone-900">Distribution rapide</h2>
       </div>
 
-      <div className="mb-5 rounded-lg border border-stone-200 bg-stone-50 p-4" aria-label="Stock de foin restant">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <p className="text-sm font-semibold text-stone-700">Stock de foin restant</p>
-            <p className="mt-1 text-2xl font-bold tabular-nums text-stone-950">
-              {formatTonnes(stock.tonnesRestantesEstimees)} t
-            </p>
-            <p className="text-sm text-stone-600">restantes estimées</p>
-          </div>
-          <div className="shrink-0 rounded-lg border border-stone-300 bg-white px-3 py-2 text-right">
-            <p className="text-xl font-bold tabular-nums text-stone-950">{pourcentageStockRestant} %</p>
-            <p className="text-sm text-stone-600">du stock enregistré</p>
-          </div>
+      <div className="mb-4 rounded-lg border border-stone-200 bg-stone-50 p-3" aria-label="Stock de foin restant">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <p className="text-sm font-semibold text-stone-700">Stock de foin restant</p>
+          <p className="font-bold tabular-nums text-stone-950">
+            <span className="text-xl">{formatTonnes(stock.tonnesRestantesEstimees)} t</span>
+            <span className="mx-2 text-stone-600" aria-hidden="true">·</span>
+            <span className="text-lg">{pourcentageStockRestant} %</span>
+          </p>
         </div>
         <div
           className="mt-3 h-2 overflow-hidden rounded-full bg-stone-200"
@@ -207,16 +187,14 @@ export default function QuickDistributionCard({
             style={{ width: `${pourcentageStockRestant}%` }}
           />
         </div>
-        <p className="mt-2 text-sm text-stone-600">
+        <p className="mt-2 text-xs text-stone-600">
           {formatTonnes(stock.tonnesEnregistrees)} t enregistrées − {formatTonnes(stock.tonnesDistribueesEstimees)} t distribuées estimées
         </p>
       </div>
 
-      <div className="divide-y divide-stone-200 overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-4 lg:grid-cols-4 lg:gap-x-4">
         <ChoiceGroup
-          step={1}
           legend="Quantité"
-          hint="Nombre de bottes ou de balles"
           value={String(quantite) as "1" | "2" | "3"}
           options={[
             { value: "1", label: "1" },
@@ -227,9 +205,7 @@ export default function QuickDistributionCard({
           disabled={saving}
         />
         <ChoiceGroup
-          step={2}
           legend="Fourrage"
-          hint="Ce qui a été distribué"
           value={typeFourrage}
           options={[
             { value: "foin", label: "Foin" },
@@ -239,9 +215,7 @@ export default function QuickDistributionCard({
           disabled={saving}
         />
         <ChoiceGroup
-          step={3}
           legend="Format"
-          hint="Unité utilisée"
           value={unite}
           options={[
             { value: "botte", label: "Botte" },
@@ -251,9 +225,7 @@ export default function QuickDistributionCard({
           disabled={saving}
         />
         <ChoiceGroup
-          step={4}
           legend="Animaux"
-          hint="Troupeau concerné"
           value={cheptel}
           options={[
             { value: "ovin", label: "Ovins" },
@@ -269,7 +241,7 @@ export default function QuickDistributionCard({
         onClick={handleSave}
         disabled={saving}
         aria-busy={saving}
-        className="mt-4 min-h-12 w-full rounded-lg bg-brand-600 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
+        className="mt-4 min-h-11 w-full rounded-lg bg-brand-600 px-4 py-2 text-base font-semibold text-white transition-colors hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60"
       >
         {saving ? "Enregistrement…" : "Enregistrer la distribution"}
       </button>
