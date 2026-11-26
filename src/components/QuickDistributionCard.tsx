@@ -41,22 +41,32 @@ const formatDistribution = (distribution: DistributionFourrage) => {
 };
 
 function ChoiceGroup<T extends string>({
+  step,
   legend,
+  hint,
   value,
   options,
   onChange,
   disabled,
 }: {
+  step: number;
   legend: string;
+  hint: string;
   value: T;
   options: Array<{ value: T; label: string }>;
   onChange: (value: T) => void;
   disabled: boolean;
 }) {
   return (
-    <fieldset className="min-w-0">
-      <legend className="mb-1.5 text-sm font-semibold text-stone-700">{legend}</legend>
-      <div className="grid auto-cols-fr grid-flow-col gap-2" role="group">
+    <fieldset className="min-w-0 px-4 py-4 sm:px-5">
+      <legend className="flex items-center gap-2 text-base font-semibold text-stone-900">
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-brand-300 bg-brand-50 text-sm font-bold text-brand-800" aria-hidden="true">
+          {step}
+        </span>
+        {legend}
+      </legend>
+      <p className="mt-1 text-sm text-stone-600">{hint}</p>
+      <div className={`mt-3 grid gap-2 ${options.length === 3 ? "grid-cols-3" : "grid-cols-2"}`} role="group">
         {options.map((option) => (
           <button
             key={option.value}
@@ -99,6 +109,9 @@ export default function QuickDistributionCard({
     () => stockFoinRestant(activitesFourrage, distributionsFourrage),
     [activitesFourrage, distributionsFourrage]
   );
+  const pourcentageStockRestant = stock.tonnesEnregistrees > 0
+    ? Math.min(100, Math.max(0, Math.round((stock.tonnesRestantesEstimees / stock.tonnesEnregistrees) * 100)))
+    : 0;
   const distributionsTriees = useMemo(
     () => [...distributionsFourrage].sort((a, b) => {
       const parDate = b.dateDistribution.localeCompare(a.dateDistribution);
@@ -157,7 +170,7 @@ export default function QuickDistributionCard({
 
   return (
     <section className="rounded-xl border border-stone-200 bg-white p-4 sm:p-5" aria-labelledby="distribution-rapide-title">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-4">
         <div>
           <div className="flex items-center gap-2">
             <Wheat className="h-5 w-5 text-brand-700" aria-hidden="true" />
@@ -165,15 +178,45 @@ export default function QuickDistributionCard({
           </div>
           <p className="mt-1 text-sm text-stone-600">Chaque enregistrement ajoute une nouvelle ligne à l’historique.</p>
         </div>
-        <div className="rounded-lg bg-brand-50 px-3 py-2 sm:text-right" aria-label="Stock de foin restant">
-          <p className="text-sm font-semibold text-brand-900">{formatTonnes(stock.tonnesRestantesEstimees)} t de foin restantes</p>
-          <p className="mt-0.5 text-xs text-stone-600">Estimation après les distributions de foin</p>
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-5 rounded-lg border border-stone-200 bg-stone-50 p-4" aria-label="Stock de foin restant">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-stone-700">Stock de foin restant</p>
+            <p className="mt-1 text-2xl font-bold tabular-nums text-stone-950">
+              {formatTonnes(stock.tonnesRestantesEstimees)} t
+            </p>
+            <p className="text-sm text-stone-600">restantes estimées</p>
+          </div>
+          <div className="shrink-0 rounded-lg border border-stone-300 bg-white px-3 py-2 text-right">
+            <p className="text-xl font-bold tabular-nums text-stone-950">{pourcentageStockRestant} %</p>
+            <p className="text-sm text-stone-600">du stock enregistré</p>
+          </div>
+        </div>
+        <div
+          className="mt-3 h-2 overflow-hidden rounded-full bg-stone-200"
+          role="progressbar"
+          aria-label="Pourcentage du stock de foin restant"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={pourcentageStockRestant}
+        >
+          <div
+            className="h-full rounded-full bg-brand-600 transition-[width]"
+            style={{ width: `${pourcentageStockRestant}%` }}
+          />
+        </div>
+        <p className="mt-2 text-sm text-stone-600">
+          {formatTonnes(stock.tonnesEnregistrees)} t enregistrées − {formatTonnes(stock.tonnesDistribueesEstimees)} t distribuées estimées
+        </p>
+      </div>
+
+      <div className="divide-y divide-stone-200 overflow-hidden rounded-lg border border-stone-200 bg-white">
         <ChoiceGroup
+          step={1}
           legend="Quantité"
+          hint="Nombre de bottes ou de balles"
           value={String(quantite) as "1" | "2" | "3"}
           options={[
             { value: "1", label: "1" },
@@ -184,7 +227,9 @@ export default function QuickDistributionCard({
           disabled={saving}
         />
         <ChoiceGroup
+          step={2}
           legend="Fourrage"
+          hint="Ce qui a été distribué"
           value={typeFourrage}
           options={[
             { value: "foin", label: "Foin" },
@@ -194,7 +239,9 @@ export default function QuickDistributionCard({
           disabled={saving}
         />
         <ChoiceGroup
+          step={3}
           legend="Format"
+          hint="Unité utilisée"
           value={unite}
           options={[
             { value: "botte", label: "Botte" },
@@ -204,7 +251,9 @@ export default function QuickDistributionCard({
           disabled={saving}
         />
         <ChoiceGroup
+          step={4}
           legend="Animaux"
+          hint="Troupeau concerné"
           value={cheptel}
           options={[
             { value: "ovin", label: "Ovins" },
